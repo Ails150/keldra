@@ -16,8 +16,9 @@ const interTight = Inter_Tight({
 });
 
 export const metadata: Metadata = {
-  title: "Keldra",
-  description: "Accountability impossible to lose",
+  title: "Keldra · See. Solve. Scale.",
+  description:
+    "The construction accountability layer. Built on 20 years of finding millions in data that nobody else could see.",
 };
 
 export default function RootLayout({

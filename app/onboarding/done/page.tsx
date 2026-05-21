@@ -22,8 +22,18 @@ export default function OnboardingDone() {
             className="mt-5 font-[family-name:var(--font-fraunces)] font-semibold"
             style={{ fontSize: 52, lineHeight: 1.05 }}
           >
-            Welcome to Keldra
+            You&apos;ve <span style={{ color: "var(--accent-bright)" }}>SEEN</span>{" "}
+            your data
+            <span style={{ color: "var(--accent-bright)" }}>.</span>
           </h1>
+          <p
+            className="mt-3 font-[family-name:var(--font-fraunces)] italic text-paper/85"
+            style={{ fontSize: 20, lineHeight: 1.4 }}
+          >
+            Now Keldra helps you{" "}
+            <span className="not-italic font-semibold text-paper">SOLVE</span>
+            <span style={{ color: "var(--accent-bright)" }}>.</span>
+          </p>
           <p
             className="mx-auto mt-5 max-w-xl text-paper/85"
             style={{ fontSize: 17, lineHeight: 1.55 }}
@@ -60,8 +70,15 @@ export default function OnboardingDone() {
 
           <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
             <div className="rounded-xl border border-paper-line bg-paper-warm/50 p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-accent-deep">
-                Right now
+              <p
+                className="font-mono font-semibold uppercase text-accent-deep"
+                style={{
+                  fontFamily: "var(--font-geist-mono, ui-monospace, monospace)",
+                  fontSize: 10,
+                  letterSpacing: "0.16em",
+                }}
+              >
+                See
               </p>
               <p className="mt-3 text-sm font-medium text-ink">
                 12 invites sent
@@ -73,8 +90,15 @@ export default function OnboardingDone() {
             </div>
 
             <div className="rounded-xl border border-paper-line bg-paper-warm/50 p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-accent-deep">
-                In 6 hours
+              <p
+                className="font-mono font-semibold uppercase text-accent-deep"
+                style={{
+                  fontFamily: "var(--font-geist-mono, ui-monospace, monospace)",
+                  fontSize: 10,
+                  letterSpacing: "0.16em",
+                }}
+              >
+                Solve
               </p>
               <p className="mt-3 text-sm font-medium text-ink">
                 Baseline programme analysed
@@ -86,8 +110,15 @@ export default function OnboardingDone() {
             </div>
 
             <div className="rounded-xl border border-paper-line bg-paper-warm/50 p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-accent-deep">
-                Tomorrow
+              <p
+                className="font-mono font-semibold uppercase text-accent-deep"
+                style={{
+                  fontFamily: "var(--font-geist-mono, ui-monospace, monospace)",
+                  fontSize: 10,
+                  letterSpacing: "0.16em",
+                }}
+              >
+                Scale
               </p>
               <p className="mt-3 text-sm font-medium text-ink">
                 First daily digest

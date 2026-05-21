@@ -130,15 +130,34 @@ export default function OnboardingWizard({ userEmail }: { userEmail: string }) {
   return (
     <div className="flex flex-1 flex-col">
       <header className="sticky top-0 z-10 border-b border-paper-line bg-paper/80 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-8 py-4">
+        <div
+          className="mx-auto flex items-center justify-between px-8 py-4"
+          style={{ maxWidth: 1600 }}
+        >
           <div className="flex items-baseline gap-3">
-            <span
-              className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
-              style={{ fontSize: 22, lineHeight: 1 }}
-            >
-              Keldra
-            </span>
-            <span className="text-sm text-ink-mid">· Set up your project</span>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-baseline gap-2">
+                <span
+                  className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
+                  style={{ fontSize: 22, lineHeight: 1 }}
+                >
+                  Keldra<span style={{ color: "var(--accent)" }}>.</span>
+                </span>
+                <span className="text-sm text-ink-mid">
+                  · Set up your project
+                </span>
+              </div>
+              <span
+                className="font-mono font-semibold uppercase text-accent-deep"
+                style={{
+                  fontFamily: "var(--font-geist-mono, ui-monospace, monospace)",
+                  fontSize: 9,
+                  letterSpacing: "0.14em",
+                }}
+              >
+                See · Solve · Scale
+              </span>
+            </div>
           </div>
           <div
             className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-paper font-semibold text-sm"
@@ -148,7 +167,10 @@ export default function OnboardingWizard({ userEmail }: { userEmail: string }) {
           </div>
         </div>
 
-        <div className="mx-auto max-w-5xl px-8 pb-5">
+        <div
+          className="mx-auto px-8 pb-5"
+          style={{ maxWidth: 1600 }}
+        >
           <div className="flex items-center justify-between gap-3">
             {Array.from({ length: totalSteps }, (_, i) => i + 1).map((n) => {
               const isActive = n === currentStep;
@@ -207,7 +229,10 @@ export default function OnboardingWizard({ userEmail }: { userEmail: string }) {
       </main>
 
       <footer className="sticky bottom-0 border-t border-paper-line bg-paper-card">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-8 py-4">
+        <div
+          className="mx-auto flex items-center justify-between gap-3 px-8 py-4"
+          style={{ maxWidth: 1600 }}
+        >
           <button
             type="button"
             onClick={prev}

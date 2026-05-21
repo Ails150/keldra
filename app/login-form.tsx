@@ -34,22 +34,16 @@ export default function LoginForm() {
 
   if (sent) {
     return (
-      <div className="w-full max-w-md text-center">
-        <h1
+      <div className="w-full max-w-md">
+        <h2
           className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
-          style={{ fontSize: 64, lineHeight: 1 }}
-        >
-          Keldra
-        </h1>
-        <p
-          className="mt-12 font-[family-name:var(--font-fraunces)] italic text-ink"
-          style={{ fontSize: 22, lineHeight: 1.4 }}
+          style={{ fontSize: 22, lineHeight: 1.2 }}
         >
           Check your email
-        </p>
+        </h2>
         <p
-          className="mt-3 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
-          style={{ fontSize: 18, lineHeight: 1.5 }}
+          className="mt-2 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
+          style={{ fontSize: 15, lineHeight: 1.5 }}
         >
           We sent a magic link to {email}
         </p>
@@ -59,22 +53,20 @@ export default function LoginForm() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="text-center">
-        <h1
-          className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
-          style={{ fontSize: 64, lineHeight: 1 }}
-        >
-          Keldra
-        </h1>
-        <p
-          className="mt-3 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
-          style={{ fontSize: 18, lineHeight: 1.5 }}
-        >
-          Accountability impossible to lose
-        </p>
-      </div>
+      <h2
+        className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
+        style={{ fontSize: 22, lineHeight: 1.2 }}
+      >
+        Sign in
+      </h2>
+      <p
+        className="mt-1.5 text-sm text-ink-mid"
+        style={{ lineHeight: 1.5 }}
+      >
+        We&apos;ll email you a magic link. No password.
+      </p>
 
-      <form onSubmit={handleSubmit} className="mt-12 flex flex-col gap-3">
+      <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-3">
         <input
           type="email"
           required
@@ -84,18 +76,18 @@ export default function LoginForm() {
           placeholder="you@company.com"
           disabled={loading}
           className="w-full rounded-[12px] border border-[#dbcce8] bg-white px-4 text-ink placeholder:text-ink-mid/60 outline-none focus:border-accent transition-colors"
-          style={{ height: 56, fontSize: 16 }}
+          style={{ height: 52, fontSize: 15 }}
         />
         <button
           type="submit"
           disabled={loading || !email}
           className="w-full rounded-[12px] bg-ink text-paper font-medium transition-colors hover:bg-accent disabled:opacity-60 disabled:cursor-not-allowed"
-          style={{ height: 56, fontSize: 16 }}
+          style={{ height: 52, fontSize: 15 }}
         >
           {loading ? "Sending…" : "Send magic link"}
         </button>
         {error && (
-          <p className="text-center text-sm text-red-600 mt-1">{error}</p>
+          <p className="text-sm text-red-600 mt-1">{error}</p>
         )}
       </form>
     </div>

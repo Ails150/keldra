@@ -224,14 +224,30 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
   return (
     <div className="flex flex-1 flex-col">
       <header className="sticky top-0 z-20 border-b border-paper-line bg-paper/85 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-8 py-4">
+        <div
+          className="mx-auto flex items-center justify-between gap-4 px-8 py-4"
+          style={{ maxWidth: 1600 }}
+        >
           <div className="flex items-center gap-4 min-w-0">
-            <span
-              className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
-              style={{ fontSize: 22, lineHeight: 1 }}
-            >
-              Keldra
-            </span>
+            <div className="flex flex-col gap-1">
+              <span
+                className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
+                style={{ fontSize: 22, lineHeight: 1 }}
+              >
+                Keldra<span style={{ color: "var(--accent)" }}>.</span>
+              </span>
+              <span
+                className="font-mono font-semibold uppercase text-accent-deep"
+                style={{
+                  fontFamily: "var(--font-geist-mono, ui-monospace, monospace)",
+                  fontSize: 9,
+                  letterSpacing: "0.14em",
+                  lineHeight: 1,
+                }}
+              >
+                See · Solve · Scale
+              </span>
+            </div>
             <span className="hidden sm:inline text-ink-mid/60">·</span>
             <span className="hidden sm:inline text-sm font-medium text-ink truncate">
               {project.project.name || "Untitled project"}
@@ -257,7 +273,10 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
           </div>
         </div>
 
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-8 pb-3">
+        <div
+          className="mx-auto flex items-center justify-between gap-4 px-8 pb-3"
+          style={{ maxWidth: 1600 }}
+        >
           <div className="relative">
             <button
               type="button"
