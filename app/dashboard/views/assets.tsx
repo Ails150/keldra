@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
+import type { BlockerMap } from "../lib/blocker-state";
 import { filterAssetsByRole, isBlankOwner, roleLabel } from "../utils";
+import AssetDetailPanel from "./asset-detail-panel";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -47,12 +50,17 @@ export default function AssetsView({
   viewingAs,
   highlightIds,
   onClearHighlight,
+  blockerMap,
+  onOpenBlocker,
 }: {
   project: WizardData;
   viewingAs: ViewingAs;
   highlightIds?: string[] | null;
   onClearHighlight?: () => void;
+  blockerMap: BlockerMap | null;
+  onOpenBlocker: (id: string) => void;
 }) {
+  const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
   const role = viewingAs.role;
   const assets = filterAssetsByRole(
     project.uploads.assets,
@@ -130,33 +138,36 @@ export default function AssetsView({
                       ? "ring-2 ring-yellow-400"
                       : "";
                   return (
-                    <li
-                      key={a.asset_id ?? `${col}-${i}`}
-                      className={`rounded-xl border p-3 ${stageCardClasses(stage)} ${highlight}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-mono text-[11px] opacity-80">{a.asset_id ?? "—"}</p>
-                        {role === "client" && col === "Yellow" && (
-                          <span className="rounded-full bg-yellow-200 px-2 py-0.5 text-[10px] font-semibold text-yellow-900">
-                            Awaiting witness
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1 text-xs font-medium leading-tight">
-                        {a.asset_type ?? "—"}
-                      </p>
-                      <p className="text-[11px] opacity-70 leading-tight">
-                        {a.location ?? a.building ?? "—"}
-                      </p>
-                      <div className="mt-2 text-[11px]">
-                        {ownerBlank ? (
-                          <span className="rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-700">
-                            Owner unclear
-                          </span>
-                        ) : (
-                          <span className="opacity-70">Owner: {a.owner_name}</span>
-                        )}
-                      </div>
+                    <li key={a.asset_id ?? `${col}-${i}`}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAsset(a)}
+                        className={`block w-full cursor-pointer rounded-xl border p-3 text-left transition-shadow hover:shadow-sm ${stageCardClasses(stage)} ${highlight}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-mono text-[11px] opacity-80">{a.asset_id ?? "—"}</p>
+                          {role === "client" && col === "Yellow" && (
+                            <span className="rounded-full bg-yellow-200 px-2 py-0.5 text-[10px] font-semibold text-yellow-900">
+                              Awaiting witness
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs font-medium leading-tight">
+                          {a.asset_type ?? "—"}
+                        </p>
+                        <p className="text-[11px] opacity-70 leading-tight">
+                          {a.location ?? a.building ?? "—"}
+                        </p>
+                        <div className="mt-2 text-[11px]">
+                          {ownerBlank ? (
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-700">
+                              Owner unclear
+                            </span>
+                          ) : (
+                            <span className="opacity-70">Owner: {a.owner_name}</span>
+                          )}
+                        </div>
+                      </button>
                     </li>
                   );
                 })}
@@ -170,6 +181,16 @@ export default function AssetsView({
           );
         })}
       </div>
+
+      <AssetDetailPanel
+        asset={selectedAsset}
+        blockerMap={blockerMap}
+        onClose={() => setSelectedAsset(null)}
+        onOpenBlocker={(id) => {
+          setSelectedAsset(null);
+          onOpenBlocker(id);
+        }}
+      />
     </section>
   );
 }

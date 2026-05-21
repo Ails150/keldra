@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
+import type { BlockerMap } from "../lib/blocker-state";
 import {
   deriveKeptRate,
   deriveOrgColour,
@@ -9,20 +11,38 @@ import {
   rollupByOrg,
   roleLabel,
 } from "../utils";
+import PersonDetailPanel from "./person-detail-panel";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export default function PeopleView({
   project,
   viewingAs,
+  blockerMap,
+  onOpenBlocker,
 }: {
   project: WizardData;
   viewingAs: ViewingAs;
+  blockerMap: BlockerMap | null;
+  onOpenBlocker: (id: string) => void;
 }) {
   const role = viewingAs.role;
+  const [selectedPerson, setSelectedPerson] = useState<any | null>(null);
 
   if (role === "client") {
-    return <ClientRollups project={project} />;
+    return (
+      <>
+        <ClientRollups project={project} />
+        <PersonDetailPanel
+          person={selectedPerson}
+          project={project}
+          blockerMap={blockerMap}
+          viewingAs={viewingAs}
+          onClose={() => setSelectedPerson(null)}
+          onOpenBlocker={onOpenBlocker}
+        />
+      </>
+    );
   }
 
   const filtered = filterPeopleByRole(
@@ -45,11 +65,20 @@ export default function PeopleView({
         </p>
       </header>
 
-      <PeopleTable rows={filtered} />
+      <PeopleTable rows={filtered} onSelect={setSelectedPerson} />
 
       {role === "subcontractor" && (
         <ContactInterfaces project={project} viewingAs={viewingAs} />
       )}
+
+      <PersonDetailPanel
+        person={selectedPerson}
+        project={project}
+        blockerMap={blockerMap}
+        viewingAs={viewingAs}
+        onClose={() => setSelectedPerson(null)}
+        onOpenBlocker={onOpenBlocker}
+      />
     </section>
   );
 }
@@ -65,7 +94,13 @@ function peopleCaption(role: ViewingAs["role"], n: number) {
   }
 }
 
-function PeopleTable({ rows }: { rows: any[] }) {
+function PeopleTable({
+  rows,
+  onSelect,
+}: {
+  rows: any[];
+  onSelect: (person: any) => void;
+}) {
   if (!rows || rows.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-paper-line bg-paper-card p-8 text-center text-sm text-ink-mid">
@@ -93,7 +128,11 @@ function PeopleTable({ rows }: { rows: any[] }) {
             const colour = deriveOrgColour(org);
             const kept = deriveKeptRate(name);
             return (
-              <tr key={`${name}-${i}`}>
+              <tr
+                key={`${name}-${i}`}
+                onClick={() => onSelect(p)}
+                className="cursor-pointer transition-colors hover:bg-paper-warm"
+              >
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <span

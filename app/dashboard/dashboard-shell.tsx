@@ -365,13 +365,22 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
             onOpenBlocker={openBlocker}
           />
         )}
-        {tab === "people" && <PeopleView project={project} viewingAs={active} />}
+        {tab === "people" && (
+          <PeopleView
+            project={project}
+            viewingAs={active}
+            blockerMap={blockerMap}
+            onOpenBlocker={openBlocker}
+          />
+        )}
         {tab === "assets" && (
           <AssetsView
             project={project}
             viewingAs={active}
             highlightIds={assetFilter}
             onClearHighlight={() => setAssetFilter(null)}
+            blockerMap={blockerMap}
+            onOpenBlocker={openBlocker}
           />
         )}
         {tab === "constraints" && (
