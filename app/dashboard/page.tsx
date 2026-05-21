@@ -1,16 +1,6 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+// TEMP: auth guard removed for demo. Re-add before going live.
 import DashboardShell from "./dashboard-shell";
 
-export default async function Dashboard() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/");
-  }
-
-  return <DashboardShell userEmail={user.email ?? ""} />;
+export default function Dashboard() {
+  return <DashboardShell userEmail="demo@keldra.io" />;
 }
