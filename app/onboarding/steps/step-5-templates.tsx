@@ -1,6 +1,10 @@
 "use client";
 
+import Papa from "papaparse";
+import type { ChangeEvent } from "react";
 import type { StepProps } from "../types";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 const TEMPLATES = [
   {
@@ -33,36 +37,101 @@ const TEMPLATES = [
   },
 ];
 
-const UPLOAD_CARDS = [
+type UploadKey = "team" | "assets" | "constraints";
+
+type UploadCardDef = {
+  key: UploadKey;
+  title: string;
+  subtitle: string;
+  countFn: (rows: any[]) => string;
+};
+
+const UPLOAD_CARDS: UploadCardDef[] = [
   {
-    id: "team",
+    key: "team",
     title: "Team roster",
-    desc: "People, roles, org assignments",
-    count: "12 people imported",
+    subtitle: "People, roles, org assignments",
+    countFn: (rows) => `${rows.length} people imported`,
   },
   {
-    id: "assets",
+    key: "assets",
     title: "Asset register",
-    desc: "Equipment list with tags + locations",
-    count: "247 assets imported",
+    subtitle: "Equipment list with tags + locations",
+    countFn: (rows) => `${rows.length} assets imported`,
   },
   {
-    id: "constraints",
+    key: "constraints",
     title: "Constraint log",
-    desc: "Open items, blockers, dependencies",
-    count: "9 constraints imported",
+    subtitle: "Open items, blockers, dependencies",
+    countFn: (rows) => {
+      const unclear = rows.filter(isBlankOwner).length;
+      return `${rows.length} constraints · ${unclear} unclear owner`;
+    },
   },
 ];
 
-const CONSTRAINT_ROWS = [
-  { id: "C-001", title: "AHU-04 flashing detail awaiting client signoff", owner: "Owner unclear", date: "12 Nov" },
-  { id: "C-002", title: "Cable tray route conflicts with structural beam in B-block", owner: "Lawrence Burke", date: "14 Nov" },
-  { id: "C-003", title: "Switchgear delivery delayed — vendor confirmation pending", owner: "Owner unclear", date: "18 Nov" },
-  { id: "C-004", title: "Roof-deck penetration sealing detail TBD", owner: "Conor Murphy", date: "21 Nov" },
-  { id: "C-005", title: "Fire damper actuator spec mismatch with mech schedule", owner: "Owner unclear", date: "22 Nov" },
-];
+function isBlankOwner(row: any): boolean {
+  const v = (row?.owner_name ?? "").toString().trim();
+  return v === "";
+}
+
+function stageBadgeClasses(stage: string): string {
+  const s = (stage || "").toLowerCase().trim();
+  if (!s) return "bg-paper-warm text-ink-mid";
+  if (s.includes("owner unclear")) return "bg-red-100 text-red-700";
+  if (s.includes("green") || s.includes("handed over") || s.includes("handover"))
+    return "bg-green-100 text-green-800";
+  if (s.includes("yellow")) return "bg-yellow-100 text-yellow-800";
+  if (s.includes("red")) return "bg-red-100 text-red-700";
+  if (s.includes("delivered") && s.includes("not installed"))
+    return "bg-zinc-200 text-zinc-700";
+  return "bg-paper-warm text-ink-mid";
+}
+
+function UploadIcon() {
+  return (
+    <svg
+      className="h-5 w-5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  );
+}
 
 export default function Step5Templates({ formData, setFormData }: StepProps) {
+  function handleFile(key: UploadKey, e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (result) => {
+        setFormData((prev) => ({
+          ...prev,
+          uploads: { ...prev.uploads, [key]: result.data as any[] },
+        }));
+      },
+    });
+    // reset so same file can be re-picked
+    e.target.value = "";
+  }
+
+  const constraintRows = formData.uploads.constraints;
+  const assetRows = formData.uploads.assets;
+
+  const unclearCount = constraintRows
+    ? constraintRows.filter(isBlankOwner).length
+    : 0;
+
   return (
     <section className="mx-auto max-w-5xl px-8">
       <header className="mb-8">
@@ -76,7 +145,7 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
           className="mt-2 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
           style={{ fontSize: 17 }}
         >
-          We'll wire the stages, then import your roster, assets and open constraints.
+          We&apos;ll wire the stages, then import your roster, assets and open constraints.
         </p>
       </header>
 
@@ -144,76 +213,171 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
           Bring in your data
         </h2>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {UPLOAD_CARDS.map((u) => (
-            <div
-              key={u.id}
-              className="rounded-2xl border border-green-200 bg-green-50/60 p-4"
-            >
-              <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-600 text-white text-xs font-bold">
-                  ✓
+          {UPLOAD_CARDS.map((c) => {
+            const rows = formData.uploads[c.key];
+            const empty = rows === null;
+            return (
+              <label
+                key={c.key}
+                className={`relative block cursor-pointer rounded-2xl p-4 transition-all ${
+                  empty
+                    ? "border-2 border-dashed border-paper-line bg-paper-card hover:border-accent hover:bg-paper-warm/40"
+                    : "border border-green-300 bg-green-50/60"
+                }`}
+              >
+                <input
+                  type="file"
+                  accept=".csv,.xlsx"
+                  className="sr-only"
+                  onChange={(e) => handleFile(c.key, e)}
+                />
+                {empty ? (
+                  <>
+                    <div className="flex items-center gap-2 text-ink-mid">
+                      <UploadIcon />
+                      <p className="font-medium text-ink text-sm">{c.title}</p>
+                    </div>
+                    <p className="mt-2 text-xs text-ink-mid">
+                      Drop CSV or click to upload
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-600 text-white text-xs font-bold">
+                        ✓
+                      </span>
+                      <p className="font-medium text-ink text-sm">{c.title}</p>
+                    </div>
+                    <p className="mt-1 text-xs text-ink-mid">{c.subtitle}</p>
+                    <p className="mt-3 text-xs font-medium text-green-700">
+                      {c.countFn(rows!)}
+                    </p>
+                  </>
+                )}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      {assetRows && assetRows.length > 0 && (
+        <div className="mb-10">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-3">
+            Preview · asset register
+          </h2>
+          <div className="rounded-2xl border border-paper-line bg-paper-card overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-paper-warm text-xs font-medium uppercase tracking-wide text-ink-mid">
+                <tr>
+                  <th className="px-4 py-3 text-left">Asset ID</th>
+                  <th className="px-4 py-3 text-left">Type</th>
+                  <th className="px-4 py-3 text-left">Stage</th>
+                  <th className="px-4 py-3 text-left">Owner</th>
+                  <th className="px-4 py-3 text-left">Last updated</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-paper-line">
+                {assetRows.slice(0, 6).map((r: any, i: number) => {
+                  const ownerBlank = isBlankOwner(r);
+                  return (
+                    <tr key={r.asset_id ?? i}>
+                      <td className="px-4 py-3 font-mono text-xs text-ink-mid">
+                        {r.asset_id ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-ink">{r.asset_type ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${stageBadgeClasses(r.current_stage ?? "")}`}
+                        >
+                          {r.current_stage ?? "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {ownerBlank ? (
+                          <span className="rounded-full bg-red-100 px-2.5 py-1 font-mono text-xs font-semibold text-red-700">
+                            Owner unclear
+                          </span>
+                        ) : (
+                          <span className="text-ink-mid">{r.owner_name}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-ink-mid">
+                        {r.last_updated ?? "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {constraintRows && constraintRows.length > 0 && (
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-3">
+            Preview · constraint log
+          </h2>
+          <div className="rounded-2xl border border-paper-line bg-paper-card overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-paper-warm text-xs font-medium uppercase tracking-wide text-ink-mid">
+                <tr>
+                  <th className="px-4 py-3 text-left">ID</th>
+                  <th className="px-4 py-3 text-left">Description</th>
+                  <th className="px-4 py-3 text-left">Linked assets</th>
+                  <th className="px-4 py-3 text-left">Owner</th>
+                  <th className="px-4 py-3 text-left">Deadline</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-paper-line">
+                {constraintRows.slice(0, 6).map((r: any, i: number) => {
+                  const ownerBlank = isBlankOwner(r);
+                  return (
+                    <tr key={r.id ?? i}>
+                      <td className="px-4 py-3 font-mono text-xs text-ink-mid">
+                        {r.id ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-ink">
+                        {r.description ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-ink-mid">
+                        {r.linked_assets ?? "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        {ownerBlank ? (
+                          <span className="rounded-full bg-red-100 px-2.5 py-1 font-mono text-xs font-semibold text-red-700">
+                            Owner unclear
+                          </span>
+                        ) : (
+                          <span className="text-ink-mid">{r.owner_name}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-ink-mid">
+                        {r.deadline ?? "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {unclearCount > 0 && (
+            <div className="mt-3 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm">
+              <span className="text-lg">⚠️</span>
+              <p className="text-red-800">
+                <span className="font-semibold">
+                  {unclearCount} {unclearCount === 1 ? "constraint has" : "constraints have"} no owner
                 </span>
-                <p className="font-medium text-ink text-sm">{u.title}</p>
-              </div>
-              <p className="mt-1 text-xs text-ink-mid">{u.desc}</p>
-              <p className="mt-3 text-xs font-medium text-green-700">
-                {u.count}
+                <span className="text-red-700"> — Keldra has tagged {unclearCount === 1 ? "it" : "them"} </span>
+                <span className="font-semibold">Owner unclear</span>
+                <span className="text-red-700">. Assign {unclearCount === 1 ? "it" : "them"} after onboarding.</span>
               </p>
             </div>
-          ))}
+          )}
         </div>
-      </div>
-
-      <div>
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-3">
-          Preview · constraint log
-        </h2>
-        <div className="rounded-2xl border border-paper-line bg-paper-card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-paper-warm text-xs font-medium uppercase tracking-wide text-ink-mid">
-              <tr>
-                <th className="px-4 py-3 text-left">ID</th>
-                <th className="px-4 py-3 text-left">Constraint</th>
-                <th className="px-4 py-3 text-left">Owner</th>
-                <th className="px-4 py-3 text-left">Opened</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-paper-line">
-              {CONSTRAINT_ROWS.map((r) => {
-                const ownerless = r.owner === "Owner unclear";
-                return (
-                  <tr key={r.id}>
-                    <td className="px-4 py-3 font-mono text-xs text-ink-mid">
-                      {r.id}
-                    </td>
-                    <td className="px-4 py-3 text-ink">{r.title}</td>
-                    <td className="px-4 py-3">
-                      {ownerless ? (
-                        <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
-                          {r.owner}
-                        </span>
-                      ) : (
-                        <span className="text-ink-mid">{r.owner}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-ink-mid">{r.date}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mt-3 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm">
-          <span className="text-lg">⚠️</span>
-          <p className="text-red-800">
-            <span className="font-semibold">3 constraints have no owner</span>
-            <span className="text-red-700"> — Keldra has tagged them </span>
-            <span className="font-semibold">Owner unclear</span>
-            <span className="text-red-700">. Assign them after onboarding.</span>
-          </p>
-        </div>
-      </div>
+      )}
     </section>
   );
 }

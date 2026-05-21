@@ -36,9 +36,12 @@ export type WizardData = {
   otherOrgs: OrgEntry[];
   template: string | null;
   uploads: {
-    team: boolean;
-    assets: boolean;
-    constraints: boolean;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    team: any[] | null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    assets: any[] | null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    constraints: any[] | null;
   };
   invites: InviteEntry[];
 };
