@@ -8,9 +8,11 @@ import { roleLabel } from "../utils";
 export default function AuditView({
   project,
   viewingAs,
+  onResetBlockers,
 }: {
   project: WizardData;
   viewingAs: ViewingAs;
+  onResetBlockers?: () => void | Promise<void>;
 }) {
   const events =
     (project.uploads.constraints?.length ?? 0) * 3 +
@@ -62,6 +64,22 @@ export default function AuditView({
       </div>
 
       <RecentChainSample project={project} />
+
+      {onResetBlockers && (
+        <div className="flex items-center justify-end border-t border-paper-line pt-4">
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm("Reset all blockers to their initial state from the uploaded CSV?")) {
+                void onResetBlockers();
+              }
+            }}
+            className="rounded-lg border border-paper-line bg-paper-card px-3 py-1.5 text-[11px] font-medium text-ink-mid transition-colors hover:border-red-300 hover:text-red-700"
+          >
+            Reset blockers to initial state
+          </button>
+        </div>
+      )}
     </section>
   );
 }

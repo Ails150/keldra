@@ -1,6 +1,7 @@
 "use client";
 
 import type { WizardData, ViewingAs } from "../../onboarding/types";
+import type { BlockerMap } from "../lib/blocker-state";
 import {
   filterAssetsByRole,
   filterConstraintsByRole,
@@ -8,15 +9,20 @@ import {
   isBlankOwner,
   roleLabel,
 } from "../utils";
+import TodayRitual from "./today-ritual";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export default function TodayView({
   project,
   viewingAs,
+  blockerMap,
+  onOpenBlocker,
 }: {
   project: WizardData;
   viewingAs: ViewingAs;
+  blockerMap: BlockerMap | null;
+  onOpenBlocker: (id: string) => void;
 }) {
   const team = filterPeopleByRole(
     project.uploads.team,
@@ -84,6 +90,10 @@ export default function TodayView({
         </p>
       </header>
 
+      {blockerMap && (
+        <TodayRitual map={blockerMap} onOpen={onOpenBlocker} />
+      )}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {tiles.map((t) => (
           <div
@@ -111,9 +121,11 @@ export default function TodayView({
           </h2>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {unclear.slice(0, 4).map((c: any, i: number) => (
-              <div
+              <button
+                type="button"
                 key={c.id ?? i}
-                className="rounded-2xl border border-red-200 bg-red-50/60 p-4"
+                onClick={() => c.id && onOpenBlocker(c.id)}
+                className="rounded-2xl border border-red-200 bg-red-50/60 p-4 text-left transition-shadow hover:shadow-[0_4px_20px_-8px_rgba(220,38,38,0.4)]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
@@ -124,13 +136,16 @@ export default function TodayView({
                     Owner unclear
                   </span>
                 </div>
-                <div className="mt-3 flex items-center gap-2 text-xs text-ink-mid">
-                  <span>Deadline:</span>
-                  <span className="font-medium text-ink">
-                    {c.deadline ?? "—"}
+                <div className="mt-3 flex items-center justify-between gap-2 text-xs text-ink-mid">
+                  <span>
+                    Deadline:{" "}
+                    <span className="font-medium text-ink">
+                      {c.deadline ?? "—"}
+                    </span>
                   </span>
+                  <span className="text-accent">Open →</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>

@@ -1,10 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { WizardData, ViewingRole, ViewingAs } from "../onboarding/types";
 import SignOutButton from "../sign-out-button";
 import { deriveOrgColour, getInitials, readStoredProject, roleLabel } from "./utils";
+import {
+  type ActionPayload,
+  type BlockerMap,
+  applyAction,
+  hydrateFromProject,
+  readBlockerState,
+  setSitOnToday,
+  writeBlockerState,
+} from "./lib/blocker-state";
 import TodayView from "./views/today";
 import PeopleView from "./views/people";
 import AssetsView from "./views/assets";
@@ -12,6 +21,7 @@ import ConstraintsView from "./views/constraints";
 import PromisesView from "./views/promises";
 import AuditView from "./views/audit";
 import InviteOrgModal from "./views/invite-org-modal";
+import BlockerDetailPanel from "./views/blocker-detail-panel";
 
 type Tab = "today" | "people" | "assets" | "constraints" | "promises" | "audit";
 
@@ -64,12 +74,14 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
   const [viewingAs, setViewingAs] = useState<ViewingAs | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [blockerMap, setBlockerMap] = useState<BlockerMap | null>(null);
+  const [activeBlockerId, setActiveBlockerId] = useState<string | null>(null);
+  const [assetFilter, setAssetFilter] = useState<string[] | null>(null);
 
   useEffect(() => {
     const stored = readStoredProject();
     setProject(stored);
     if (stored) {
-      // Default to whatever the wizard saved; the demo can switch from there.
       setViewingAs(
         stored.viewingAs ?? {
           orgName: "Mercury Engineering",
@@ -78,6 +90,84 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
         },
       );
     }
+  }, []);
+
+  // Hydrate blocker state once the project is known.
+  useEffect(() => {
+    if (!project) return;
+    let cancelled = false;
+    const existing = readBlockerState();
+    if (existing) {
+      setBlockerMap(existing);
+      return;
+    }
+    (async () => {
+      const fresh = await hydrateFromProject(project);
+      if (cancelled) return;
+      writeBlockerState(fresh);
+      setBlockerMap(fresh);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [project]);
+
+  const actorName = useMemo(() => {
+    if (!project) return userEmail || "Demo user";
+    const first = (project.uploads.team ?? []).find(
+      (p) => (p?.email ?? "").toString().trim().toLowerCase() === userEmail.toLowerCase(),
+    );
+    if (first && first.name) return first.name as string;
+    // Fall back to the first person from the org the user is currently viewing as.
+    const own = (project.uploads.team ?? []).find(
+      (p) => (p?.organisation ?? "").toString().toLowerCase().includes((viewingAs?.orgName ?? "").toLowerCase()),
+    );
+    if (own && own.name) return own.name as string;
+    return userEmail || "Demo user";
+  }, [project, userEmail, viewingAs]);
+
+  const openBlocker = useCallback((id: string) => {
+    setActiveBlockerId(id);
+  }, []);
+  const closeBlocker = useCallback(() => setActiveBlockerId(null), []);
+
+  const runBlockerAction = useCallback(
+    async (id: string, actionId: string, payload?: ActionPayload) => {
+      setBlockerMap((current) => {
+        if (!current) return current;
+        // Run async and write afterwards.
+        void (async () => {
+          const next = await applyAction(current, id, actionId, actorName, payload);
+          writeBlockerState(next);
+          setBlockerMap(next);
+        })();
+        return current;
+      });
+    },
+    [actorName],
+  );
+
+  const toggleSit = useCallback((id: string, on: boolean) => {
+    setBlockerMap((current) => {
+      if (!current) return current;
+      const next = setSitOnToday(current, id, on);
+      writeBlockerState(next);
+      return next;
+    });
+  }, []);
+
+  const resetBlockers = useCallback(async () => {
+    if (!project) return;
+    const fresh = await hydrateFromProject(project);
+    writeBlockerState(fresh);
+    setBlockerMap(fresh);
+    setActiveBlockerId(null);
+  }, [project]);
+
+  const jumpToAssets = useCallback((ids: string[]) => {
+    setAssetFilter(ids.length > 0 ? ids : null);
+    setActiveBlockerId(null);
+    setTab("assets");
   }, []);
 
   // Role options for the switcher — always offer the four demo personas, but
@@ -258,20 +348,59 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
       </header>
 
       <main className="flex-1 py-8">
-        {tab === "today" && <TodayView project={project} viewingAs={active} />}
+        {tab === "today" && (
+          <TodayView
+            project={project}
+            viewingAs={active}
+            blockerMap={blockerMap}
+            onOpenBlocker={openBlocker}
+          />
+        )}
         {tab === "people" && <PeopleView project={project} viewingAs={active} />}
-        {tab === "assets" && <AssetsView project={project} viewingAs={active} />}
+        {tab === "assets" && (
+          <AssetsView
+            project={project}
+            viewingAs={active}
+            highlightIds={assetFilter}
+            onClearHighlight={() => setAssetFilter(null)}
+          />
+        )}
         {tab === "constraints" && (
-          <ConstraintsView project={project} viewingAs={active} />
+          <ConstraintsView
+            project={project}
+            viewingAs={active}
+            blockerMap={blockerMap}
+            onOpenBlocker={openBlocker}
+          />
         )}
         {tab === "promises" && <PromisesView project={project} viewingAs={active} />}
-        {tab === "audit" && <AuditView project={project} viewingAs={active} />}
+        {tab === "audit" && (
+          <AuditView
+            project={project}
+            viewingAs={active}
+            onResetBlockers={resetBlockers}
+          />
+        )}
       </main>
 
       {inviteOpen && (
         <InviteOrgModal
           activeRole={active.role}
           onClose={() => setInviteOpen(false)}
+        />
+      )}
+
+      {activeBlockerId && blockerMap && blockerMap[activeBlockerId] && (
+        <BlockerDetailPanel
+          blocker={blockerMap[activeBlockerId]}
+          team={project.uploads.team}
+          viewingAs={active}
+          onClose={closeBlocker}
+          onAction={(actionId, payload) =>
+            runBlockerAction(activeBlockerId, actionId, payload)
+          }
+          onToggleSit={(on) => toggleSit(activeBlockerId, on)}
+          onJumpToAssets={jumpToAssets}
         />
       )}
     </div>

@@ -45,9 +45,13 @@ function stageCardClasses(stage: string): string {
 export default function AssetsView({
   project,
   viewingAs,
+  highlightIds,
+  onClearHighlight,
 }: {
   project: WizardData;
   viewingAs: ViewingAs;
+  highlightIds?: string[] | null;
+  onClearHighlight?: () => void;
 }) {
   const role = viewingAs.role;
   const assets = filterAssetsByRole(
@@ -55,6 +59,10 @@ export default function AssetsView({
     role,
     viewingAs.orgName,
   );
+  const highlightSet =
+    highlightIds && highlightIds.length > 0
+      ? new Set(highlightIds.map((s) => s.trim()))
+      : null;
 
   const buckets = new Map<string, any[]>();
   COLUMN_ORDER.forEach((b) => buckets.set(b, []));
@@ -81,6 +89,24 @@ export default function AssetsView({
     <section className="mx-auto max-w-6xl px-8">
       <Header role={role} count={assets.length} viewingAs={viewingAs} />
 
+      {highlightSet && (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
+          <p className="text-ink">
+            Showing assets linked to a blocker:{" "}
+            <span className="font-medium">
+              {Array.from(highlightSet).join(", ")}
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={onClearHighlight}
+            className="text-xs font-medium text-accent hover:text-accent-deep"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
       <div className="mt-6 grid gap-3" style={{ gridTemplateColumns: `repeat(${visibleCols.length}, minmax(220px, 1fr))` }}>
         {visibleCols.map((col) => {
           const items = buckets.get(col) ?? [];
@@ -97,8 +123,10 @@ export default function AssetsView({
                 {items.slice(0, 8).map((a: any, i: number) => {
                   const ownerBlank = isBlankOwner(a);
                   const stage = a.current_stage ?? col;
-                  const highlight =
-                    role === "client" && col === "Yellow"
+                  const isHighlighted = highlightSet?.has((a.asset_id ?? "").toString().trim());
+                  const highlight = isHighlighted
+                    ? "ring-2 ring-accent"
+                    : role === "client" && col === "Yellow"
                       ? "ring-2 ring-yellow-400"
                       : "";
                   return (

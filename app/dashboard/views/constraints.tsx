@@ -1,10 +1,11 @@
 "use client";
 
 import type { WizardData, ViewingAs } from "../../onboarding/types";
+import type { Blocker, BlockerMap, BlockerStateName } from "../lib/blocker-state";
+import { daysInState } from "../lib/blocker-state";
 import {
   filterConstraintsByRole,
   isBlankOwner,
-  orgKey,
   roleLabel,
 } from "../utils";
 
@@ -13,9 +14,13 @@ import {
 export default function ConstraintsView({
   project,
   viewingAs,
+  blockerMap,
+  onOpenBlocker,
 }: {
   project: WizardData;
   viewingAs: ViewingAs;
+  blockerMap: BlockerMap | null;
+  onOpenBlocker: (id: string) => void;
 }) {
   const role = viewingAs.role;
   const all = filterConstraintsByRole(
@@ -55,8 +60,8 @@ export default function ConstraintsView({
             <ConstraintCard
               key={c.id ?? i}
               row={c}
-              role={role}
-              viewingAs={viewingAs}
+              blocker={c.id ? blockerMap?.[c.id] : undefined}
+              onOpen={() => c.id && onOpenBlocker(c.id)}
             />
           ))}
         </ul>
@@ -78,17 +83,6 @@ function caption(role: ViewingAs["role"], n: number, org: string) {
   }
 }
 
-function escalationTarget(row: any, role: ViewingAs["role"]): string {
-  const owner = orgKey(row.owner_org);
-  if (role === "client") return "Main contractor";
-  if (role === "design") return "Mercury";
-  if (role === "subcontractor") return "Main contractor";
-  if (owner === "ardmac") return "Ardmac PM";
-  if (owner === "central") return "Central Design";
-  if (owner === "client") return "Client";
-  return "Project lead";
-}
-
 function priorityTone(p: string): string {
   const l = (p ?? "").toString().toLowerCase();
   if (l.includes("critical")) return "bg-red-100 text-red-700";
@@ -98,116 +92,91 @@ function priorityTone(p: string): string {
   return "bg-paper-warm text-ink-mid";
 }
 
+const STATE_PILL: Record<BlockerStateName, { label: string; classes: string }> = {
+  unowned: { label: "Unowned", classes: "bg-red-100 text-red-700" },
+  "pending-acceptance": { label: "Pending acceptance", classes: "bg-amber-100 text-amber-800" },
+  accepted: { label: "Accepted", classes: "bg-teal-100 text-teal-800" },
+  working: { label: "Working", classes: "bg-teal-100 text-teal-800" },
+  "awaiting-input": { label: "Awaiting input", classes: "bg-amber-100 text-amber-800" },
+  escalated: { label: "Escalated", classes: "bg-red-100 text-red-700" },
+  "proposed-resolved": { label: "Proposed resolved", classes: "bg-blue-100 text-blue-800" },
+  verified: { label: "Verified", classes: "bg-green-100 text-green-800" },
+  closed: { label: "Closed", classes: "bg-zinc-200 text-zinc-700" },
+  reopened: { label: "Reopened", classes: "bg-orange-100 text-orange-800" },
+};
+
 function ConstraintCard({
   row,
-  role,
-  viewingAs,
+  blocker,
+  onOpen,
 }: {
   row: any;
-  role: ViewingAs["role"];
-  viewingAs: ViewingAs;
+  blocker: Blocker | undefined;
+  onOpen: () => void;
 }) {
   const blank = isBlankOwner(row);
-  const escalate = escalationTarget(row, role);
+  const state = blocker?.state ?? (blank ? "unowned" : "pending-acceptance");
+  const pill = STATE_PILL[state] ?? STATE_PILL.unowned;
+  const dIn = blocker ? daysInState(blocker) : 0;
 
   return (
-    <li
-      className={`rounded-2xl border p-4 ${
-        blank ? "border-red-200 bg-red-50/60" : "border-paper-line bg-paper-card"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="font-mono text-xs text-ink-mid">{row.id ?? "—"}</p>
-            {row.priority && (
-              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${priorityTone(row.priority)}`}>
-                {row.priority}
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`block w-full rounded-2xl border p-4 text-left transition-shadow hover:shadow-[0_8px_28px_-12px_rgba(26,15,43,0.25)] ${
+          blank ? "border-red-200 bg-red-50/60" : "border-paper-line bg-paper-card"
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-mono text-xs text-ink-mid">{row.id ?? "—"}</p>
+              {row.priority && (
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${priorityTone(row.priority)}`}>
+                  {row.priority}
+                </span>
+              )}
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${pill.classes}`}>
+                {pill.label}
               </span>
-            )}
+            </div>
+            <p className="mt-1 text-sm text-ink">{row.description ?? "—"}</p>
           </div>
-          <p className="mt-1 text-sm text-ink">{row.description ?? "—"}</p>
+          {blocker?.sit_on_today && (
+            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent-deep">
+              ★ Today
+            </span>
+          )}
         </div>
-        {blank && (
-          <span className="rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-semibold text-red-700">
-            Owner unclear
-          </span>
-        )}
-      </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-ink-mid">
-        <div>
-          <span className="opacity-70">Owner: </span>
-          <span className="font-medium text-ink">
-            {row.owner_name?.trim() || "—"}
-          </span>
+        <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-ink-mid">
+          <div>
+            <span className="opacity-70">Owner: </span>
+            <span className="font-medium text-ink">
+              {blocker?.current_owner || row.owner_name?.trim() || "—"}
+            </span>
+          </div>
+          <div>
+            <span className="opacity-70">Org: </span>
+            <span className="font-medium text-ink">
+              {blocker?.current_owner_org || row.owner_org || "—"}
+            </span>
+          </div>
+          <div>
+            <span className="opacity-70">Deadline: </span>
+            <span className="font-medium text-ink">{row.deadline ?? "—"}</span>
+          </div>
+          <div>
+            <span className="opacity-70">In state: </span>
+            <span className={`font-medium ${dIn > 3 ? "text-red-700" : "text-ink"}`}>
+              {dIn} {dIn === 1 ? "day" : "days"}
+            </span>
+          </div>
         </div>
-        <div>
-          <span className="opacity-70">Org: </span>
-          <span className="font-medium text-ink">{row.owner_org ?? "—"}</span>
-        </div>
-        <div>
-          <span className="opacity-70">Deadline: </span>
-          <span className="font-medium text-ink">{row.deadline ?? "—"}</span>
-        </div>
-        <div>
-          <span className="opacity-70">Raised by: </span>
-          <span className="font-medium text-ink">{row.raised_by ?? "—"}</span>
-        </div>
-      </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <CardButton
-          tone="primary"
-          onClick={() =>
-            alert(
-              `Would prompt to assign an owner for ${row.id} — defaulting to ${escalate}.`,
-            )
-          }
-        >
-          Resolve owner
-        </CardButton>
-        <CardButton
-          tone="warning"
-          onClick={() =>
-            alert(
-              `Escalating ${row.id} to ${escalate} (viewing as ${roleLabel(role)} · ${viewingAs.orgName}).`,
-            )
-          }
-        >
-          Escalate to {escalate}
-        </CardButton>
-        <CardButton
-          tone="ghost"
-          onClick={() => alert(`Open discussion thread on ${row.id}.`)}
-        >
-          Discuss
-        </CardButton>
-      </div>
+        <p className="mt-3 text-[11px] font-medium text-accent">Open blocker →</p>
+      </button>
     </li>
-  );
-}
-
-function CardButton({
-  tone,
-  onClick,
-  children,
-}: {
-  tone: "primary" | "warning" | "ghost";
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  const base =
-    "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors";
-  const styles: Record<string, string> = {
-    primary: "bg-ink text-paper hover:bg-accent",
-    warning: "bg-orange-100 text-orange-800 hover:bg-orange-200",
-    ghost:
-      "border border-paper-line bg-paper-card text-ink-mid hover:bg-paper-warm hover:text-ink",
-  };
-  return (
-    <button type="button" onClick={onClick} className={`${base} ${styles[tone]}`}>
-      {children}
-    </button>
   );
 }
