@@ -8,7 +8,8 @@
   --ink: #1a0f2b;
   --ink-mid: #5a4a72;
   --accent: #8a3dd6;
-  --accent-deep: #6a2aaf;
+  --accent-deep: #5e25a3;
+  --accent-bright: #bc6aff;
   --border-soft: #dbcce8;
 }
 
@@ -21,6 +22,7 @@
   --color-ink-mid: var(--ink-mid);
   --color-accent: var(--accent);
   --color-accent-deep: var(--accent-deep);
+  --color-accent-bright: var(--accent-bright);
   --color-border-soft: var(--border-soft);
   --font-fraunces: var(--font-fraunces);
   --font-sans: var(--font-inter-tight);
