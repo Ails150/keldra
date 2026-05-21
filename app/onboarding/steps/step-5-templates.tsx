@@ -65,7 +65,7 @@ const UPLOAD_CARDS: UploadCardDef[] = [
     subtitle: "Open items, blockers, dependencies",
     countFn: (rows) => {
       const unclear = rows.filter(isBlankOwner).length;
-      return `${rows.length} constraints · ${unclear} unclear owner`;
+      return `${rows.length} · ${unclear} unclear owner`;
     },
   },
 ];
@@ -78,14 +78,18 @@ function isBlankOwner(row: any): boolean {
 function stageBadgeClasses(stage: string): string {
   const s = (stage || "").toLowerCase().trim();
   if (!s) return "bg-paper-warm text-ink-mid";
-  if (s.includes("owner unclear")) return "bg-red-100 text-red-700";
+  if (s.includes("delivered") && s.includes("not installed"))
+    return "bg-zinc-200 text-zinc-700";
   if (s.includes("green") || s.includes("handed over") || s.includes("handover"))
     return "bg-green-100 text-green-800";
   if (s.includes("yellow")) return "bg-yellow-100 text-yellow-800";
   if (s.includes("red")) return "bg-red-100 text-red-700";
-  if (s.includes("delivered") && s.includes("not installed"))
-    return "bg-zinc-200 text-zinc-700";
   return "bg-paper-warm text-ink-mid";
+}
+
+function truncate(s: string, n: number): string {
+  if (!s) return "";
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
 
 function UploadIcon() {
@@ -274,7 +278,7 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
                   <th className="px-4 py-3 text-left">Type</th>
                   <th className="px-4 py-3 text-left">Stage</th>
                   <th className="px-4 py-3 text-left">Owner</th>
-                  <th className="px-4 py-3 text-left">Last updated</th>
+                  <th className="px-4 py-3 text-left">Notes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-paper-line">
@@ -303,7 +307,7 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
                         )}
                       </td>
                       <td className="px-4 py-3 text-xs text-ink-mid">
-                        {r.last_updated ?? "—"}
+                        {truncate(r.notes ?? "", 60) || "—"}
                       </td>
                     </tr>
                   );

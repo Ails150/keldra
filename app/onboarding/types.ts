@@ -17,6 +17,19 @@ export type InviteEntry = {
   colour: string;
 };
 
+export type ViewingRole =
+  | "originating"
+  | "main-contractor"
+  | "client"
+  | "subcontractor"
+  | "design";
+
+export type ViewingAs = {
+  orgName: string;
+  orgType: string;
+  role: ViewingRole;
+};
+
 export type WizardData = {
   phase: string | null;
   org: {
@@ -44,6 +57,7 @@ export type WizardData = {
     constraints: any[] | null;
   };
   invites: InviteEntry[];
+  viewingAs: ViewingAs;
 };
 
 export type StepProps = {

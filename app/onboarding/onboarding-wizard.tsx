@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { WizardData } from "./types";
+import type { WizardData, ViewingRole } from "./types";
 import Step1Phase from "./steps/step-1-phase";
 import Step2Organisation from "./steps/step-2-organisation";
 import Step3Project from "./steps/step-3-project";
@@ -38,7 +38,29 @@ const INITIAL: WizardData = {
     { id: "4", name: "Conor Murphy", email: "conor@centraldesign.ie", org: "Central", role: "Design lead", initials: "CM", colour: "#16a34a" },
     { id: "5", name: "Sarah Kennedy", email: "sarah.k@hyperscalerx.com", org: "Client", role: "Project sponsor", initials: "SK", colour: "#0891b2" },
   ],
+  viewingAs: {
+    orgName: "Mercury Engineering",
+    orgType: "main-contractor",
+    role: "main-contractor",
+  },
 };
+
+function deriveViewingRole(orgType: string | null): ViewingRole {
+  switch (orgType) {
+    case "main-contractor":
+    case "gc":
+      return "main-contractor";
+    case "subcontractor":
+    case "commissioning":
+      return "subcontractor";
+    case "client":
+      return "client";
+    case "design":
+      return "design";
+    default:
+      return "originating";
+  }
+}
 
 const STEP_LABELS = [
   "Phase",
@@ -56,10 +78,39 @@ export default function OnboardingWizard({ userEmail }: { userEmail: string }) {
 
   const totalSteps = 6;
 
+  // Keep viewingAs in sync with the org the user entered in step 2.
+  useEffect(() => {
+    setFormData((prev) => {
+      const desiredName = prev.org.name.trim() || "Mercury Engineering";
+      const desiredType = prev.org.type ?? "main-contractor";
+      const desiredRole = deriveViewingRole(prev.org.type);
+      if (
+        prev.viewingAs.orgName === desiredName &&
+        prev.viewingAs.orgType === desiredType &&
+        prev.viewingAs.role === desiredRole
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        viewingAs: { orgName: desiredName, orgType: desiredType, role: desiredRole },
+      };
+    });
+  }, [formData.org.name, formData.org.type]);
+
+  function persist(data: WizardData) {
+    try {
+      localStorage.setItem("keldra_demo_project", JSON.stringify(data));
+    } catch {
+      // localStorage may be unavailable (e.g. private mode) — fine for a demo.
+    }
+  }
+
   function next() {
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
     } else {
+      persist(formData);
       router.push("/onboarding/done");
     }
   }
