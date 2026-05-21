@@ -1,26 +1,33 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #faf7fc;
+  --paper-warm: #f5eef9;
+  --paper-line: #e8dcf0;
+  --paper-card: #ffffff;
+  --ink: #1a0f2b;
+  --ink-mid: #5a4a72;
+  --accent: #8a3dd6;
+  --accent-deep: #6a2aaf;
+  --border-soft: #dbcce8;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-paper: var(--paper);
+  --color-paper-warm: var(--paper-warm);
+  --color-paper-line: var(--paper-line);
+  --color-paper-card: var(--paper-card);
+  --color-ink: var(--ink);
+  --color-ink-mid: var(--ink-mid);
+  --color-accent: var(--accent);
+  --color-accent-deep: var(--accent-deep);
+  --color-border-soft: var(--border-soft);
+  --font-fraunces: var(--font-fraunces);
+  --font-sans: var(--font-inter-tight);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-inter-tight), system-ui, -apple-system, sans-serif;
 }
