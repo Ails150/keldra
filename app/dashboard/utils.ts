@@ -1,4 +1,5 @@
 import type { WizardData, ViewingRole } from "../onboarding/types";
+import type { Blocker, BlockerMap } from "./lib/blocker-state";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -217,4 +218,146 @@ export function readStoredProject(): WizardData | null {
   } catch {
     return null;
   }
+}
+
+// ---------- schedule helpers ----------
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+
+export type AssetStatus =
+  | "on-track"
+  | "in-progress"
+  | "at-risk"
+  | "slipping"
+  | "blocked"
+  | "stalled";
+
+// Whole-day delta from `earlier` to `later`. Positive means later is in the future.
+export function daysBetween(later: Date, earlier: Date): number {
+  return Math.round((later.getTime() - earlier.getTime()) / DAY_MS);
+}
+
+function parseDate(value: unknown): Date | null {
+  if (value === undefined || value === null) return null;
+  const s = value.toString().trim();
+  if (!s) return null;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
+function hashStringStable(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+export function getAssetPlannedEnd(
+  asset: any,
+  today: Date = new Date(),
+): Date {
+  const candidates = [
+    parseDate(asset?.green_date),
+    parseDate(asset?.yellow_tag_date),
+    parseDate(asset?.red_tag_date),
+  ].filter((d): d is Date => d !== null);
+  if (candidates.length > 0) {
+    return new Date(Math.max(...candidates.map((d) => d.getTime())));
+  }
+  const hash = hashStringStable((asset?.asset_id ?? "").toString());
+  // 2–8 weeks from today, deterministic per asset_id.
+  const weeks = 2 + (hash % 7);
+  return new Date(today.getTime() + weeks * WEEK_MS);
+}
+
+export function getLinkedBlockers(
+  asset: any,
+  blockerMap: BlockerMap | null,
+): Blocker[] {
+  if (!blockerMap) return [];
+  const id = (asset?.asset_id ?? "").toString().trim();
+  if (!id) return [];
+  return Object.values(blockerMap).filter(
+    (b) =>
+      b.state !== "closed" &&
+      b.linked_assets.some((a) => a.trim() === id),
+  );
+}
+
+export function getAssetActualStatus(
+  asset: any,
+  blockerMap: BlockerMap | null,
+): AssetStatus {
+  const owner = (asset?.owner_name ?? "").toString().trim();
+  if (!owner) return "blocked";
+
+  const stage = (asset?.current_stage ?? "").toString().toLowerCase();
+  if (stage.includes("delivered") && stage.includes("not installed"))
+    return "stalled";
+  if (stage.includes("green") || stage.includes("handover"))
+    return "on-track";
+  if (stage.includes("yellow")) return "at-risk";
+  if (stage.includes("red")) return "slipping";
+  if (
+    stage.includes("designed") ||
+    stage.includes("delivered") ||
+    stage.includes("installed")
+  )
+    return "in-progress";
+
+  // Fall back to checking linked blockers — if any are open, treat as blocked.
+  if (getLinkedBlockers(asset, blockerMap).length > 0) return "blocked";
+  return "in-progress";
+}
+
+const STATUS_RANK: Record<AssetStatus, number> = {
+  blocked: 6,
+  stalled: 5,
+  slipping: 4,
+  "at-risk": 3,
+  "in-progress": 2,
+  "on-track": 1,
+};
+
+export function worstStatus(items: AssetStatus[]): AssetStatus {
+  if (items.length === 0) return "in-progress";
+  return items.reduce((acc, s) =>
+    STATUS_RANK[s] > STATUS_RANK[acc] ? s : acc,
+  );
+}
+
+export function groupAssetsByWorkPackage(
+  assets: any[],
+): Map<string, any[]> {
+  const groups = new Map<string, any[]>();
+  for (const a of assets) {
+    const sys = (a?.system ?? "").toString().trim();
+    const loc = (a?.location ?? "").toString();
+    const type = (a?.asset_type ?? "").toString();
+
+    let key: string;
+    if (sys) {
+      key = sys;
+    } else if (/MMR\s*1/i.test(loc)) {
+      key = "MEP Plant Room MMR1";
+    } else if (/MMR\s*2/i.test(loc)) {
+      key = "MEP Plant Room MMR2";
+    } else if (/colo|hall/i.test(loc)) {
+      key = "Colo Halls";
+    } else if (/cable\s*tray|containment/i.test(type)) {
+      key = "Containment";
+    } else if (/\bUPS\b|\bPNL\b|\bUPM\b|\bGEN\b/i.test(type)) {
+      key = "Power";
+    } else if (/\bHRU\b|\bAHU\b|\bCRAC\b|\bCHW\b/i.test(type)) {
+      key = "Cooling";
+    } else {
+      key = "Other";
+    }
+
+    const existing = groups.get(key) ?? [];
+    existing.push(a);
+    groups.set(key, existing);
+  }
+  return groups;
 }

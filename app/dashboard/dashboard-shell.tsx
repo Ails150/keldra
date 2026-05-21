@@ -19,11 +19,19 @@ import PeopleView from "./views/people";
 import AssetsView from "./views/assets";
 import ConstraintsView from "./views/constraints";
 import PromisesView from "./views/promises";
+import ScheduleView from "./views/schedule";
 import AuditView from "./views/audit";
 import InviteOrgModal from "./views/invite-org-modal";
 import BlockerDetailPanel from "./views/blocker-detail-panel";
 
-type Tab = "today" | "people" | "assets" | "constraints" | "promises" | "audit";
+type Tab =
+  | "today"
+  | "people"
+  | "assets"
+  | "constraints"
+  | "promises"
+  | "schedule"
+  | "audit";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "today", label: "Today" },
@@ -31,6 +39,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "assets", label: "Assets" },
   { id: "constraints", label: "Constraints" },
   { id: "promises", label: "Promises" },
+  { id: "schedule", label: "Schedule" },
   { id: "audit", label: "Audit" },
 ];
 
@@ -374,6 +383,14 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
           />
         )}
         {tab === "promises" && <PromisesView project={project} viewingAs={active} />}
+        {tab === "schedule" && (
+          <ScheduleView
+            project={project}
+            viewingAs={active}
+            blockerMap={blockerMap}
+            onOpenBlocker={openBlocker}
+          />
+        )}
         {tab === "audit" && (
           <AuditView
             project={project}
