@@ -20,6 +20,7 @@ import AssetsView from "./views/assets";
 import ConstraintsView from "./views/constraints";
 import PromisesView from "./views/promises";
 import ScheduleView from "./views/schedule";
+import IntelligenceView from "./views/intelligence";
 import AuditView from "./views/audit";
 import InviteOrgModal from "./views/invite-org-modal";
 import BlockerDetailPanel from "./views/blocker-detail-panel";
@@ -31,6 +32,7 @@ type Tab =
   | "constraints"
   | "promises"
   | "schedule"
+  | "intelligence"
   | "audit";
 
 const TABS: { id: Tab; label: string }[] = [
@@ -40,6 +42,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "constraints", label: "Constraints" },
   { id: "promises", label: "Promises" },
   { id: "schedule", label: "Schedule" },
+  { id: "intelligence", label: "Intelligence" },
   { id: "audit", label: "Audit" },
 ];
 
@@ -398,6 +401,13 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
             viewingAs={active}
             blockerMap={blockerMap}
             onOpenBlocker={openBlocker}
+          />
+        )}
+        {tab === "intelligence" && (
+          <IntelligenceView
+            project={project}
+            viewingAs={active}
+            blockerMap={blockerMap}
           />
         )}
         {tab === "audit" && (
