@@ -264,6 +264,9 @@ export default function BlockerDetailPanel({
             <Chain blocker={blocker} />
           )}
 
+          {/* AI pattern card — pilot week 6 preview */}
+          {blocker.description.trim().length > 10 && <AiPatternCard />}
+
           {/* Actions */}
           <section>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-mid">
@@ -579,6 +582,82 @@ function PromptForm({
           Submit
         </button>
       </div>
+    </div>
+  );
+}
+
+function AiPatternCard() {
+  const notice =
+    "Pilot week 6 deliverable — AI pattern detection coming once data volume exceeds 30 blockers across 6+ weeks.";
+  return (
+    <section className="rounded-2xl border border-accent/40 bg-paper-warm/70 p-4">
+      <p
+        className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-accent-deep"
+        style={{ fontFamily: "var(--font-geist-mono, ui-monospace, monospace)" }}
+      >
+        Pilot Week 6 · Pattern AI
+      </p>
+      <h3
+        className="mt-1 font-[family-name:var(--font-fraunces)] font-medium text-ink"
+        style={{ fontSize: 16, lineHeight: 1.25 }}
+      >
+        Keldra sees this pattern
+      </h3>
+
+      <p
+        className="mt-2 text-ink leading-relaxed"
+        style={{ fontSize: 13 }}
+      >
+        This blocker is structurally similar to 4 others Mercury has raised on
+        hyperscaler DC projects. Pattern detected: ungrounded MEP elements in
+        colo halls.
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-start gap-x-4 gap-y-3">
+        <MiniStat label="Common owner-unclear" value="Mercury QS vs Ardmac PM" />
+        <MiniStat label="Avg days to resolve" value="11 days" />
+        <MiniStat label="Combined cost-of-delay" value="£62,000/day" />
+      </div>
+
+      <p className="mt-4 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-accent-deep">
+        Recommendation
+      </p>
+      <p
+        className="mt-1 font-[family-name:var(--font-fraunces)] italic text-ink"
+        style={{ fontSize: 14, lineHeight: 1.45 }}
+      >
+        Add MMR cable tray coordination to Tuesday&apos;s design review.
+        Specifically resolve the Mercury QS vs Ardmac PM handoff for these
+        assets: MMR1-CT-01, MMR1-CT-02, MMR1-CT-03.
+      </p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => alert(notice)}
+          className="rounded-full border border-accent/40 bg-paper-card px-3 py-1.5 text-[11px] font-medium text-accent-deep transition-colors hover:bg-accent hover:text-paper"
+        >
+          Schedule meeting
+        </button>
+        <button
+          type="button"
+          onClick={() => alert(notice)}
+          className="rounded-full border border-paper-line bg-paper-card px-3 py-1.5 text-[11px] font-medium text-ink-mid transition-colors hover:border-accent/40 hover:text-ink"
+        >
+          Dismiss pattern
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">
+        {label}
+      </p>
+      <p className="mt-0.5 text-xs font-medium text-ink">{value}</p>
     </div>
   );
 }
