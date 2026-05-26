@@ -1,0 +1,15 @@
+name,email,organisation,role,trade,deputy,phone
+Johnny McKenna,johnny.mckenna@mercuryeng.com,Mercury Engineering,Commissioning lead,M&E,Tom Walsh,+353871234567
+Tom Walsh,tom.walsh@mercuryeng.com,Mercury Engineering,Site supervisor,M&E,Johnny McKenna,+353871234568
+Aoife Sheehan,aoife.sheehan@mercuryeng.com,Mercury Engineering,QA engineer,M&E,Tom Walsh,+353871234569
+Dermot Kelly,dermot.kelly@mercuryeng.com,Mercury Engineering,Electrical lead,Electrical,Tom Walsh,+353871234570
+Lawrence Burke,lawrence.burke@ardmac.com,Ardmac,Design lead,Containment,Niamh Boyle,+353871234571
+Niamh Boyle,niamh.boyle@ardmac.com,Ardmac,Site engineer,Containment,Lawrence Burke,+353871234572
+Cormac Doyle,cormac.doyle@ardmac.com,Ardmac,Drywall foreman,Drywall,Lawrence Burke,+353871234573
+Conor Murphy,conor.murphy@centraldesign.com,Central Design,Engineer,Design,Eimear Healy,+353871234574
+Eimear Healy,eimear.healy@centraldesign.com,Central Design,BIM coordinator,Design,Conor Murphy,+353871234575
+Patrick O'Sullivan,patrick.osullivan@primopower.com,Primo Power,Project manager,Power,Sean Quinn,+353871234576
+Sean Quinn,sean.quinn@primopower.com,Primo Power,Field engineer,Power,Patrick O'Sullivan,+353871234577
+Sarah Kennedy,sarah.kennedy@primopower.com,Primo Power,Commissioning engineer,Power,Patrick O'Sullivan,+353871234578
+David O'Brien,david.obrien@microsoft.com,Microsoft,Client witness,Client,Karen Lynch,+353871234579
+Karen Lynch,karen.lynch@microsoft.com,Microsoft,Commissioning manager,Client,David O'Brien,+353871234580

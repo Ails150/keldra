@@ -149,9 +149,25 @@ function splitLinkedAssets(s: unknown): string[] {
 function initialStateFromCsv(row: any): BlockerStateName {
   const owner = (row.owner_name ?? "").toString().trim();
   const status = (row.status ?? "").toString().trim().toLowerCase();
-  if (!owner) return "unowned";
-  if (status.includes("in progress") || status.includes("in-progress"))
+  // Honour explicit blocker-state values from the source register first — a
+  // constraint log can mark an item "unowned" even when an action-by name is
+  // listed (suggested owner, not yet accepted).
+  if (status.includes("closed")) return "closed";
+  if (status.includes("unowned")) return "unowned";
+  if (status.includes("await") || status.includes("input"))
+    return "awaiting-input";
+  if (status.includes("escalat")) return "escalated";
+  if (status.includes("verif")) return "verified";
+  if (status.includes("reopen")) return "reopened";
+  if (status.includes("pending")) return "pending-acceptance";
+  if (
+    status.includes("working") ||
+    status.includes("in progress") ||
+    status.includes("in-progress")
+  )
     return "working";
+  // Fall back to ownership when the status isn't a recognised state name.
+  if (!owner) return "unowned";
   return "pending-acceptance";
 }
 
@@ -171,6 +187,7 @@ export async function hydrateFromProject(
     const ownerOrg = (row.owner_org ?? "").toString().trim() || null;
     const priority = (row.priority ?? "").toString().trim();
 
+    const events: BlockerEvent[] = [];
     const raisedEvent = await buildEvent(
       undefined,
       "raised",
@@ -181,6 +198,29 @@ export async function hydrateFromProject(
         priority,
       },
     );
+    events.push(raisedEvent);
+
+    // An ingested action register carries its Comments history as parsed,
+    // date-ordered events. Each one becomes a hash-chained "comment" event so
+    // the project's real audit trail shows up in the chain, not just "raised".
+    const commentEvents: Array<{ date?: string; content?: string }> = Array.isArray(
+      row.comment_events,
+    )
+      ? row.comment_events
+      : [];
+    for (const ce of commentEvents) {
+      const content = (ce?.content ?? "").toString().trim();
+      if (!content) continue;
+      const ts = isoOrNow(ce?.date, raisedDate);
+      const evt = await buildEvent(
+        events[events.length - 1],
+        "comment",
+        raisedBy,
+        ts,
+        { note: content },
+      );
+      events.push(evt);
+    }
 
     map[id] = {
       id,
@@ -193,7 +233,7 @@ export async function hydrateFromProject(
       waiting_on_person: null,
       waiting_on_org: null,
       since_timestamp: raisedDate,
-      events: [raisedEvent],
+      events,
       cost_per_day: costForPriority(priority),
       sit_on_today: false,
       sit_on_today_date: null,

@@ -1,8 +1,20 @@
 "use client";
 
 import Papa from "papaparse";
-import type { ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import type { StepProps } from "../types";
+import {
+  buildRegisterFromConstraintRows,
+  parseActionRegister,
+  registerToConstraintRows,
+  type ParsedConstraint,
+  type ParsedRegister,
+} from "../lib/register-parser";
+import {
+  DUB12_ASSETS_CSV,
+  DUB12_CONSTRAINTS_CSV,
+  DUB12_TEAM_CSV,
+} from "../sample-data/dub12";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -111,7 +123,73 @@ function UploadIcon() {
   );
 }
 
+function SpreadsheetIcon({ className = "h-7 w-7" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M8 13h8M8 17h8M8 13v4M12 13v4" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+function registerStatusClasses(status: string): string {
+  if (status === "CLOSED") return "bg-green-100 text-green-800";
+  if (status === "AWAITING_INPUT") return "bg-yellow-100 text-yellow-800";
+  return "bg-red-100 text-red-700"; // OPEN
+}
+
+function daysOpen(c: ParsedConstraint): number {
+  if (!c.date_raised) return 0;
+  const start = new Date(c.date_raised).getTime();
+  if (Number.isNaN(start)) return 0;
+  const end =
+    c.status === "CLOSED" && c.date_closed
+      ? new Date(c.date_closed).getTime()
+      : Date.now();
+  return Math.max(0, Math.round((end - start) / 86400000));
+}
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-IE", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function Step5Templates({ formData, setFormData }: StepProps) {
+  const [parsing, setParsing] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
+
   function handleFile(key: UploadKey, e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -127,6 +205,85 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
     });
     // reset so same file can be re-picked
     e.target.value = "";
+  }
+
+  // Merge register-derived constraint rows into uploads.constraints (de-duped by
+  // Item No) so every parsed row also shows up on the dashboard as a blocker.
+  function absorbRegister(parsed: ParsedRegister) {
+    const rows = registerToConstraintRows(parsed);
+    setFormData((prev) => {
+      const existing = prev.uploads.constraints ?? [];
+      const existingIds = new Set(
+        existing.map((r: any) => (r?.id ?? "").toString()),
+      );
+      const merged = [
+        ...existing,
+        ...rows.filter((r) => !existingIds.has(r.id)),
+      ];
+      return {
+        ...prev,
+        uploads: { ...prev.uploads, register: parsed, constraints: merged },
+      };
+    });
+  }
+
+  async function handleRegisterFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    setParsing(true);
+    setParseError(null);
+    try {
+      const parsed = await parseActionRegister(file);
+      if (parsed.rowCount === 0) {
+        setParseError(
+          "No rows with an Item No were found — check the file has an Item No / Description / Status header row.",
+        );
+        return;
+      }
+      absorbRegister(parsed);
+    } catch (err) {
+      setParseError(
+        err instanceof Error
+          ? err.message
+          : "Could not read that file. Try a .xlsx or .csv export.",
+      );
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  function parseCsv(csv: string): any[] {
+    return Papa.parse<Record<string, string>>(csv, {
+      header: true,
+      skipEmptyLines: true,
+    }).data as any[];
+  }
+
+  // Auto-fills all four uploads with the DUB-12 sample so the demo can run
+  // without manually dropping files. Builds a register from the constraint log
+  // so the 4th card lands in its done-state too.
+  async function loadDub12Sample() {
+    setParsing(true);
+    setParseError(null);
+    try {
+      const team = parseCsv(DUB12_TEAM_CSV);
+      const assets = parseCsv(DUB12_ASSETS_CSV);
+      const constraints = parseCsv(DUB12_CONSTRAINTS_CSV);
+      const register = await buildRegisterFromConstraintRows(
+        "dub12-constraint-log.csv",
+        constraints,
+      );
+      setFormData((prev) => ({
+        ...prev,
+        template: prev.template ?? "mercury-red-tag",
+        uploads: { team, assets, constraints, register },
+      }));
+    } catch {
+      setParseError("Could not load the DUB-12 sample data.");
+    } finally {
+      setParsing(false);
+    }
   }
 
   const constraintRows = formData.uploads.constraints;
@@ -213,9 +370,20 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
       </div>
 
       <div className="mb-10">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-3">
-          Bring in your data
-        </h2>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-mid">
+            Bring in your data
+          </h2>
+          <button
+            type="button"
+            onClick={loadDub12Sample}
+            disabled={parsing}
+            className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/5 px-3 py-1.5 text-xs font-medium text-accent-deep transition-colors hover:bg-accent/10 disabled:opacity-50"
+          >
+            <span aria-hidden>⚡</span>
+            Load DUB-12 sample
+          </button>
+        </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {UPLOAD_CARDS.map((c) => {
             const rows = formData.uploads[c.key];
@@ -262,6 +430,15 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
               </label>
             );
           })}
+        </div>
+
+        <div className="mt-3">
+          <RegisterCard
+            register={formData.uploads.register}
+            parsing={parsing}
+            error={parseError}
+            onFile={handleRegisterFile}
+          />
         </div>
       </div>
 
@@ -383,5 +560,148 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
         </div>
       )}
     </section>
+  );
+}
+
+function RegisterStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="rounded-xl border border-green-200 bg-paper-card px-3 py-2.5">
+      <p
+        className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
+        style={{ fontSize: 22, lineHeight: 1 }}
+      >
+        {value}
+      </p>
+      <p className="mt-1 text-[11px] leading-snug text-ink-mid">{label}</p>
+    </div>
+  );
+}
+
+function RegisterCard({
+  register,
+  parsing,
+  error,
+  onFile,
+}: {
+  register: ParsedRegister | null;
+  parsing: boolean;
+  error: string | null;
+  onFile: (e: ChangeEvent<HTMLInputElement>) => void;
+}) {
+  // ---- done state ----
+  if (register) {
+    const r = register;
+    const preview = r.constraints.slice(0, 5);
+    const range = r.dateRange
+      ? `${fmtDate(r.dateRange.from)} → ${fmtDate(r.dateRange.to)}`
+      : "—";
+    return (
+      <div className="rounded-2xl border border-green-300 bg-green-50/60 p-5">
+        <p
+          className="font-mono font-semibold uppercase text-accent-deep"
+          style={{ fontSize: 10, letterSpacing: "0.14em" }}
+        >
+          Project history · absorbed
+        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-600 text-white">
+            <CheckIcon className="h-3.5 w-3.5" />
+          </span>
+          <span className="font-mono text-sm text-ink truncate">{r.fileName}</span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <RegisterStat
+            value={`${r.rowCount}`}
+            label={r.rowCount === 1 ? "constraint parsed" : "constraints parsed"}
+          />
+          <RegisterStat
+            value={`${r.eventCount}`}
+            label="comment events absorbed into audit chain"
+          />
+          <RegisterStat value={range} label="date range: earliest → latest" />
+        </div>
+
+        <ul className="mt-4 divide-y divide-green-200 rounded-xl border border-green-200 bg-paper-card">
+          {preview.map((c) => (
+            <li
+              key={c.item_no}
+              className="flex items-center gap-3 px-3 py-2.5 text-sm"
+            >
+              <span className="w-12 flex-shrink-0 font-mono text-xs text-ink-mid">
+                {c.item_no}
+              </span>
+              <span className="flex-1 min-w-0 truncate text-ink">
+                {truncate(c.description, 64) || "—"}
+              </span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${registerStatusClasses(c.status)}`}
+              >
+                {c.status === "AWAITING_INPUT" ? "AWAITING" : c.status}
+              </span>
+              <span className="w-16 flex-shrink-0 text-right text-xs text-ink-mid">
+                {daysOpen(c)}d open
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        <p className="mt-3 text-xs italic text-ink-mid">
+          Each row hash-chained as a blocker event. Owner-unclear flags raised
+          automatically where Action By is blank or ambiguous.
+        </p>
+      </div>
+    );
+  }
+
+  // ---- empty state ----
+  return (
+    <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-paper-line bg-paper-card p-5 transition-all hover:border-accent hover:bg-paper-warm/40">
+      <input
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        className="sr-only"
+        onChange={onFile}
+      />
+      <p
+        className="font-mono font-semibold uppercase text-accent-deep"
+        style={{ fontSize: 10, letterSpacing: "0.14em" }}
+      >
+        Project history · absorb your actual data
+      </p>
+      <h3
+        className="mt-1.5 font-[family-name:var(--font-fraunces)] font-medium text-ink"
+        style={{ fontSize: 18, lineHeight: 1.2 }}
+      >
+        Action register / meeting minutes
+      </h3>
+      <p className="mt-1 italic text-ink-mid" style={{ fontSize: 13 }}>
+        Drop your existing tracker. Every row becomes a structured blocker. Every
+        comment becomes a hash-chained event.
+      </p>
+
+      <div className="mt-4 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-paper-line bg-paper-warm/30 px-4 py-7 text-center">
+        <span className="text-ink-mid">
+          <SpreadsheetIcon />
+        </span>
+        {parsing ? (
+          <p className="text-sm font-medium text-accent-deep">Parsing…</p>
+        ) : (
+          <p className="text-sm font-medium text-ink">
+            Drop .xlsx or .csv here, or click to upload
+          </p>
+        )}
+        <p className="max-w-md text-xs leading-snug text-ink-mid">
+          Accepts action registers, constraint logs, security meeting minutes,
+          defect trackers. The Comments column becomes your audit history.
+        </p>
+      </div>
+
+      {error && (
+        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          {error}
+        </p>
+      )}
+    </label>
   );
 }

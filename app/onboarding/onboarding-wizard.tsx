@@ -14,7 +14,7 @@ const INITIAL: WizardData = {
   phase: null,
   org: { name: "", type: null, colour: "#8a3dd6" },
   project: {
-    name: "",
+    name: "DUB-12 Building 4",
     client: "",
     sector: "",
     startDate: "",
@@ -30,7 +30,7 @@ const INITIAL: WizardData = {
     { id: "cli", name: "Hyperscaler X", role: "Client", initials: "CLI", colour: "#0891b2" },
   ],
   template: "mercury-red-tag",
-  uploads: { team: null, assets: null, constraints: null },
+  uploads: { team: null, assets: null, constraints: null, register: null },
   invites: [
     { id: "1", name: "Johnny McKenna", email: "johnny@mercuryeng.com", org: "Mercury", role: "Commissioning lead", initials: "JM", colour: "#dc2626" },
     { id: "2", name: "Tom Walsh", email: "tom.walsh@mercuryeng.com", org: "Mercury", role: "Site manager", initials: "TW", colour: "#dc2626" },

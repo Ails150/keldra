@@ -626,9 +626,9 @@ function AiPatternCard() {
         className="mt-1 font-[family-name:var(--font-fraunces)] italic text-ink"
         style={{ fontSize: 14, lineHeight: 1.45 }}
       >
-        Add MMR cable tray coordination to Tuesday&apos;s design review.
+        Add MER1 cable tray coordination to Tuesday&apos;s design review.
         Specifically resolve the Mercury QS vs Ardmac PM handoff for these
-        assets: MMR1-CT-01, MMR1-CT-02, MMR1-CT-03.
+        assets: MER1-CT-01, MER1-CT-02, MER1-CT-03.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">

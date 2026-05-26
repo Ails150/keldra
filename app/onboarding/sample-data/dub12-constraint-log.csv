@@ -1,0 +1,21 @@
+id,description,raised_date,raised_by,owner_name,owner_org,priority,status,linked_assets,deadline
+C-001,Exercise on what's included in security vendor scope vs not (e.g. locks not in security scope),2026-03-12,FL,JM Cundall,Cundall,Medium,working,ADMIN-SEC-01;ADMIN-SEC-02,2026-06-12
+C-002,Model review - Ardmac and Cundall coordination on security model updates,2026-03-12,MD,FL DEL,DEL,Medium,working,ADMIN-SEC-01;ADMIN-SEC-02,2026-06-12
+C-003,FoK list for security camera and card reader locations - federated model only 90% complete,2026-03-12,MD,GV Evolution,Evolution,Medium,working,ADMIN-SEC-01;ADMIN-SEC-02,2026-06-12
+C-004,FoK list to be provided by GV - issued 03/04/2026 but not received by Ardmac,2026-03-12,SC,GV Evolution,Evolution,Medium,working,ADMIN-SEC-01;ADMIN-SEC-02,2026-06-12
+C-005,Workshop on underground ducts with Ardmac/Cundall/Evolution/DEL,2026-04-10,DON,SC,Ardmac,Medium,working,ADMIN-SEC-01,2026-06-10
+C-006,Power requirements for doors - GV Evolution to review,2026-04-10,SC,GV Evolution,Evolution,Medium,working,ADMIN-SEC-01;ADMIN-SEC-02,2026-06-10
+C-007,Dog box scope - JM Ardmac to confirm,2026-05-08,SC,JM Ardmac,Ardmac,Medium,working,ADMIN-SEC-02,2026-06-08
+C-008,SCP Details for plinth - JM Ardmac review,2026-05-08,GV,JM Ardmac,Ardmac,Medium,working,ADMIN-SEC-02,2026-06-08
+C-009,Security model updates - JM Cundall to update model with correct SCP details,2026-05-22,GV,JM Cundall,Cundall,Medium,working,ADMIN-SEC-01;ADMIN-SEC-02,2026-06-22
+C-010,EPED spurs cannot be de-energised - scope to be confirmed,2026-05-22,SC,JM Ardmac,Ardmac,Medium,working,ADMIN-SEC-02,2026-06-22
+C-011,Earthing in Colo - frame for AC - multiple HRU and CRAC units need earthing schedule,2026-05-13,Johnny McKenna,Lawrence Burke,Ardmac,Critical,awaiting-input,COLO-EWS-01;COLO-EWS-02;COLO-HRU-01;COLO-HRU-02,2026-06-13
+C-012,Co-ordination PNLs/UPMs - Primo Power deliverables not yet installed despite delivery 30+ days ago,2026-05-15,Johnny McKenna,Patrick O'Sullivan,Primo Power,Critical,unowned,MER1-PNL-01;MER1-PNL-02;MER1-UPM-01;MER1-UPM-02,2026-06-15
+C-013,Fire stop sign-off chain - who certifies cross-org installs?,2026-05-19,Johnny McKenna,,,High,unowned,ADMIN-FAS-01;ADMIN-FAS-02,2026-06-19
+C-014,MER1 cable tray clash with structural beam at column grid G7,2026-05-14,Tom Walsh,Lawrence Burke,Ardmac,High,awaiting-input,MER1-CT-01;MER1-CT-02,2026-06-14
+C-015,Robust Verification process delay - paperwork chain for red tag close-out not flowing,2026-05-08,Johnny McKenna,Aoife Sheehan,Mercury Engineering,High,working,COLO-HRU-01;COLO-HRU-02;COLO-EWS-01,2026-06-08
+C-016,Asbestos Check process adding 4-6 days to every red tag close-out cycle,2026-05-10,Johnny McKenna,Tom Walsh,Mercury Engineering,Medium,working,COLO-EWS-01;COLO-EWS-02,2026-06-10
+C-017,Residual Verification PM - backlog of 9 items pending project manager sign-off,2026-05-11,Johnny McKenna,Johnny McKenna,Mercury Engineering,High,working,COLO-CRAC-03;COLO-EWSD-04;COLO-EWSD-05,2026-06-11
+C-018,AHU red tag chain - Lawrence Rev D drawing 5 days overdue,2026-05-20,Tom Walsh,Lawrence Burke,Ardmac,Critical,awaiting-input,MER1-AHU-01;MER1-AHU-02;MER1-AHU-03,2026-06-20
+C-019,Microsoft witness sign-off slots not booked for July red tags,2026-05-22,Karen Lynch,Karen Lynch,Microsoft,High,working,,2026-06-22
+C-020,Generator commissioning sequence - Mercury and Primo handoff unclear,2026-05-21,Dermot Kelly,,,High,unowned,MER1-GEN-01,2026-06-21

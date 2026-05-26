@@ -55,6 +55,7 @@ export type WizardData = {
     assets: any[] | null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constraints: any[] | null;
+    register: import("./lib/register-parser").ParsedRegister | null;
   };
   invites: InviteEntry[];
   viewingAs: ViewingAs;

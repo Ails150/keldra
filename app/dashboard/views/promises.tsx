@@ -16,7 +16,7 @@ type Promise = {
 const SAMPLE: Promise[] = [
   {
     id: "P-1421",
-    what: "Rev D drawing — Hall 2 containment",
+    what: "Rev D drawing — MER1 containment",
     from: { name: "Lawrence Burke", org: "Ardmac" },
     to: { name: "Johnny McKenna", org: "Mercury" },
     due: "Was: Mon 18 May",
@@ -24,7 +24,7 @@ const SAMPLE: Promise[] = [
   },
   {
     id: "P-1438",
-    what: "UPS-A1 commissioning slot confirmation",
+    what: "MER1-UPM-01 commissioning slot confirmation",
     from: { name: "Patrick O'Neill", org: "Mercury" },
     to: { name: "Sarah Kennedy", org: "Hyperscaler X" },
     due: "Today 14:00",
@@ -33,7 +33,7 @@ const SAMPLE: Promise[] = [
   },
   {
     id: "P-1402",
-    what: "Snag-list close-out — Hall 2 East",
+    what: "Snag-list close-out — Colo Hall 2",
     from: { name: "Cormac Daly", org: "Ardmac" },
     to: { name: "Johnny McKenna", org: "Mercury" },
     due: "Kept — yesterday",

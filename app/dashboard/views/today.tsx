@@ -220,25 +220,25 @@ function walksForRole(role: ViewingAs["role"]) {
       return {
         caption: "Your patches today (Ardmac scope)",
         items: [
-          { time: "09", title: "Drywall close-up — Hall 2 East", location: "Building 2 · L1", tag: "Ardmac", tone: "bg-blue-100 text-blue-800" },
-          { time: "11", title: "Containment QC walk", location: "Hall 2 · zones 3–4", tag: "Joint", tone: "bg-purple-100 text-purple-800" },
-          { time: "15", title: "Snag close-out with Mercury", location: "Hall 2 East", tag: "Interface", tone: "bg-orange-100 text-orange-800" },
+          { time: "09", title: "Drywall close-up — Colo Hall 2", location: "Colo Hall 2", tag: "Ardmac", tone: "bg-blue-100 text-blue-800" },
+          { time: "11", title: "Containment QC walk", location: "MER1 Main Electrical Room", tag: "Joint", tone: "bg-purple-100 text-purple-800" },
+          { time: "15", title: "Snag close-out with Mercury", location: "Colo Hall 2", tag: "Interface", tone: "bg-orange-100 text-orange-800" },
         ],
       };
     case "client":
       return {
         caption: "Witness slots booked with you",
         items: [
-          { time: "10", title: "Yellow → Green witness — UPS-A1", location: "MEP Plant Room A", tag: "Sign-off", tone: "bg-yellow-100 text-yellow-800" },
-          { time: "14", title: "IST dry-run review", location: "Control Room", tag: "Witness", tone: "bg-yellow-100 text-yellow-800" },
+          { time: "10", title: "Yellow → Green witness — MER1-UPM-01", location: "MER1 Main Electrical Room", tag: "Sign-off", tone: "bg-yellow-100 text-yellow-800" },
+          { time: "14", title: "IST dry-run review", location: "Admin Plant", tag: "Witness", tone: "bg-yellow-100 text-yellow-800" },
         ],
       };
     case "design":
       return {
         caption: "Design queries on site today",
         items: [
-          { time: "10", title: "RFI-072 walk-down — chilled water tie-in", location: "Hall 1", tag: "Design", tone: "bg-green-100 text-green-800" },
-          { time: "13", title: "As-built mark-up review", location: "Site office", tag: "RFI", tone: "bg-green-100 text-green-800" },
+          { time: "10", title: "RFI-072 walk-down — chilled water tie-in", location: "Colo Hall 1", tag: "Design", tone: "bg-green-100 text-green-800" },
+          { time: "13", title: "As-built mark-up review", location: "Admin Plant", tag: "RFI", tone: "bg-green-100 text-green-800" },
         ],
       };
     default:
@@ -246,8 +246,8 @@ function walksForRole(role: ViewingAs["role"]) {
         caption: "Your day across the site",
         items: [
           { time: "08", title: "Morning stand-up — all subs", location: "Site canteen", tag: "Lead", tone: "bg-red-100 text-red-700" },
-          { time: "10", title: "Ardmac drywall closure walk", location: "Building 2 · L1", tag: "Joint", tone: "bg-blue-100 text-blue-800" },
-          { time: "14", title: "Yellow → Green review with client", location: "MEP Plant Room A", tag: "Witness", tone: "bg-yellow-100 text-yellow-800" },
+          { time: "10", title: "Ardmac drywall closure walk", location: "Colo Hall 2", tag: "Joint", tone: "bg-blue-100 text-blue-800" },
+          { time: "14", title: "Yellow → Green review with client", location: "MER1 Main Electrical Room", tag: "Witness", tone: "bg-yellow-100 text-yellow-800" },
         ],
       };
   }
@@ -264,7 +264,7 @@ function promisesForRole(role: ViewingAs["role"]) {
         ...base,
         caption: "Ardmac promises in/out",
         items: [
-          { title: "Drywall snag close-out — Hall 2 East", by: "Lawrence → Mercury", due: "Today 16:00", dot: "bg-yellow-500" },
+          { title: "Drywall snag close-out — Colo Hall 2", by: "Lawrence → Mercury", due: "Today 16:00", dot: "bg-yellow-500" },
           { title: "Containment QC sign-off pack", by: "Niamh → Mercury", due: "Tomorrow", dot: "bg-blue-500" },
           { title: "Punch-list returned to Mercury", by: "Cormac · kept", due: "Yesterday", dot: "bg-green-500" },
         ],
@@ -274,7 +274,7 @@ function promisesForRole(role: ViewingAs["role"]) {
         title: "Promises to you",
         caption: "Deliverables awaiting your sign-off",
         items: [
-          { title: "L5 handover pack — MEP Plant A", by: "Mercury → Client", due: "Fri", dot: "bg-yellow-500" },
+          { title: "L5 handover pack — MER1 Main Electrical Room", by: "Mercury → Client", due: "Fri", dot: "bg-yellow-500" },
           { title: "IST dry-run report", by: "Mercury → Client", due: "Mon", dot: "bg-blue-500" },
           { title: "Witness slot confirmation", by: "Sarah · pending", due: "Today", dot: "bg-orange-500" },
         ],
@@ -285,7 +285,7 @@ function promisesForRole(role: ViewingAs["role"]) {
         caption: "Design responses owed",
         items: [
           { title: "RFI-072 — chilled water tie-in", by: "Mercury → Central", due: "Overdue", dot: "bg-red-500" },
-          { title: "RFI-074 — UPS-A1 cable tray clash", by: "Ardmac → Central", due: "Today", dot: "bg-yellow-500" },
+          { title: "RFI-074 — MER1 cable tray clash", by: "Ardmac → Central", due: "Today", dot: "bg-yellow-500" },
           { title: "RFI-070 — closed", by: "Central · kept", due: "Yesterday", dot: "bg-green-500" },
         ],
       };
@@ -293,8 +293,8 @@ function promisesForRole(role: ViewingAs["role"]) {
       return {
         ...base,
         items: [
-          { title: "Rev D drawing — Hall 2 containment", by: "Lawrence → you", due: "Overdue 2d", dot: "bg-red-500" },
-          { title: "UPS-A1 commissioning slot", by: "Patrick → you", due: "Today 14:00", dot: "bg-yellow-500" },
+          { title: "Rev D drawing — MER1 containment", by: "Lawrence → you", due: "Overdue 2d", dot: "bg-red-500" },
+          { title: "MER1-UPM-01 commissioning slot", by: "Patrick → you", due: "Today 14:00", dot: "bg-yellow-500" },
           { title: "Snag-list close-out", by: "Cormac · kept", due: "Yesterday", dot: "bg-green-500" },
         ],
       };
