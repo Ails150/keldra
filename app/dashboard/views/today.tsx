@@ -10,6 +10,7 @@ import {
   roleLabel,
 } from "../utils";
 import TodayRitual from "./today-ritual";
+import SmartAlerts from "./smart-alerts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -18,11 +19,13 @@ export default function TodayView({
   viewingAs,
   blockerMap,
   onOpenBlocker,
+  onAlertAction,
 }: {
   project: WizardData;
   viewingAs: ViewingAs;
   blockerMap: BlockerMap | null;
   onOpenBlocker: (id: string) => void;
+  onAlertAction?: (target: string) => void;
 }) {
   const team = filterPeopleByRole(
     project.uploads.team,
@@ -89,6 +92,16 @@ export default function TodayView({
           What needs your attention from the {roleLabel(role)} seat.
         </p>
       </header>
+
+      {blockerMap && (
+        <SmartAlerts
+          projectName={project.project.name}
+          blockerMap={blockerMap}
+          assets={project.uploads.assets ?? []}
+          people={project.uploads.team ?? []}
+          onAction={onAlertAction}
+        />
+      )}
 
       {blockerMap && (
         <TodayRitual map={blockerMap} onOpen={onOpenBlocker} />

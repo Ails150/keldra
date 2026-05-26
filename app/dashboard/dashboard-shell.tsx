@@ -182,6 +182,36 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
     setTab("assets");
   }, []);
 
+  // Routes a Smart Alert action_target ("blocker:<id>", "asset:<id>",
+  // "person:<name>", "filter:unowned", "tab:<name>") to the right view.
+  const handleAlertAction = useCallback(
+    (target: string) => {
+      const idx = target.indexOf(":");
+      const kind = idx === -1 ? target : target.slice(0, idx);
+      const value = idx === -1 ? "" : target.slice(idx + 1);
+      switch (kind) {
+        case "blocker":
+          if (value) openBlocker(value);
+          break;
+        case "asset":
+          if (value) jumpToAssets([value]);
+          break;
+        case "person":
+          setTab("people");
+          break;
+        case "filter": // e.g. filter:unowned — surfaced on the constraints view
+          setTab("constraints");
+          break;
+        case "tab":
+          if (TABS.some((t) => t.id === value)) setTab(value as Tab);
+          break;
+        default:
+          break;
+      }
+    },
+    [openBlocker, jumpToAssets],
+  );
+
   // Role options for the switcher — always offer the four demo personas, but
   // if the originating org isn't Mercury, surface it as a fifth option so
   // Johnny can also flip back into his real org's view.
@@ -385,6 +415,7 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
             viewingAs={active}
             blockerMap={blockerMap}
             onOpenBlocker={openBlocker}
+            onAlertAction={handleAlertAction}
           />
         )}
         {tab === "people" && (
