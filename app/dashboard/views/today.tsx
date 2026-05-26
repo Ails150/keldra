@@ -104,6 +104,7 @@ export default function TodayView({
           blockerMap={blockerMap}
           assets={project.uploads.assets ?? []}
           people={project.uploads.team ?? []}
+          xer={project.uploads.xer}
           onAction={onAlertAction}
         />
       )}

@@ -3,6 +3,7 @@
 import type { Blocker, BlockerMap, BlockerStateName } from "../lib/blocker-state";
 import { daysInState } from "../lib/blocker-state";
 import { deriveOrgColour, getInitials, getLinkedBlockers } from "../utils";
+import { slipDays, type ParsedXer } from "../../onboarding/lib/xer-parser";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -96,6 +97,7 @@ type Props = {
   blockerMap: BlockerMap | null;
   onClose: () => void;
   onOpenBlocker: (id: string) => void;
+  xer?: ParsedXer | null;
 };
 
 export default function AssetDetailPanel({
@@ -103,8 +105,16 @@ export default function AssetDetailPanel({
   blockerMap,
   onClose,
   onOpenBlocker,
+  xer,
 }: Props) {
   if (!asset) return null;
+
+  const activityId = (asset.activity_id ?? "").toString().trim();
+  const activity =
+    activityId && xer
+      ? xer.activities.find((a) => a.task_code === activityId) ?? null
+      : null;
+  const activitySlip = activity ? slipDays(activity) : 0;
 
   const ownerName = (asset.owner_name ?? "").toString().trim();
   const ownerOrg = (asset.owner_org ?? "").toString().trim();
@@ -180,6 +190,41 @@ export default function AssetDetailPanel({
               </p>
             )}
           </section>
+
+          {/* P6 activity (only when an XER is loaded and this asset maps) */}
+          {activity && (
+            <section>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-2">
+                P6 activity
+              </p>
+              <div className="rounded-2xl border border-paper-line bg-paper-card p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-sm font-semibold text-ink">
+                    {activity.task_code}
+                  </span>
+                  {activity.is_critical && (
+                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
+                      Critical path
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-ink-mid">{activity.task_name}</p>
+                <p className="mt-2 text-xs text-ink">
+                  Planned{" "}
+                  <span className="font-medium">{fmtDate(activity.target_start)}</span>{" "}
+                  →{" "}
+                  <span className="font-medium">{fmtDate(activity.target_end)}</span>{" "}
+                  · {activity.complete_pct}% complete
+                </p>
+                {activitySlip > 0 && (
+                  <p className="mt-2 text-xs font-semibold text-red-700">
+                    ⚑ {activitySlip} {activitySlip === 1 ? "day" : "days"} slipped
+                    vs baseline
+                  </p>
+                )}
+              </div>
+            </section>
+          )}
 
           {/* Owner block */}
           <section>

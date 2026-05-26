@@ -185,6 +185,7 @@ export default function AssetsView({
       <AssetDetailPanel
         asset={selectedAsset}
         blockerMap={blockerMap}
+        xer={project.uploads.xer}
         onClose={() => setSelectedAsset(null)}
         onOpenBlocker={(id) => {
           setSelectedAsset(null);

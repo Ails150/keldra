@@ -14,6 +14,15 @@ interface ProjectState {
   totalExposurePerDay: number;
   unownedCount: number;
   awaitingInputCount: number;
+  // Present only when a P6 XER has been ingested — the open critical-path
+  // activities, each flagged if its linked asset has an open blocker.
+  criticalActivities?: Array<{
+    task_code: string;
+    task_name: string;
+    target_end: string | null;
+    asset_id: string | null;
+    blocked: boolean;
+  }>;
 }
 
 export async function POST(req: NextRequest) {
@@ -71,12 +80,16 @@ ${JSON.stringify(state.assets.slice(0, 20), null, 2)}
 
 PEOPLE:
 ${JSON.stringify(state.people, null, 2)}
-
+${
+  state.criticalActivities && state.criticalActivities.length
+    ? `\nCRITICAL PATH (from P6 schedule — open activities; "blocked" means the linked asset has an open blocker):\n${JSON.stringify(state.criticalActivities, null, 2)}\n`
+    : ""
+}
 Return JSON in this exact shape:
 {
   "alerts": [
     {
-      "type": "PATTERN" | "TREND" | "ALERT" | "RECOMMENDATION",
+      "type": "PATTERN" | "TREND" | "ALERT" | "RECOMMENDATION" | "CRITICAL_PATH_RISK",
       "title": "Short, specific title (max 8 words)",
       "body": "1-2 sentence explanation citing specific people, asset IDs, days, or £ figures from the data above",
       "action_label": "What button to show (max 4 words, e.g. 'View Lawrence's chain')",
@@ -85,11 +98,38 @@ Return JSON in this exact shape:
   ]
 }
 
-Be specific. Cite real names and IDs from the data. Identify cross-organisation handoff failures, dependency bottlenecks, cost trajectories, and recurring patterns. Do NOT generate generic insights. Do NOT include alerts that aren't grounded in the data.`;
+Be specific. Cite real names and IDs from the data. Identify cross-organisation handoff failures, dependency bottlenecks, cost trajectories, and recurring patterns. If critical-path activities are blocked or due to complete within ~7 days, emit a CRITICAL_PATH_RISK alert citing the specific activity IDs and their linked assets and the downstream cascade, with action_target "tab:schedule". Do NOT generate generic insights. Do NOT include alerts that aren't grounded in the data.`;
 }
 
 function generateRuleBasedAlerts(state: ProjectState) {
   const alerts: any[] = [];
+
+  // Rule 0: Critical-path risk (only fires when a P6 XER has been ingested).
+  const crit = state.criticalActivities ?? [];
+  if (crit.length > 0) {
+    const horizon = new Date(Date.now() + 7 * 86400000)
+      .toISOString()
+      .slice(0, 10);
+    const atRisk = crit.filter(
+      (a) => a.blocked || (a.target_end !== null && a.target_end <= horizon),
+    );
+    if (atRisk.length > 0) {
+      const cites = atRisk
+        .slice(0, 3)
+        .map((a) => `${a.task_code}${a.asset_id ? ` (${a.asset_id})` : ""}`)
+        .join(" and ");
+      const blockedNote = atRisk.some((a) => a.blocked)
+        ? " Both blocked."
+        : "";
+      alerts.push({
+        type: "CRITICAL_PATH_RISK",
+        title: `${atRisk.length} critical path ${atRisk.length === 1 ? "activity" : "activities"} at risk this week`,
+        body: `${cites} on the critical path with planned completion this week.${blockedNote} A single-day slip cascades through downstream activities.`,
+        action_label: "Open critical path",
+        action_target: "tab:schedule",
+      });
+    }
+  }
 
   // Rule 1: Person bottleneck — anyone blocking 3+ items
   const ownerCounts: Record<string, { count: number; cost: number; ids: string[] }> = {};

@@ -3,6 +3,9 @@
 import { Fragment, useMemo, useState } from "react";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { Blocker, BlockerMap } from "../lib/blocker-state";
+import type { ParsedXer, XerActivity } from "../../onboarding/lib/xer-parser";
+import { slipDays } from "../../onboarding/lib/xer-parser";
+import AssetDetailPanel from "./asset-detail-panel";
 import {
   type AssetStatus,
   daysBetween,
@@ -41,13 +44,14 @@ const STATUS_BAR: Record<
   },
 };
 
-type Mode = "by-job" | "by-task" | "by-week" | "modular-flow";
+type Mode = "by-job" | "by-task" | "by-week" | "modular-flow" | "p6-timeline";
 
 const MODE_LABELS: Record<Mode, string> = {
   "by-job": "By job",
   "by-task": "By task",
   "by-week": "By week",
   "modular-flow": "Modular flow",
+  "p6-timeline": "P6 timeline",
 };
 
 type Props = {
@@ -67,6 +71,7 @@ export default function ScheduleView({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [filterOrg, setFilterOrg] = useState<string>("all");
   const [filterStage, setFilterStage] = useState<string>("all");
+  const [activeAsset, setActiveAsset] = useState<any | null>(null);
 
   const today = useMemo(() => new Date(), []);
 
@@ -139,7 +144,15 @@ export default function ScheduleView({
         </div>
 
         <div className="flex items-center gap-1 rounded-full border border-paper-line bg-paper-card p-1">
-          {(["by-job", "by-task", "by-week", "modular-flow"] as Mode[]).map(
+          {(
+            [
+              "by-job",
+              "by-task",
+              "by-week",
+              "modular-flow",
+              "p6-timeline",
+            ] as Mode[]
+          ).map(
             (m) => (
               <button
                 key={m}
@@ -223,8 +236,26 @@ export default function ScheduleView({
           onOpenBlocker={onOpenBlocker}
         />
       )}
+      {mode === "p6-timeline" && (
+        <P6Timeline
+          xer={project.uploads.xer}
+          assets={project.uploads.assets ?? []}
+          onOpenAsset={setActiveAsset}
+        />
+      )}
 
       {(mode === "by-job" || mode === "by-task") && <Legend />}
+
+      <AssetDetailPanel
+        asset={activeAsset}
+        blockerMap={blockerMap}
+        xer={project.uploads.xer}
+        onClose={() => setActiveAsset(null)}
+        onOpenBlocker={(id) => {
+          setActiveAsset(null);
+          onOpenBlocker(id);
+        }}
+      />
     </section>
   );
 }
@@ -1159,6 +1190,257 @@ function ModularStat({
       >
         {value}
       </p>
+    </div>
+  );
+}
+
+// ---------- P6 timeline (Job 9.D) ----------
+
+function fmtP6(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function p6BarColour(a: XerActivity, todayIso: string): string {
+  if (a.status === "COMPLETE") return "bg-green-500";
+  if (a.status === "IN_PROGRESS")
+    return a.target_end && a.target_end < todayIso
+      ? "bg-amber-500"
+      : "bg-blue-500";
+  if (a.target_start && a.target_start < todayIso) return "bg-red-500";
+  return "bg-zinc-400";
+}
+
+function P6Timeline({
+  xer,
+  assets,
+  onOpenAsset,
+}: {
+  xer: ParsedXer | null;
+  assets: any[];
+  onOpenAsset: (asset: any) => void;
+}) {
+  const [activeActivity, setActiveActivity] = useState<XerActivity | null>(null);
+
+  const codeToAsset = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const a of assets) {
+      const code = (a.activity_id ?? "").toString().trim();
+      if (code) m.set(code, a);
+    }
+    return m;
+  }, [assets]);
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  const domain = useMemo(() => {
+    if (!xer) return null;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const a of xer.activities) {
+      const s = a.target_start ? new Date(a.target_start).getTime() : NaN;
+      const e = a.target_end ? new Date(a.target_end).getTime() : NaN;
+      if (!Number.isNaN(s)) min = Math.min(min, s);
+      if (!Number.isNaN(e)) max = Math.max(max, e);
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min)
+      return null;
+    return { min, max, span: max - min };
+  }, [xer]);
+
+  const groups = useMemo(() => {
+    if (!xer) return [];
+    const nameById = new Map(xer.wbs.map((w) => [w.id, w.name]));
+    const byWbs = new Map<string, XerActivity[]>();
+    for (const a of xer.activities) {
+      const key = a.wbs_id ?? "—";
+      const arr = byWbs.get(key);
+      if (arr) arr.push(a);
+      else byWbs.set(key, [a]);
+    }
+    return Array.from(byWbs.entries())
+      .map(([id, items]) => ({
+        id,
+        name: nameById.get(id) ?? "Unassigned",
+        items: items
+          .slice()
+          .sort((x, y) =>
+            (x.target_start ?? "").localeCompare(y.target_start ?? ""),
+          ),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [xer]);
+
+  if (!xer) {
+    return (
+      <div className="rounded-2xl border border-dashed border-paper-line bg-paper-card p-10 text-center">
+        <p className="text-sm text-ink">
+          Drop a P6 XER export on Step 5 of the wizard to see your live schedule
+          here.
+        </p>
+        <p
+          className="mt-2 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
+          style={{ fontSize: 13 }}
+        >
+          Pilot week 4: direct Primavera Cloud API integration.
+        </p>
+      </div>
+    );
+  }
+
+  const pos = (iso: string | null): number => {
+    if (!iso || !domain) return 0;
+    const t = new Date(iso).getTime();
+    if (Number.isNaN(t)) return 0;
+    return ((t - domain.min) / domain.span) * 100;
+  };
+  const todayPct = Math.max(0, Math.min(100, pos(todayIso)));
+
+  return (
+    <div className="space-y-4">
+      <div className="overflow-hidden rounded-2xl border border-paper-line bg-paper-card">
+        <div className="flex">
+          <div className="w-[260px] flex-shrink-0 border-r border-paper-line bg-paper px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-ink-mid">
+            WBS / activity
+          </div>
+          <div className="flex flex-1 items-center justify-between px-3 py-2 font-mono text-[10px] text-ink-mid">
+            <span>{domain ? fmtP6(new Date(domain.min).toISOString()) : ""}</span>
+            <span className="text-accent-deep">Today</span>
+            <span>{domain ? fmtP6(new Date(domain.max).toISOString()) : ""}</span>
+          </div>
+        </div>
+
+        {groups.map((g) => (
+          <div key={g.id}>
+            <div className="flex items-center gap-2 border-t border-paper-line bg-paper-warm/40 px-4 py-1.5">
+              <span className="text-[11px] font-semibold text-ink">{g.name}</span>
+              <span className="font-mono text-[10px] text-ink-mid">
+                {g.items.length}
+              </span>
+            </div>
+            {g.items.map((a) => {
+              const mapped = codeToAsset.get(a.task_code);
+              const left = Math.max(0, Math.min(100, pos(a.target_start)));
+              const right = Math.max(0, Math.min(100, pos(a.target_end)));
+              const width = Math.max(1.5, right - left);
+              const slip = slipDays(a);
+              const tooltip = `${a.task_code} · ${a.task_name}\n${fmtP6(a.target_start)} → ${fmtP6(a.target_end)} · ${a.complete_pct}%${slip > 0 ? ` · slipped ${slip}d` : ""}${a.is_critical ? " · CRITICAL" : ""}${mapped ? `\nAsset: ${mapped.asset_id}` : ""}`;
+              return (
+                <div
+                  key={a.task_id}
+                  className="flex items-stretch border-t border-paper-line hover:bg-paper-warm/40"
+                >
+                  <div className="w-[260px] flex-shrink-0 border-r border-paper-line bg-paper px-4 py-2">
+                    <div className="flex items-center gap-1.5">
+                      {a.is_critical && (
+                        <span className="inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-600" />
+                      )}
+                      <span className="font-mono text-[10px] text-ink-mid">
+                        {a.task_code}
+                      </span>
+                      {mapped && (
+                        <span className="font-mono text-[9px] text-accent-deep">
+                          ↔ {mapped.asset_id}
+                        </span>
+                      )}
+                    </div>
+                    <p className="truncate text-xs text-ink">{a.task_name}</p>
+                  </div>
+                  <div className="relative flex-1 px-3 py-2">
+                    <div className="relative h-5">
+                      <div
+                        className="absolute top-0 h-full border-l border-dashed border-accent/40"
+                        style={{ left: `${todayPct}%` }}
+                        aria-hidden
+                      />
+                      <button
+                        type="button"
+                        title={tooltip}
+                        onClick={() =>
+                          mapped ? onOpenAsset(mapped) : setActiveActivity(a)
+                        }
+                        className={`absolute top-0 h-5 cursor-pointer rounded transition-shadow hover:ring-2 hover:ring-offset-1 ${p6BarColour(a, todayIso)} ${a.is_critical ? "border-2 border-red-600" : ""}`}
+                        style={{ left: `${left}%`, width: `${width}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-ink-mid">
+        {[
+          ["bg-green-500", "Complete"],
+          ["bg-blue-500", "In progress"],
+          ["bg-amber-500", "Slipping"],
+          ["bg-red-500", "Overdue (not started)"],
+          ["bg-zinc-400", "Planned"],
+        ].map(([cls, label]) => (
+          <span key={label} className="inline-flex items-center gap-1.5">
+            <span className={`inline-block h-3 w-5 rounded-sm ${cls}`} />
+            {label}
+          </span>
+        ))}
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-3 w-5 rounded-sm border-2 border-red-600" />
+          Critical path
+        </span>
+      </div>
+
+      {activeActivity && (
+        <div className="rounded-2xl border border-accent/30 bg-[color:var(--accent)]/[0.04] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-mono text-sm font-semibold text-ink">
+                {activeActivity.task_code}
+              </p>
+              <p className="text-xs text-ink-mid">{activeActivity.task_name}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveActivity(null)}
+              className="rounded-full p-1 text-ink-mid transition-colors hover:bg-paper-warm hover:text-ink"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-ink">
+            <p>
+              <span className="text-ink-mid">Planned start:</span>{" "}
+              {fmtP6(activeActivity.target_start)}
+            </p>
+            <p>
+              <span className="text-ink-mid">Planned end:</span>{" "}
+              {fmtP6(activeActivity.target_end)}
+            </p>
+            <p>
+              <span className="text-ink-mid">Status:</span>{" "}
+              {activeActivity.status.replace(/_/g, " ").toLowerCase()}
+            </p>
+            <p>
+              <span className="text-ink-mid">Complete:</span>{" "}
+              {activeActivity.complete_pct}%
+            </p>
+            {slipDays(activeActivity) > 0 && (
+              <p className="col-span-2 font-semibold text-red-700">
+                Slipped {slipDays(activeActivity)} days vs baseline
+              </p>
+            )}
+          </div>
+          <p className="mt-2 text-[11px] italic text-ink-mid">
+            No Keldra asset mapped to this activity yet.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

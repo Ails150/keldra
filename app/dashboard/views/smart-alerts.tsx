@@ -7,6 +7,7 @@ import {
   isOpen,
   totalDailyExposure,
 } from "../lib/blocker-state";
+import type { ParsedXer } from "../../onboarding/lib/xer-parser";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -23,12 +24,14 @@ type Props = {
   blockerMap: BlockerMap;
   assets: any[];
   people: any[];
+  xer?: ParsedXer | null;
   onAction?: (target: string) => void;
 };
 
 function typePill(type: string): string {
   switch (type) {
     case "ALERT":
+    case "CRITICAL_PATH_RISK":
       return "bg-red-100 text-red-700";
     case "PATTERN":
       return "bg-accent/10 text-accent-deep";
@@ -41,6 +44,41 @@ function typePill(type: string): string {
   }
 }
 
+function typeLabel(type: string): string {
+  return type === "CRITICAL_PATH_RISK" ? "CRITICAL PATH" : type;
+}
+
+// Open critical-path activities (from the ingested XER), each flagged if its
+// mapped asset has an open blocker. Empty when no XER is loaded.
+function buildCritical(
+  xer: ParsedXer | null | undefined,
+  assets: any[],
+  map: BlockerMap,
+) {
+  if (!xer) return [];
+  const blockedAssets = new Set<string>();
+  for (const b of Object.values(map)) {
+    if (isOpen(b)) for (const id of b.linked_assets) blockedAssets.add(id.trim());
+  }
+  const assetByCode = new Map<string, string>();
+  for (const a of assets) {
+    const code = (a.activity_id ?? "").toString().trim();
+    if (code) assetByCode.set(code, (a.asset_id ?? "").toString().trim());
+  }
+  return xer.activities
+    .filter((a) => a.is_critical && a.status !== "COMPLETE")
+    .map((a) => {
+      const asset_id = assetByCode.get(a.task_code) ?? null;
+      return {
+        task_code: a.task_code,
+        task_name: a.task_name,
+        target_end: a.target_end,
+        asset_id,
+        blocked: asset_id ? blockedAssets.has(asset_id) : false,
+      };
+    });
+}
+
 // Maps the dashboard's BlockerMap into the /api/insights payload shape. The
 // route expects owner_name (we hold current_owner) and a precomputed days_open.
 function buildPayload(
@@ -48,6 +86,7 @@ function buildPayload(
   map: BlockerMap,
   assets: any[],
   people: any[],
+  xer: ParsedXer | null | undefined,
 ) {
   const open = Object.values(map).filter(isOpen);
   const blockers = open.map((b) => ({
@@ -69,6 +108,7 @@ function buildPayload(
     totalExposurePerDay: totalDailyExposure(map),
     unownedCount: open.filter((b) => b.state === "unowned").length,
     awaitingInputCount: open.filter((b) => b.state === "awaiting-input").length,
+    criticalActivities: buildCritical(xer, assets, map),
   };
 }
 
@@ -77,6 +117,7 @@ export default function SmartAlerts({
   blockerMap,
   assets,
   people,
+  xer,
   onAction,
 }: Props) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -95,7 +136,9 @@ export default function SmartAlerts({
       const res = await fetch("/api/insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildPayload(projectName, blockerMap, assets, people)),
+        body: JSON.stringify(
+          buildPayload(projectName, blockerMap, assets, people, xer),
+        ),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -109,7 +152,7 @@ export default function SmartAlerts({
     } finally {
       setLoading(false);
     }
-  }, [projectName, blockerMap, assets, people]);
+  }, [projectName, blockerMap, assets, people, xer]);
 
   // Fetch once when the blocker set is first available; the Refresh button
   // re-runs against the current state on demand.
@@ -170,7 +213,7 @@ export default function SmartAlerts({
               <span
                 className={`mb-2 inline-flex w-fit rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${typePill(a.type)}`}
               >
-                {a.type}
+                {typeLabel(a.type)}
               </span>
               <p className="text-sm font-medium leading-snug text-ink">{a.title}</p>
               <p className="mt-1 flex-1 text-xs leading-relaxed text-ink-mid">

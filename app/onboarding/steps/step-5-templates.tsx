@@ -15,6 +15,8 @@ import {
   DUB12_CONSTRAINTS_CSV,
   DUB12_TEAM_CSV,
 } from "../sample-data/dub12";
+import { parseXer, type ParsedXer } from "../lib/xer-parser";
+import { DUB12_XER } from "../sample-data/dub12-xer";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -189,6 +191,7 @@ function fmtDate(iso: string): string {
 export default function Step5Templates({ formData, setFormData }: StepProps) {
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [xerError, setXerError] = useState<string | null>(null);
 
   function handleFile(key: UploadKey, e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -253,6 +256,31 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
     }
   }
 
+  async function handleXerFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setParsing(true);
+    setXerError(null);
+    try {
+      const xer = await parseXer(file);
+      if (xer.activities.length === 0) {
+        setXerError(
+          "No activities found — make sure this is a P6 XER export with a TASK table.",
+        );
+        return;
+      }
+      setFormData((prev) => ({
+        ...prev,
+        uploads: { ...prev.uploads, xer },
+      }));
+    } catch {
+      setXerError("Could not read that file. Export it from P6 as .xer.");
+    } finally {
+      setParsing(false);
+    }
+  }
+
   function parseCsv(csv: string): any[] {
     return Papa.parse<Record<string, string>>(csv, {
       header: true,
@@ -274,10 +302,13 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
         "dub12-constraint-log.csv",
         constraints,
       );
+      const xer = await parseXer(
+        new File([DUB12_XER], "DUB-12_Building_4.xer"),
+      );
       setFormData((prev) => ({
         ...prev,
         template: prev.template ?? "mercury-red-tag",
-        uploads: { team, assets, constraints, register },
+        uploads: { team, assets, constraints, register, xer },
       }));
     } catch {
       setParseError("Could not load the DUB-12 sample data.");
@@ -438,6 +469,15 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
             parsing={parsing}
             error={parseError}
             onFile={handleRegisterFile}
+          />
+        </div>
+
+        <div className="mt-3">
+          <XerCard
+            xer={formData.uploads.xer}
+            parsing={parsing}
+            error={xerError}
+            onFile={handleXerFile}
           />
         </div>
       </div>
@@ -694,6 +734,138 @@ function RegisterCard({
         <p className="max-w-md text-xs leading-snug text-ink-mid">
           Accepts action registers, constraint logs, security meeting minutes,
           defect trackers. The Comments column becomes your audit history.
+        </p>
+      </div>
+
+      {error && (
+        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          {error}
+        </p>
+      )}
+    </label>
+  );
+}
+
+function ScheduleIcon({ className = "h-7 w-7" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M3 9h18M8 2v4M16 2v4" />
+      <path d="M7 13h5M7 17h8" />
+    </svg>
+  );
+}
+
+function XerCard({
+  xer,
+  parsing,
+  error,
+  onFile,
+}: {
+  xer: ParsedXer | null;
+  parsing: boolean;
+  error: string | null;
+  onFile: (e: ChangeEvent<HTMLInputElement>) => void;
+}) {
+  // ---- done state ----
+  if (xer) {
+    const s = xer.stats;
+    const plan = xer.project
+      ? `${xer.project.planStart ? fmtDate(xer.project.planStart) : "—"} → ${
+          xer.project.planEnd ? fmtDate(xer.project.planEnd) : "—"
+        }`
+      : "—";
+    return (
+      <div className="rounded-2xl border border-green-300 bg-green-50/60 p-5">
+        <p
+          className="font-mono font-semibold uppercase text-accent-deep"
+          style={{ fontSize: 10, letterSpacing: "0.14em" }}
+        >
+          Programme / schedule · ingested
+        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-600 text-white">
+            <CheckIcon className="h-3.5 w-3.5" />
+          </span>
+          <span className="font-mono text-sm text-ink truncate">
+            {xer.fileName}
+          </span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <RegisterStat value={`${s.activityCount}`} label="activities parsed" />
+          <RegisterStat
+            value={`${s.completedCount} · ${s.inProgressCount} · ${s.notStartedCount}`}
+            label="complete · in progress · not started"
+          />
+          <RegisterStat value={`${s.criticalCount}`} label="on critical path" />
+          <RegisterStat
+            value={`${s.slippingCount}`}
+            label="slipping vs baseline"
+          />
+        </div>
+
+        <p className="mt-3 text-xs text-ink">
+          <span className="font-semibold">Plan:</span> {plan}
+        </p>
+
+        <p className="mt-2 text-xs italic text-ink-mid">
+          Activities mapped to assets via task_code. Unmapped activities remain
+          visible in the schedule but unlinked.
+        </p>
+      </div>
+    );
+  }
+
+  // ---- empty state ----
+  return (
+    <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-paper-line bg-paper-card p-5 transition-all hover:border-accent hover:bg-paper-warm/40">
+      <input
+        type="file"
+        accept=".xer"
+        className="sr-only"
+        onChange={onFile}
+      />
+      <p
+        className="font-mono font-semibold uppercase text-accent-deep"
+        style={{ fontSize: 10, letterSpacing: "0.14em" }}
+      >
+        Programme / schedule
+      </p>
+      <h3
+        className="mt-1.5 font-[family-name:var(--font-fraunces)] font-medium text-ink"
+        style={{ fontSize: 18, lineHeight: 1.2 }}
+      >
+        P6 XER export
+      </h3>
+      <p className="mt-1 italic text-ink-mid" style={{ fontSize: 13 }}>
+        Drag your P6 XER file here. Keldra reads activities, dates, and
+        relationships.
+      </p>
+
+      <div className="mt-4 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-paper-line bg-paper-warm/30 px-4 py-7 text-center">
+        <span className="text-ink-mid">
+          <ScheduleIcon />
+        </span>
+        {parsing ? (
+          <p className="text-sm font-medium text-accent-deep">Parsing…</p>
+        ) : (
+          <p className="text-sm font-medium text-ink">
+            Drop .xer file here, or click to upload
+          </p>
+        )}
+        <p className="max-w-md text-xs leading-snug text-ink-mid">
+          Accepts P6 XER exports from Primavera v15 onwards. Activities map to
+          your asset register via activity ID.
         </p>
       </div>
 
