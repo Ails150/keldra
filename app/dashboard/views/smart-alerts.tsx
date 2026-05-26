@@ -135,7 +135,7 @@ export default function SmartAlerts({
           </p>
           {source && (
             <span className="rounded-full bg-paper-warm px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-ink-mid">
-              {source === "gemini" ? "Gemini 2.5 Flash" : "Rule-based"}
+              {source === "gemini" ? "Powered by Gemini" : "Rule-based"}
             </span>
           )}
         </div>

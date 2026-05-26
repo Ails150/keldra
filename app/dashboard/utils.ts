@@ -60,16 +60,59 @@ export function isBlankOwner(row: any): boolean {
   return ((row?.owner_name ?? "") as string).toString().trim() === "";
 }
 
+// Canonical org keys the role filters reason about. Free text gets matched
+// against these — exact substring first, then fuzzy (handles typos like
+// "Mecury" / "Ardmak").
+const CANONICAL_ORGS = [
+  "mercury",
+  "ardmac",
+  "central",
+  "primo",
+  "hyperscaler",
+  "microsoft",
+  "cundall",
+  "evolution",
+  "del",
+];
+
+// Standard Levenshtein edit distance.
+export function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  let curr = new Array<number>(n + 1);
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n];
+}
+
 // Map a free-text org name to a canonical short key the role filters can
 // reason about ("ardmac", "mercury", "central", "client", ...).
 export function orgKey(name: string): string {
   const n = normaliseOrg(name);
   if (!n) return "";
-  if (n.includes("ardmac")) return "ardmac";
-  if (n.includes("mercury")) return "mercury";
-  if (n.includes("central")) return "central";
-  if (n.includes("primo")) return "primo";
+  // Preserve the existing client alias (the role switcher uses "Hyperscaler X").
   if (n.includes("hyperscaler") || n.includes("client")) return "client";
+  // Exact substring against canonical orgs.
+  for (const c of CANONICAL_ORGS) {
+    if (n.includes(c)) return c;
+  }
+  // Fuzzy: any word within edit-distance threshold of a canonical name.
+  // Threshold scales with name length so short names ("del") stay strict.
+  for (const word of n.split(/\s+/).filter(Boolean)) {
+    for (const c of CANONICAL_ORGS) {
+      const maxDist = Math.min(2, Math.max(1, Math.floor(c.length / 2)));
+      if (levenshtein(word, c) <= maxDist) return c;
+    }
+  }
   return n;
 }
 

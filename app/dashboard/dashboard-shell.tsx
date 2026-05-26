@@ -124,6 +124,19 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
     };
   }, [project]);
 
+  // Pick up blocker changes written by another tab (e.g. /field captures on the
+  // same device) so they appear live without a manual refresh.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "keldra_blocker_state") {
+        const next = readBlockerState();
+        if (next) setBlockerMap(next);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   const actorName = useMemo(() => {
     if (!project) return userEmail || "Demo user";
     const first = (project.uploads.team ?? []).find(
@@ -285,6 +298,14 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
           </div>
 
           <div className="flex items-center gap-3">
+            <a
+              href="/field"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-accent-deep transition-colors hover:text-accent md:inline"
+            >
+              Field mode ↗
+            </a>
             <button
               type="button"
               onClick={() => setInviteOpen(true)}

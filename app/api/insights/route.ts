@@ -26,15 +26,24 @@ export async function POST(req: NextRequest) {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
+    // Disable 2.5-flash's default "thinking" — with the full project payload it
+    // pushes latency to ~22s (over the 15s budget). Off, it returns in ~5s.
+    // thinkingConfig isn't in the SDK's GenerationConfig type yet but the v1beta
+    // API honours it, so it's passed through an untyped object.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const generationConfig: any = {
+      responseMimeType: 'application/json',
+      thinkingConfig: { thinkingBudget: 0 },
+    };
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
-      generationConfig: { responseMimeType: 'application/json' }
+      generationConfig,
     });
 
     const prompt = buildPrompt(projectState);
     const result = await Promise.race([
       model.generateContent(prompt),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000))
     ]) as any;
 
     const text = result.response.text();

@@ -47,29 +47,34 @@ export default function TodayView({
   const role = viewingAs.role;
 
   // Stat tiles
-  const tiles: { label: string; value: string | number; sub?: string }[] =
+  const tiles: {
+    label: string;
+    value: string | number;
+    sub?: string;
+    target?: string;
+  }[] =
     role === "client"
       ? [
-          { label: "Open constraints", value: constraints.length, sub: "Critical / client" },
-          { label: "Awaiting sign-off", value: assets.filter((a) => (a.current_stage ?? "").toLowerCase().includes("yellow")).length, sub: "Yellow → Green" },
-          { label: "Orgs on project", value: new Set((project.uploads.team ?? []).map((p: any) => (p.organisation ?? "").toString().trim()).filter(Boolean)).size, sub: "Visible to you" },
+          { label: "Open constraints", value: constraints.length, sub: "Critical / client", target: "tab:constraints" },
+          { label: "Awaiting sign-off", value: assets.filter((a) => (a.current_stage ?? "").toLowerCase().includes("yellow")).length, sub: "Yellow → Green", target: "tab:assets" },
+          { label: "Orgs on project", value: new Set((project.uploads.team ?? []).map((p: any) => (p.organisation ?? "").toString().trim()).filter(Boolean)).size, sub: "Visible to you", target: "tab:people" },
         ]
       : role === "design"
         ? [
-            { label: "Open design RFIs", value: constraints.length, sub: "Awaiting your action" },
-            { label: "Assets with RFIs", value: assets.length, sub: "Across the register" },
-            { label: "Owner unclear", value: unclear.length, sub: "On design constraints" },
+            { label: "Open design RFIs", value: constraints.length, sub: "Awaiting your action", target: "tab:constraints" },
+            { label: "Assets with RFIs", value: assets.length, sub: "Across the register", target: "tab:assets" },
+            { label: "Owner unclear", value: unclear.length, sub: "On design constraints", target: "filter:unowned" },
           ]
         : role === "subcontractor"
           ? [
-              { label: "Your open items", value: constraints.length, sub: `On ${viewingAs.orgName}` },
-              { label: "Your assets", value: assets.length, sub: "Owned + interfaced" },
-              { label: "Owner unclear", value: unclear.length, sub: "Need someone to grab" },
+              { label: "Your open items", value: constraints.length, sub: `On ${viewingAs.orgName}`, target: "tab:constraints" },
+              { label: "Your assets", value: assets.length, sub: "Owned + interfaced", target: "tab:assets" },
+              { label: "Owner unclear", value: unclear.length, sub: "Need someone to grab", target: "filter:unowned" },
             ]
           : [
-              { label: "Open constraints", value: constraints.length, sub: "Across the project" },
-              { label: "Owner unclear", value: unclear.length, sub: "Top of the pile" },
-              { label: "People on project", value: team.length || project.uploads.team?.length || 0, sub: "Across all orgs" },
+              { label: "Open constraints", value: constraints.length, sub: "Across the project", target: "tab:constraints" },
+              { label: "Owner unclear", value: unclear.length, sub: "Top of the pile", target: "filter:unowned" },
+              { label: "People on project", value: team.length || project.uploads.team?.length || 0, sub: "Across all orgs", target: "tab:people" },
             ];
 
   // Today's walks — captioned per role
@@ -108,23 +113,31 @@ export default function TodayView({
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {tiles.map((t) => (
-          <div
-            key={t.label}
-            className="rounded-2xl border border-paper-line bg-paper-card p-5"
-          >
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid">
-              {t.label}
-            </p>
-            <p
-              className="mt-2 font-[family-name:var(--font-fraunces)] font-semibold text-ink"
-              style={{ fontSize: 40, lineHeight: 1 }}
+        {tiles.map((t) => {
+          const clickable = Boolean(t.target && onAlertAction);
+          return (
+            <button
+              key={t.label}
+              type="button"
+              disabled={!clickable}
+              onClick={() => t.target && onAlertAction?.(t.target)}
+              className={`rounded-2xl border border-paper-line bg-paper-card p-5 text-left transition-shadow ${
+                clickable ? "cursor-pointer hover:shadow-sm" : "cursor-default"
+              }`}
             >
-              {t.value}
-            </p>
-            {t.sub && <p className="mt-1 text-xs text-ink-mid">{t.sub}</p>}
-          </div>
-        ))}
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid">
+                {t.label}
+              </p>
+              <p
+                className="mt-2 font-[family-name:var(--font-fraunces)] font-semibold text-ink"
+                style={{ fontSize: 40, lineHeight: 1 }}
+              >
+                {t.value}
+              </p>
+              {t.sub && <p className="mt-1 text-xs text-ink-mid">{t.sub}</p>}
+            </button>
+          );
+        })}
       </div>
 
       {unclear.length > 0 && (

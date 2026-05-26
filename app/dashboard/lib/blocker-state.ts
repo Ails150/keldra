@@ -245,6 +245,57 @@ export async function hydrateFromProject(
   return map;
 }
 
+// ---------- field capture ----------
+
+// Creates a new, unowned blocker from a field capture (voice/photo/text) with
+// a hash-chained "field-capture" event, and returns the updated map. Used by
+// the /field route so phone captures land in the same store as the dashboard.
+export async function createCapturedBlocker(
+  map: BlockerMap,
+  params: {
+    actor: string;
+    description: string;
+    assetId?: string;
+    note?: string;
+    hasVoice?: boolean;
+    hasPhoto?: boolean;
+  },
+): Promise<{ map: BlockerMap; id: string }> {
+  const nowIso = new Date().toISOString();
+  const id = `F-${Date.now().toString(36).toUpperCase()}`;
+  const stamp = new Date().toLocaleString("en-GB");
+  const content = `${params.actor} captured field evidence at ${stamp}`;
+  const evt = await buildEvent(undefined, "field-capture", params.actor, nowIso, {
+    note: content,
+    text: params.note ?? "",
+    asset: params.assetId ?? null,
+    voice: Boolean(params.hasVoice),
+    photo: Boolean(params.hasPhoto),
+  });
+
+  const blocker: Blocker = {
+    id,
+    description: params.description || content,
+    linked_assets: params.assetId ? [params.assetId] : [],
+    raised_by: params.actor,
+    state: "unowned",
+    current_owner: null,
+    current_owner_org: null,
+    waiting_on_person: null,
+    waiting_on_org: null,
+    since_timestamp: nowIso,
+    events: [evt],
+    cost_per_day: costForPriority("Medium"),
+    sit_on_today: false,
+    sit_on_today_date: null,
+    proposed_resolution_note: null,
+    priority: "Medium",
+    raised_date: nowIso,
+  };
+
+  return { map: { ...map, [id]: blocker }, id };
+}
+
 // ---------- persistence ----------
 
 export function readBlockerState(): BlockerMap | null {

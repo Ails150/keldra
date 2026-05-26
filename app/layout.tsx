@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter_Tight } from "next/font/google";
 import "./globals.css";
+import SwRegister from "./sw-register";
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -19,6 +20,15 @@ export const metadata: Metadata = {
   title: "Keldra · See. Solve. Scale.",
   description:
     "The construction accountability layer. Built on 20 years of finding millions in data that nobody else could see.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "Keldra",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#8a3dd6",
 };
 
 export default function RootLayout({
@@ -31,7 +41,10 @@ export default function RootLayout({
       lang="en"
       className={`${fraunces.variable} ${interTight.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <SwRegister />
+      </body>
     </html>
   );
 }

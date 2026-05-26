@@ -10,9 +10,25 @@ export default function SignOutButton() {
 
   async function handleSignOut() {
     setLoading(true);
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.refresh();
+    // Don't let a hung Supabase call trap the user — race it against a 2s
+    // fallback, then clear demo state and leave regardless of the outcome.
+    try {
+      const supabase = createClient();
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((resolve) => setTimeout(resolve, 2000)),
+      ]);
+    } catch {
+      // ignore — we clear local state and redirect either way
+    }
+    try {
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith("keldra_"))
+        .forEach((k) => localStorage.removeItem(k));
+    } catch {
+      // localStorage may be unavailable — fine
+    }
+    router.push("/");
   }
 
   return (
