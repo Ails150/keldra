@@ -4,7 +4,7 @@ import { Fragment, useMemo, useState } from "react";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { Blocker, BlockerMap } from "../lib/blocker-state";
 import type { ParsedXer, XerActivity } from "../../onboarding/lib/xer-parser";
-import { slipDays } from "../../onboarding/lib/xer-parser";
+import { slipDays, xerByCode } from "../../onboarding/lib/xer-parser";
 import AssetDetailPanel from "./asset-detail-panel";
 import {
   type AssetStatus,
@@ -85,22 +85,50 @@ export default function ScheduleView({
     [project.uploads.assets, viewingAs.role, viewingAs.orgName],
   );
 
-  // Per-asset derived data.
+  const xerIdx = useMemo(
+    () => xerByCode(project.uploads.xer),
+    [project.uploads.xer],
+  );
+
+  const constraintsByAsset = useMemo(() => {
+    const m = new Map<string, any[]>();
+    for (const c of project.uploads.constraints ?? []) {
+      const ids = (c.linked_assets ?? "")
+        .toString()
+        .split(/[,;|]/)
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+      for (const id of ids) {
+        const arr = m.get(id) ?? [];
+        arr.push(c);
+        m.set(id, arr);
+      }
+    }
+    return m;
+  }, [project.uploads.constraints]);
+
+  // Per-asset derived data — including a real start→end window and a
+  // date-aware bar status for the Gantt.
   const enriched = useMemo(
     () =>
       assets.map((a: any) => {
         const planned = getAssetPlannedEnd(a, today);
         const status = getAssetActualStatus(a, blockerMap);
         const linked = getLinkedBlockers(a, blockerMap);
+        const sched = deriveSchedule(a, xerIdx, constraintsByAsset, today);
         return {
           asset: a,
           plannedEnd: planned,
           daysUntil: daysBetween(planned, today),
           status,
           linked,
+          start: sched.start,
+          end: sched.end,
+          source: sched.source,
+          barState: deriveBarState(a, sched, linked, today),
         };
       }),
-    [assets, blockerMap, today],
+    [assets, blockerMap, today, xerIdx, constraintsByAsset],
   );
 
   const orgOptions = useMemo(() => {
@@ -369,6 +397,10 @@ type EnrichedAsset = {
   daysUntil: number;
   status: AssetStatus;
   linked: Blocker[];
+  start: Date;
+  end: Date;
+  source: Sched["source"];
+  barState: BarState;
 };
 
 function matchesStageFilter(s: AssetStatus, f: string): boolean {
@@ -403,7 +435,7 @@ function ByTaskRows({
           }
           return matchesStageFilter(e.status, filterStage);
         })
-        .sort((a, b) => a.plannedEnd.getTime() - b.plannedEnd.getTime()),
+        .sort((a, b) => a.start.getTime() - b.start.getTime()),
     [enriched, filterOrg, filterStage],
   );
 
@@ -432,12 +464,14 @@ function ByTaskRows({
               </div>
             }
             today={today}
-            startDays={0}
-            endDays={Math.max(0, e.daysUntil)}
-            status={e.status}
-            barText={e.asset.asset_id ?? ""}
+            start={e.start}
+            end={e.end}
+            barState={e.barState}
+            stageText={(e.asset.current_stage ?? "").toString() || "—"}
             linked={e.linked}
-            plannedEnd={e.plannedEnd}
+            costPerDay={e.linked[0]?.cost_per_day}
+            activityId={e.source === "p6" ? (e.asset.activity_id ?? null) : null}
+            assetTitle={`${e.asset.asset_id ?? "—"} · ${e.asset.asset_type ?? ""}`.trim()}
             onOpenBlocker={onOpenBlocker}
             onClickBar={() => {
               if (e.linked.length > 0) onOpenBlocker(e.linked[0].id);
@@ -458,9 +492,9 @@ function ByTaskRows({
 type GroupRow = {
   key: string;
   items: EnrichedAsset[];
-  minDays: number;
-  maxDays: number;
-  status: AssetStatus;
+  start: Date;
+  end: Date;
+  barState: BarState;
 };
 
 function ByJobRows({
@@ -484,16 +518,15 @@ function ByJobRows({
         .map((a) => enriched.find((e) => e.asset === a))
         .filter((e): e is EnrichedAsset => Boolean(e));
       if (items.length === 0) continue;
-      const days = items.map((i) => i.daysUntil);
       out.push({
         key,
         items,
-        minDays: Math.min(...days),
-        maxDays: Math.max(...days),
-        status: worstStatus(items.map((i) => i.status)),
+        start: new Date(Math.min(...items.map((i) => i.start.getTime()))),
+        end: new Date(Math.max(...items.map((i) => i.end.getTime()))),
+        barState: worstBarState(items.map((i) => i.barState)),
       });
     }
-    return out.sort((a, b) => a.minDays - b.minDays);
+    return out.sort((a, b) => a.start.getTime() - b.start.getTime());
   }, [enriched]);
 
   if (groups.length === 0) {
@@ -509,8 +542,9 @@ function ByJobRows({
       <ul className="divide-y divide-paper-line">
         {groups.map((g) => {
           const isOpen = expanded.has(g.key);
-          const blockedCount = g.items.filter((i) => i.status === "blocked")
-            .length;
+          const blockedCount = g.items.filter(
+            (i) => i.barState === "blocked",
+          ).length;
           return (
             <li key={g.key}>
               <Row
@@ -536,14 +570,12 @@ function ByJobRows({
                     </span>
                   </button>
                 }
-                startDays={g.minDays}
-                endDays={g.maxDays}
-                status={g.status}
-                barText={`${g.items.length} assets`}
+                start={g.start}
+                end={g.end}
+                barState={g.barState}
+                stageText={`${g.items.length} assets`}
                 linked={[]}
-                plannedEnd={
-                  new Date(today.getTime() + g.maxDays * 86400000)
-                }
+                assetTitle={g.key}
                 onOpenBlocker={onOpenBlocker}
                 onClickBar={() => onToggleExpand(g.key)}
               />
@@ -551,11 +583,10 @@ function ByJobRows({
                 <ul className="divide-y divide-paper-line bg-paper-warm/30">
                   {g.items
                     .slice()
-                    .sort((a, b) => a.daysUntil - b.daysUntil)
+                    .sort((a, b) => a.start.getTime() - b.start.getTime())
                     .map((e) => (
                       <Row
                         key={e.asset.asset_id ?? Math.random()}
-                        indented
                         today={today}
                         label={
                           <div className="min-w-0 pl-5">
@@ -567,12 +598,18 @@ function ByJobRows({
                             </p>
                           </div>
                         }
-                        startDays={0}
-                        endDays={Math.max(0, e.daysUntil)}
-                        status={e.status}
-                        barText={e.asset.asset_id ?? ""}
+                        start={e.start}
+                        end={e.end}
+                        barState={e.barState}
+                        stageText={
+                          (e.asset.current_stage ?? "").toString() || "—"
+                        }
                         linked={e.linked}
-                        plannedEnd={e.plannedEnd}
+                        costPerDay={e.linked[0]?.cost_per_day}
+                        activityId={
+                          e.source === "p6" ? (e.asset.activity_id ?? null) : null
+                        }
+                        assetTitle={`${e.asset.asset_id ?? "—"} · ${e.asset.asset_type ?? ""}`.trim()}
                         onOpenBlocker={onOpenBlocker}
                         onClickBar={() => {
                           if (e.linked.length > 0)
@@ -596,62 +633,209 @@ function ByJobRows({
 
 // ---------- shared row + bar ----------
 
-function clampPercent(n: number): number {
-  if (Number.isNaN(n)) return 0;
-  return Math.max(0, Math.min(100, n));
+const DAY = 86400000;
+
+// Date-aware bar status (drives colour). Precedence per the schedule spec.
+type BarState =
+  | "blocked"
+  | "overdue"
+  | "at-risk"
+  | "in-progress"
+  | "complete"
+  | "not-started";
+
+const BAR: Record<BarState, { bg: string; ring: string; label: string }> = {
+  blocked: { bg: "bg-red-500", ring: "ring-red-500", label: "Blocked" },
+  overdue: {
+    bg: "[background:repeating-linear-gradient(45deg,#ef4444,#ef4444_6px,#fecaca_6px,#fecaca_12px)]",
+    ring: "ring-red-500",
+    label: "Overdue",
+  },
+  "at-risk": { bg: "bg-amber-500", ring: "ring-amber-500", label: "At risk" },
+  "in-progress": { bg: "bg-accent", ring: "ring-accent", label: "In progress" },
+  complete: { bg: "bg-green-500", ring: "ring-green-500", label: "Complete" },
+  "not-started": { bg: "bg-zinc-400", ring: "ring-zinc-400", label: "Not started" },
+};
+
+const BAR_RANK: Record<BarState, number> = {
+  blocked: 6,
+  overdue: 5,
+  "at-risk": 4,
+  "in-progress": 3,
+  "not-started": 2,
+  complete: 1,
+};
+
+function worstBarState(states: BarState[]): BarState {
+  if (states.length === 0) return "not-started";
+  return states.reduce((a, b) => (BAR_RANK[b] > BAR_RANK[a] ? b : a));
+}
+
+function parseDateSafe(v: unknown): Date | null {
+  const s = (v ?? "").toString().trim();
+  if (!s) return null;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+type Sched = {
+  start: Date;
+  end: Date;
+  source: "p6" | "constraints" | "events" | "fallback";
+};
+
+// Derives a real start→end window for an asset, in order of accuracy:
+// 1) linked P6 activity dates, 2) linked constraint raised→deadline span,
+// 3) latest stage-transition date + 14d, 4) today → today+30d fallback.
+function deriveSchedule(
+  asset: any,
+  xerIdx: Map<string, XerActivity>,
+  consByAsset: Map<string, any[]>,
+  today: Date,
+): Sched {
+  const code = (asset.activity_id ?? "").toString().trim();
+  if (code) {
+    const act = xerIdx.get(code);
+    if (act) {
+      const s = parseDateSafe(act.target_start);
+      const e = parseDateSafe(act.target_end);
+      if (s && e) return { start: s, end: e, source: "p6" };
+    }
+  }
+
+  const id = (asset.asset_id ?? "").toString().trim();
+  const cons = consByAsset.get(id) ?? [];
+  if (cons.length) {
+    const starts = cons
+      .map((c) => parseDateSafe(c.raised_date))
+      .filter((d): d is Date => !!d);
+    const ends = cons
+      .map((c) => parseDateSafe(c.deadline))
+      .filter((d): d is Date => !!d);
+    if (starts.length && ends.length) {
+      const start = new Date(Math.min(...starts.map((d) => d.getTime())));
+      const end = new Date(Math.max(...ends.map((d) => d.getTime())));
+      if (end.getTime() > start.getTime())
+        return { start, end, source: "constraints" };
+    }
+  }
+
+  const tags = [
+    asset.green_date,
+    asset.yellow_tag_date,
+    asset.red_tag_date,
+    asset.installed_date,
+    asset.delivered_date,
+  ]
+    .map(parseDateSafe)
+    .filter((d): d is Date => !!d);
+  if (tags.length) {
+    const start = new Date(Math.max(...tags.map((d) => d.getTime())));
+    return { start, end: new Date(start.getTime() + 14 * DAY), source: "events" };
+  }
+
+  return { start: today, end: new Date(today.getTime() + 30 * DAY), source: "fallback" };
+}
+
+function assetHasStages(asset: any): boolean {
+  return [
+    "green_date",
+    "yellow_tag_date",
+    "red_tag_date",
+    "installed_date",
+    "delivered_date",
+  ].some((k) => (asset[k] ?? "").toString().trim());
+}
+
+function deriveBarState(
+  asset: any,
+  sched: Sched,
+  linkedOpen: Blocker[],
+  today: Date,
+): BarState {
+  const stage = (asset.current_stage ?? "").toString().toLowerCase();
+  const isComplete = stage.includes("green") || stage.includes("handover");
+  const t = today.getTime();
+  const endT = sched.end.getTime();
+  const blocked = linkedOpen.length > 0;
+
+  if (endT > t && blocked) return "blocked";
+  if (endT < t && !isComplete) return "overdue";
+  if (endT >= t && endT <= t + 7 * DAY && !isComplete) return "at-risk";
+  if (assetHasStages(asset) && !isComplete) return "in-progress";
+  if (isComplete) return "complete";
+  if (sched.start.getTime() > t) return "not-started";
+  return "in-progress";
+}
+
+function truncate14(s: string): string {
+  return s.length > 14 ? s.slice(0, 13) + "…" : s;
+}
+
+function fmtBarDate(d: Date): string {
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
 }
 
 function Row({
   label,
   today,
-  startDays,
-  endDays,
-  status,
-  barText,
+  start,
+  end,
+  barState,
+  stageText,
   linked,
-  plannedEnd,
+  costPerDay,
+  activityId,
+  assetTitle,
   onClickBar,
   onOpenBlocker,
-  indented,
 }: {
   label: React.ReactNode;
   today: Date;
-  startDays: number;
-  endDays: number;
-  status: AssetStatus;
-  barText: string;
+  start: Date;
+  end: Date;
+  barState: BarState;
+  stageText: string;
   linked: Blocker[];
-  plannedEnd: Date;
+  costPerDay?: number;
+  activityId?: string | null;
+  assetTitle: string;
   onClickBar: () => void;
   onOpenBlocker: (id: string) => void;
-  indented?: boolean;
 }) {
-  const left = clampPercent((Math.max(0, startDays) / WINDOW_DAYS) * 100);
-  const rightEdge = clampPercent((Math.max(0, endDays) / WINDOW_DAYS) * 100);
-  const width = Math.max(4, rightEdge - left);
+  // Position the bar across the timeline (today → today + WINDOW_DAYS).
+  const startDays = daysBetween(start, today); // negative when start is in the past
+  const endDays = daysBetween(end, today);
+  const leftPct = (startDays / WINDOW_DAYS) * 100;
+  const rightPct = (endDays / WINDOW_DAYS) * 100;
+  const left = Math.max(0, Math.min(95, leftPct));
+  const right = Math.max(0, Math.min(100, rightPct));
+  const width = Math.max(2, Math.min(100 - left, right - left));
 
   const overdue = endDays < 0;
-  const slippedDays = overdue ? Math.abs(endDays) : 0;
-  const bar = STATUS_BAR[status];
+  const slippedDays = overdue ? -endDays : 0;
+  const bar = BAR[barState];
   const primaryBlocker = linked[0];
+  const showWhy =
+    (barState === "blocked" || barState === "overdue") && !!primaryBlocker;
+
   const tooltip = [
-    barText || "Asset",
-    `Stage: ${status}`,
-    `Planned end: ${plannedEnd.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}`,
-    overdue ? `Overdue ${slippedDays}d` : `${endDays}d until planned end`,
+    assetTitle,
+    `${fmtBarDate(start)} → ${fmtBarDate(end)}`,
+    overdue
+      ? `Overdue ${slippedDays}d`
+      : `${Math.max(0, endDays)}d until deadline`,
     linked.length > 0
-      ? `${linked.length} linked blocker${linked.length === 1 ? "" : "s"}`
+      ? `${linked.length} open blocker${linked.length === 1 ? "" : "s"}`
       : null,
+    costPerDay ? `${GBP.format(costPerDay)}/day cost-of-delay` : null,
+    activityId ? `P6 ${activityId}` : null,
   ]
     .filter(Boolean)
     .join(" · ");
 
   return (
-    <div
-      className={`group flex items-stretch transition-colors hover:bg-paper-warm/60 ${
-        indented ? "" : ""
-      }`}
-    >
+    <div className="group flex items-stretch transition-colors hover:bg-paper-warm/60">
       <div className="w-[240px] flex-shrink-0 border-r border-paper-line bg-paper px-4 py-3">
         {label}
       </div>
@@ -667,12 +851,9 @@ function Row({
             onClick={onClickBar}
             title={tooltip}
             className={`absolute top-0 flex h-6 cursor-pointer items-center overflow-hidden rounded-md px-2 text-[11px] font-medium text-white transition-shadow hover:ring-2 hover:ring-offset-1 ${bar.bg} ${bar.ring}`}
-            style={{
-              left: `${left}%`,
-              width: `${width}%`,
-            }}
+            style={{ left: `${left}%`, width: `${width}%` }}
           >
-            <span className="truncate">{barText}</span>
+            <span className="truncate">{truncate14(stageText)}</span>
           </button>
 
           {overdue && (
@@ -685,7 +866,7 @@ function Row({
           )}
         </div>
 
-        {primaryBlocker && (
+        {showWhy && (
           <button
             type="button"
             onClick={() => onOpenBlocker(primaryBlocker.id)}
@@ -714,21 +895,19 @@ function Row({
 // ---------- legend ----------
 
 function Legend() {
-  const items: { key: AssetStatus; copy: string }[] = [
-    { key: "on-track", copy: "On track" },
+  const items: { key: BarState; copy: string }[] = [
+    { key: "complete", copy: "Complete" },
     { key: "in-progress", copy: "In progress" },
-    { key: "at-risk", copy: "At risk" },
-    { key: "slipping", copy: "Slipping" },
-    { key: "blocked", copy: "Blocked (linked to open blocker)" },
-    { key: "stalled", copy: "Stalled" },
+    { key: "at-risk", copy: "At risk (≤7 days)" },
+    { key: "overdue", copy: "Overdue" },
+    { key: "blocked", copy: "Blocked (open blocker)" },
+    { key: "not-started", copy: "Not started" },
   ];
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-ink-mid">
       {items.map((i) => (
         <span key={i.key} className="inline-flex items-center gap-1.5">
-          <span
-            className={`inline-block h-3 w-5 rounded-sm ${STATUS_BAR[i.key].bg}`}
-          />
+          <span className={`inline-block h-3 w-5 rounded-sm ${BAR[i.key].bg}`} />
           {i.copy}
         </span>
       ))}
