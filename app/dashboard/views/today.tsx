@@ -48,6 +48,21 @@ function roomBadge(
   return { label: r.code, bg };
 }
 
+// ----- Director status traffic-light severity -----
+type Sev = "red" | "amber" | "green";
+const SEV_RANK: Record<Sev, number> = { red: 3, amber: 2, green: 1 };
+function sevColour(s: Sev): string {
+  return s === "red" ? BRAND.dangerInk : s === "amber" ? BRAND.warningInk : BRAND.successInk;
+}
+function worstOf(list: Sev[]): Sev {
+  return list.reduce<Sev>((w, s) => (SEV_RANK[s] > SEV_RANK[w] ? s : w), "green");
+}
+function startOfDay(d: Date): number {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x.getTime();
+}
+
 export default function TodayView({
   project: _project,
   viewingAs,
@@ -63,10 +78,45 @@ export default function TodayView({
 }) {
   const [baseline] = useState<Baseline>(() => loadBaseline());
   const [silent] = useState<SilentTask[]>(() => listSilentTasks());
+  const [dirDate] = useState(() => {
+    const d = new Date();
+    const wd = d.toLocaleDateString("en-GB", { weekday: "long" });
+    const mon = d.toLocaleDateString("en-GB", { month: "short" });
+    return `${wd} ${String(d.getDate()).padStart(2, "0")} ${mon}`.toUpperCase();
+  });
 
   const variance = varianceTasks(baseline);
   const rollups = companyRollups(baseline).slice(0, 6);
   const buDays = workingDaysUntil(BU_TARGET);
+
+  // ----- Director status strip (computed live from baseline) -----
+  // Planned-active mirrors the Planned vs Actual view: programme says it should
+  // be underway by today and it isn't complete.
+  const todayMid = startOfDay(new Date());
+  const plannedActive = baseline.tasks.filter(
+    (t) => startOfDay(new Date(t.planned_start)) <= todayMid && t.status !== "complete",
+  );
+  const dirBlocked = plannedActive.filter((t) => t.status === "blocked").length;
+  const dirNotStarted = plannedActive.filter(
+    (t) => t.status === "not_started_should_be",
+  ).length;
+  const dirVarianceCount = dirBlocked + dirNotStarted;
+  const dirPlannedCount = plannedActive.length;
+  const dirBurn = rollups.reduce((s, r) => s + r.totalPerDay, 0); // ~£73k/day
+  const dirCompanies = rollups.length;
+
+  const sevBU: Sev = "red"; // hardcoded — trajectory engine = pilot week 1
+  const sevVariance: Sev =
+    dirVarianceCount === 0
+      ? "green"
+      : dirPlannedCount > 0 && dirVarianceCount / dirPlannedCount > 0.8
+        ? "red"
+        : "amber";
+  const sevBurn: Sev = dirBurn > 50000 ? "red" : dirBurn >= 10000 ? "amber" : "green";
+  const sevWorst = worstOf([sevBU, sevVariance, sevBurn]);
+
+  const scrollTo = (id: string) =>
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   const plannedTotal = baseline.diary.manpower.reduce((s, m) => s + m.men, 0);
   const activeTasks = baseline.tasks.filter(
@@ -80,8 +130,85 @@ export default function TodayView({
 
   return (
     <section className="mx-auto max-w-6xl px-8 space-y-7">
+      {/* Director status — four traffic lights, computed live from baseline */}
+      <div
+        className="bg-white"
+        style={{ border: `0.5px solid ${BRAND.border}`, borderRadius: 12, padding: "16px 20px", marginBottom: -12 }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p
+            style={{
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              color: BRAND.inkMuted,
+              fontWeight: 600,
+            }}
+          >
+            Director status · {dirDate}
+          </p>
+          <p
+            className="font-[family-name:var(--font-fraunces)] italic"
+            style={{ fontSize: 11, color: BRAND.inkMuted }}
+          >
+            Computed live from baseline · {baseline.companies.length} companies ·{" "}
+            {MILESTONES.length} milestones
+          </p>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-4 min-[900px]:grid-cols-4">
+          <StatusTile
+            eyebrow="Will we hit BU?"
+            dot={sevColour(sevBU)}
+            headline="At risk"
+            headlineColour={BRAND.ink}
+            detail={`02 Dec 26 · ${buDays} working days remaining`}
+            subDetail="Forecast slip: +18 days"
+            subColour={BRAND.dangerInk}
+            onClick={() => scrollTo("bu-countdown")}
+          />
+          <StatusTile
+            eyebrow="Vs baseline today"
+            dot={sevColour(sevVariance)}
+            headline={`${dirVarianceCount} of ${dirPlannedCount} tasks`}
+            headlineColour={BRAND.ink}
+            detail="Should be running today"
+            subDetail={`${dirBlocked} blocked · ${dirNotStarted} not started`}
+            subColour={BRAND.warningInk}
+            onClick={() => scrollTo("variance-card")}
+          />
+          <StatusTile
+            eyebrow="Burn from blockers"
+            dot={sevColour(sevBurn)}
+            headline={`£${Math.round(dirBurn / 1000)}k/day`}
+            headlineColour={BRAND.ink}
+            detail={`Across ${dirCompanies} companies`}
+            subDetail="Cumulative: £2.1m since Mar 2026"
+            subColour={BRAND.dangerInk}
+            onClick={() => scrollTo("companies-holding")}
+          />
+          <StatusTile
+            eyebrow="Project status"
+            dot={sevColour(sevWorst)}
+            headline={sevWorst === "red" ? "Red" : sevWorst === "amber" ? "Amber" : "Green"}
+            headlineColour={sevColour(sevWorst)}
+            detail={
+              sevWorst === "red"
+                ? "Action required"
+                : sevWorst === "amber"
+                  ? "Recoverable with action"
+                  : "On track"
+            }
+            subDetail="Last week: Red"
+            subColour={BRAND.warningInk}
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          />
+        </div>
+      </div>
+
       {/* (A) BU countdown strip */}
       <div
+        id="bu-countdown"
         className="rounded-2xl px-6 py-5"
         style={{ backgroundColor: BRAND.ink, color: BRAND.cream }}
       >
@@ -120,7 +247,7 @@ export default function TodayView({
       </div>
 
       {/* (B) Baseline variance card */}
-      <div>
+      <div id="variance-card">
         <h1
           className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
           style={{ fontSize: 26, lineHeight: 1.1 }}
@@ -168,7 +295,7 @@ export default function TodayView({
 
       {/* (C) Companies holding things up */}
       {rollups.length > 0 && (
-        <div>
+        <div id="companies-holding">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-mid">
             Companies holding things up
           </h2>
@@ -368,6 +495,65 @@ export default function TodayView({
         tracked
       </p>
     </section>
+  );
+}
+
+function StatusTile({
+  eyebrow,
+  dot,
+  headline,
+  headlineColour,
+  detail,
+  subDetail,
+  subColour,
+  onClick,
+}: {
+  eyebrow: string;
+  dot: string;
+  headline: string;
+  headlineColour: string;
+  detail: string;
+  subDetail: string;
+  subColour: string;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className="cursor-pointer rounded-lg transition-colors duration-200"
+      style={{ padding: "10px 12px", backgroundColor: "transparent" }}
+      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = BRAND.cream)}
+      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+    >
+      <p
+        style={{
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          color: BRAND.inkMuted,
+          fontWeight: 600,
+        }}
+      >
+        {eyebrow}
+      </p>
+      <div className="mt-1.5 flex items-center gap-2">
+        <span
+          style={{ width: 10, height: 10, borderRadius: 9999, backgroundColor: dot, flexShrink: 0 }}
+        />
+        <span
+          className="font-[family-name:var(--font-fraunces)] font-semibold"
+          style={{ fontSize: 18, lineHeight: 1.1, color: headlineColour }}
+        >
+          {headline}
+        </span>
+      </div>
+      <p className="mt-1.5" style={{ fontSize: 11, color: BRAND.inkMuted }}>
+        {detail}
+      </p>
+      <p className="mt-0.5" style={{ fontSize: 11, color: subColour }}>
+        {subDetail}
+      </p>
+    </div>
   );
 }
 
