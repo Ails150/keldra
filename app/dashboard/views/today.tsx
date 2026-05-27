@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { BlockerMap } from "../lib/blocker-state";
 import { roleLabel } from "../utils";
@@ -48,19 +49,13 @@ function roomBadge(
   return { label: r.code, bg };
 }
 
-// ----- Director status traffic-light severity -----
-type Sev = "red" | "amber" | "green";
-const SEV_RANK: Record<Sev, number> = { red: 3, amber: 2, green: 1 };
-function sevColour(s: Sev): string {
-  return s === "red" ? BRAND.dangerInk : s === "amber" ? BRAND.warningInk : BRAND.successInk;
-}
-function worstOf(list: Sev[]): Sev {
-  return list.reduce<Sev>((w, s) => (SEV_RANK[s] > SEV_RANK[w] ? s : w), "green");
-}
-function startOfDay(d: Date): number {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x.getTime();
+// Whole weeks from today to an ISO milestone date.
+function weeksUntil(iso: string): number {
+  const a = new Date();
+  a.setHours(0, 0, 0, 0);
+  const b = new Date(iso);
+  b.setHours(0, 0, 0, 0);
+  return Math.round((b.getTime() - a.getTime()) / (7 * 86400000));
 }
 
 export default function TodayView({
@@ -84,36 +79,11 @@ export default function TodayView({
     const mon = d.toLocaleDateString("en-GB", { month: "short" });
     return `${wd} ${String(d.getDate()).padStart(2, "0")} ${mon}`.toUpperCase();
   });
+  const router = useRouter();
 
   const variance = varianceTasks(baseline);
   const rollups = companyRollups(baseline).slice(0, 6);
   const buDays = workingDaysUntil(BU_TARGET);
-
-  // ----- Director status strip (computed live from baseline) -----
-  // Planned-active mirrors the Planned vs Actual view: programme says it should
-  // be underway by today and it isn't complete.
-  const todayMid = startOfDay(new Date());
-  const plannedActive = baseline.tasks.filter(
-    (t) => startOfDay(new Date(t.planned_start)) <= todayMid && t.status !== "complete",
-  );
-  const dirBlocked = plannedActive.filter((t) => t.status === "blocked").length;
-  const dirNotStarted = plannedActive.filter(
-    (t) => t.status === "not_started_should_be",
-  ).length;
-  const dirVarianceCount = dirBlocked + dirNotStarted;
-  const dirPlannedCount = plannedActive.length;
-  const dirBurn = rollups.reduce((s, r) => s + r.totalPerDay, 0); // ~£73k/day
-  const dirCompanies = rollups.length;
-
-  const sevBU: Sev = "red"; // hardcoded — trajectory engine = pilot week 1
-  const sevVariance: Sev =
-    dirVarianceCount === 0
-      ? "green"
-      : dirPlannedCount > 0 && dirVarianceCount / dirPlannedCount > 0.8
-        ? "red"
-        : "amber";
-  const sevBurn: Sev = dirBurn > 50000 ? "red" : dirBurn >= 10000 ? "amber" : "green";
-  const sevWorst = worstOf([sevBU, sevVariance, sevBurn]);
 
   const scrollTo = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -130,7 +100,8 @@ export default function TodayView({
 
   return (
     <section className="mx-auto max-w-6xl px-8 space-y-7">
-      {/* Director status — four traffic lights, computed live from baseline */}
+      {/* Director forecast — milestone look-ahead. Pilot week 1 wires real
+          trajectory math here; numbers are hardcoded for the demo. */}
       <div
         className="bg-white"
         style={{ border: `0.5px solid ${BRAND.border}`, borderRadius: 12, padding: "16px 20px", marginBottom: -12 }}
@@ -145,63 +116,49 @@ export default function TodayView({
               fontWeight: 600,
             }}
           >
-            Director status · {dirDate}
+            Director forecast · Looking ahead from {dirDate}
           </p>
           <p
             className="font-[family-name:var(--font-fraunces)] italic"
             style={{ fontSize: 11, color: BRAND.inkMuted }}
           >
-            Computed live from baseline · {baseline.companies.length} companies ·{" "}
-            {MILESTONES.length} milestones
+            Computed live from baseline · DUB-16 P6 rev 21-Apr-26
           </p>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-4 min-[900px]:grid-cols-4">
-          <StatusTile
-            eyebrow="Will we hit BU?"
-            dot={sevColour(sevBU)}
-            headline="At risk"
+        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <ForecastTile
+            eyebrow="At site install"
+            dateLine={`17 Aug 26 · ${weeksUntil("2026-08-17")} weeks away`}
+            dot={BRAND.warningInk}
+            headline="12 weeks behind ready"
             headlineColour={BRAND.ink}
-            detail={`02 Dec 26 · ${buDays} working days remaining`}
-            subDetail="Forecast slip: +18 days"
-            subColour={BRAND.dangerInk}
-            onClick={() => scrollTo("bu-countdown")}
-          />
-          <StatusTile
-            eyebrow="Vs baseline today"
-            dot={sevColour(sevVariance)}
-            headline={`${dirVarianceCount} of ${dirPlannedCount} tasks`}
-            headlineColour={BRAND.ink}
-            detail="Should be running today"
-            subDetail={`${dirBlocked} blocked · ${dirNotStarted} not started`}
-            subColour={BRAND.warningInk}
+            detail="8 off-site assets need to clear L2/L3 first"
+            action="→ Action this week"
+            actionColour={BRAND.warningInk}
             onClick={() => scrollTo("variance-card")}
           />
-          <StatusTile
-            eyebrow="Burn from blockers"
-            dot={sevColour(sevBurn)}
-            headline={`£${Math.round(dirBurn / 1000)}k/day`}
+          <ForecastTile
+            eyebrow="At yellow tag"
+            dateLine={`04 Nov 26 · ${weeksUntil("2026-11-04")} weeks away`}
+            dot={BRAND.warningInk}
+            headline="8 weeks behind ready"
             headlineColour={BRAND.ink}
-            detail={`Across ${dirCompanies} companies`}
-            subDetail="Cumulative: £2.1m since Mar 2026"
-            subColour={BRAND.dangerInk}
+            detail="5 blockers must clear by 18 Sep to stay critical path"
+            action="→ Action this month"
+            actionColour={BRAND.warningInk}
             onClick={() => scrollTo("companies-holding")}
           />
-          <StatusTile
-            eyebrow="Project status"
-            dot={sevColour(sevWorst)}
-            headline={sevWorst === "red" ? "Red" : sevWorst === "amber" ? "Amber" : "Green"}
-            headlineColour={sevColour(sevWorst)}
-            detail={
-              sevWorst === "red"
-                ? "Action required"
-                : sevWorst === "amber"
-                  ? "Recoverable with action"
-                  : "On track"
-            }
-            subDetail="Last week: Red"
-            subColour={BRAND.warningInk}
-            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          <ForecastTile
+            eyebrow="At BU"
+            dateLine={`02 Dec 26 · ${weeksUntil("2026-12-02")} weeks away`}
+            dot={BRAND.dangerInk}
+            headline="At risk · £4.2m exposure"
+            headlineColour={BRAND.dangerInk}
+            detail="5 of 7 chains terminate at Microsoft. Without sign-offs, slip is real"
+            action="→ The Microsoft ask"
+            actionColour={BRAND.dangerInk}
+            onClick={() => router.push("/dashboard/holding-back")}
           />
         </div>
       </div>
@@ -498,23 +455,25 @@ export default function TodayView({
   );
 }
 
-function StatusTile({
+function ForecastTile({
   eyebrow,
+  dateLine,
   dot,
   headline,
   headlineColour,
   detail,
-  subDetail,
-  subColour,
+  action,
+  actionColour,
   onClick,
 }: {
   eyebrow: string;
+  dateLine: string;
   dot: string;
   headline: string;
   headlineColour: string;
   detail: string;
-  subDetail: string;
-  subColour: string;
+  action: string;
+  actionColour: string;
   onClick: () => void;
 }) {
   return (
@@ -536,6 +495,9 @@ function StatusTile({
       >
         {eyebrow}
       </p>
+      <p className="mt-1.5" style={{ fontSize: 12, color: BRAND.ink }}>
+        {dateLine}
+      </p>
       <div className="mt-1.5 flex items-center gap-2">
         <span
           style={{ width: 10, height: 10, borderRadius: 9999, backgroundColor: dot, flexShrink: 0 }}
@@ -550,8 +512,8 @@ function StatusTile({
       <p className="mt-1.5" style={{ fontSize: 11, color: BRAND.inkMuted }}>
         {detail}
       </p>
-      <p className="mt-0.5" style={{ fontSize: 11, color: subColour }}>
-        {subDetail}
+      <p className="mt-1.5" style={{ fontSize: 11, color: actionColour, fontWeight: 500 }}>
+        {action}
       </p>
     </div>
   );
