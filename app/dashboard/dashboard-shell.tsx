@@ -33,7 +33,7 @@ type Tab =
   | "people"
   | "assets"
   | "constraints"
-  | "activity"
+  | "promises"
   | "schedule"
   | "map"
   | "intelligence"
@@ -45,7 +45,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "people", label: "People" },
   { id: "assets", label: "Assets" },
   { id: "constraints", label: "Constraints" },
-  { id: "activity", label: "Activity" },
+  { id: "promises", label: "Activity" },
   { id: "schedule", label: "Schedule" },
   { id: "map", label: "Map" },
   { id: "intelligence", label: "Intelligence" },
@@ -484,7 +484,7 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
             onOpenBlocker={openBlocker}
           />
         )}
-        {tab === "activity" && (
+        {tab === "promises" && (
           <ActivityView
             project={project}
             viewingAs={active}
