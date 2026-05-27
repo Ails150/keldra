@@ -27,12 +27,14 @@ import MapView from "./views/map-view";
 import InviteOrgModal from "./views/invite-org-modal";
 import BlockerDetailPanel from "./views/blocker-detail-panel";
 import PlannedVsActualView from "./views/planned-vs-actual";
+import HoldingBackView from "./views/holding-back";
 
 type Tab =
   | "today"
   | "variance"
   | "funnel"
   | "people"
+  | "holding-back"
   | "assets"
   | "constraints"
   | "promises"
@@ -46,6 +48,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "variance", label: "Planned vs Actual" },
   { id: "funnel", label: "Funnel" },
   { id: "people", label: "People" },
+  { id: "holding-back", label: "Holding back" },
   { id: "assets", label: "Assets" },
   { id: "constraints", label: "Constraints" },
   { id: "promises", label: "Activity" },
@@ -470,6 +473,14 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
         )}
         {tab === "people" && (
           <PeopleView
+            project={project}
+            viewingAs={active}
+            blockerMap={blockerMap}
+            onOpenBlocker={openBlocker}
+          />
+        )}
+        {tab === "holding-back" && (
+          <HoldingBackView
             project={project}
             viewingAs={active}
             blockerMap={blockerMap}
