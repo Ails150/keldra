@@ -1,12 +1,15 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { BRAND } from "@/lib/brand";
 import {
-  BASELINE_TASKS,
-  SITE_DIARY,
+  DEFAULT_BASELINE,
+  type Baseline,
   companyBySlug,
-  daysOpen,
   holdingCompany,
+  loadBaseline,
   roomByCode,
 } from "../../lib/baseline-seed";
 
@@ -16,19 +19,30 @@ const GBP = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 0,
 });
 
-export default async function CompanyPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await params;
-  const company = companyBySlug(slug);
-  if (!company) notFound();
+export default function CompanyPage() {
+  const params = useParams();
+  const slug = String(params.slug ?? "");
+  const [baseline, setBaseline] = useState<Baseline>(DEFAULT_BASELINE);
+  useEffect(() => setBaseline(loadBaseline()), []);
 
-  const held = BASELINE_TASKS.filter((t) => holdingCompany(t) === slug);
-  const owned = BASELINE_TASKS.filter((t) => t.responsible_company === slug);
+  const company = companyBySlug(baseline, slug);
+
+  if (!company) {
+    return (
+      <main className="mx-auto max-w-3xl px-8 py-10">
+        <Link href="/dashboard" className="text-xs font-medium text-accent hover:text-accent-deep">
+          ← Back to dashboard
+        </Link>
+        <p className="mt-6 text-sm text-ink-mid">Company not found.</p>
+      </main>
+    );
+  }
+
+  const held = baseline.tasks.filter((t) => holdingCompany(t) === slug);
+  const owned = baseline.tasks.filter((t) => t.responsible_company === slug);
+  const heldCritical = held.filter((t) => t.cost_per_day > 0);
   const totalPerDay = held.reduce((s, t) => s + t.cost_per_day, 0);
-  const deployment = SITE_DIARY.manpower.filter((m) => m.company === slug);
+  const deployment = baseline.diary.manpower.filter((m) => m.company === slug);
 
   return (
     <main className="mx-auto max-w-3xl px-8 py-10 space-y-6">
@@ -75,59 +89,60 @@ export default async function CompanyPage({
         </p>
       </div>
 
-      {/* Card 1 — blockers held */}
-      <Card title={`Blockers held (${held.filter((t) => t.cost_per_day > 0).length})`}>
-        {held.filter((t) => t.cost_per_day > 0).length === 0 ? (
+      <Card title={`Blockers held (${heldCritical.length})`}>
+        {heldCritical.length === 0 ? (
           <p className="text-sm text-ink-mid">Nothing currently holding others up.</p>
         ) : (
           <ul className="space-y-2">
-            {held
-              .filter((t) => t.cost_per_day > 0)
-              .map((t) => {
-                const r = roomByCode(t.affects_room);
-                return (
-                  <li key={t.activity_id}>
-                    <Link
-                      href={`/dashboard/tasks/${t.activity_id}`}
-                      className="flex items-center gap-3 rounded-xl border border-paper-line bg-paper-card px-3 py-2 text-sm transition-colors hover:bg-paper-warm"
-                    >
-                      <span className="font-mono text-[11px] text-accent-deep">
-                        {t.activity_id}
+            {heldCritical.map((t) => {
+              const r = roomByCode(baseline, t.affects_room);
+              return (
+                <li key={t.activity_id}>
+                  <Link
+                    href={`/dashboard/tasks/${t.activity_id}`}
+                    className="flex items-center gap-3 rounded-xl border border-paper-line bg-paper-card px-3 py-2 text-sm transition-colors hover:bg-paper-warm"
+                  >
+                    <span className="font-mono text-[11px] text-accent-deep">
+                      {t.activity_id}
+                    </span>
+                    <span className="flex-1 truncate text-ink">{t.name}</span>
+                    {r && (
+                      <span className="rounded-full bg-paper-warm px-2 py-0.5 font-mono text-[10px] text-ink-mid">
+                        {r.code}
                       </span>
-                      <span className="flex-1 truncate text-ink">{t.name}</span>
-                      {r && (
-                        <span className="rounded-full bg-paper-warm px-2 py-0.5 font-mono text-[10px] text-ink-mid">
-                          {r.code}
-                        </span>
-                      )}
-                      <span className="font-mono text-[11px] font-semibold text-red-700">
-                        {GBP.format(t.cost_per_day)}/day
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
+                    )}
+                    <span className="font-mono text-[11px] font-semibold text-red-700">
+                      {GBP.format(t.cost_per_day)}/day
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Card>
 
-      {/* Card 2 — tasks owned */}
       <Card title={`Tasks owned (${owned.length})`}>
-        <ul className="space-y-1.5">
-          {owned.slice(0, 8).map((t) => (
-            <li key={t.activity_id} className="flex items-center gap-3 text-sm">
-              <span className="font-mono text-[11px] text-ink-mid">{t.activity_id}</span>
-              <span className="flex-1 truncate text-ink">{t.name}</span>
-              <StatusPill status={t.status} />
-            </li>
-          ))}
-          {owned.length > 8 && (
-            <li className="text-[11px] text-ink-mid">+ {owned.length - 8} more</li>
-          )}
-        </ul>
+        {owned.length === 0 ? (
+          <p className="text-sm text-ink-mid">No tasks owned in this baseline.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {owned.slice(0, 8).map((t) => (
+              <li key={t.activity_id} className="flex items-center gap-3 text-sm">
+                <span className="font-mono text-[11px] text-ink-mid">
+                  {t.activity_id}
+                </span>
+                <span className="flex-1 truncate text-ink">{t.name}</span>
+                <StatusPill status={t.status} />
+              </li>
+            ))}
+            {owned.length > 8 && (
+              <li className="text-[11px] text-ink-mid">+ {owned.length - 8} more</li>
+            )}
+          </ul>
+        )}
       </Card>
 
-      {/* Card 3 — today's deployment */}
       <Card title="Today's deployment">
         {deployment.length === 0 ? (
           <p className="text-sm text-ink-mid">
@@ -136,14 +151,13 @@ export default async function CompanyPage({
         ) : (
           deployment.map((m) => (
             <p key={m.activity} className="text-sm text-ink">
-              <span className="font-semibold">{m.men}</span> man
-              {m.men === 1 ? "" : "men"} on {m.activity}.
-              {held.filter((t) => t.cost_per_day > 0).length > 0 && (
+              <span className="font-semibold">{m.men}</span>{" "}
+              {m.men === 1 ? "man" : "men"} on {m.activity}.
+              {heldCritical.length > 0 && (
                 <span className="text-ink-mid">
                   {" "}
-                  Meeting deployment, but holding{" "}
-                  {held.filter((t) => t.cost_per_day > 0).length} critical task
-                  {held.filter((t) => t.cost_per_day > 0).length === 1 ? "" : "s"}.
+                  Meeting deployment, but holding {heldCritical.length} critical
+                  task{heldCritical.length === 1 ? "" : "s"}.
                 </span>
               )}
             </p>

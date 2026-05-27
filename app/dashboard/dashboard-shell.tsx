@@ -310,6 +310,12 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
 
           <div className="flex items-center gap-3">
             <a
+              href="/dashboard/ingest"
+              className="hidden font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-accent-deep transition-colors hover:text-accent md:inline"
+            >
+              Re-ingest data ↑
+            </a>
+            <a
               href="/field"
               target="_blank"
               rel="noopener noreferrer"

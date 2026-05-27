@@ -11,6 +11,14 @@ export const BRAND = {
   purple: "#8a3dd6",
   purpleDeep: "#5e25a3",
 
+  border: "#e8dcf0",
+  successInk: "#3b6d11",
+  successBg: "#eaf3de",
+  warningInk: "#854f0b",
+  warningBg: "#faeeda",
+  dangerInk: "#a32d2d",
+  dangerBg: "#fcebeb",
+
   // Company hues, per the P6 seed.
   coral: "#e2654b",
   blue: "#2563eb",

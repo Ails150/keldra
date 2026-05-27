@@ -1,13 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { BlockerMap } from "../lib/blocker-state";
 import { BRAND } from "@/lib/brand";
 import {
+  type Baseline,
   companyColour,
   companyName,
   daysOpen,
+  loadBaseline,
   recoveryTasks,
   roomByCode,
 } from "../lib/baseline-seed";
@@ -32,8 +35,11 @@ const STAGES = [
   { label: "Beneficial Use", n: 0, legacy: "Beneficial Use · 02 Dec 26" },
 ];
 
-function roomBadge(code: string | null): { label: string; bg: string } | null {
-  const r = roomByCode(code);
+function roomBadge(
+  b: Baseline,
+  code: string | null,
+): { label: string; bg: string } | null {
+  const r = roomByCode(b, code);
   if (!r) return null;
   const bg =
     r.tag === "BU"
@@ -59,8 +65,9 @@ export default function FunnelView({
   blockerMap: _blockerMap,
   onAlertAction: _onAlertAction,
 }: Props) {
+  const [baseline] = useState<Baseline>(() => loadBaseline());
   const max = Math.max(...STAGES.map((s) => s.n), 1);
-  const recovery = recoveryTasks();
+  const recovery = recoveryTasks(baseline);
 
   return (
     <section className="mx-auto max-w-5xl px-8 space-y-6">
@@ -142,7 +149,7 @@ export default function FunnelView({
         <div className="overflow-hidden rounded-2xl border border-paper-line bg-paper-card">
           <ul className="divide-y divide-paper-line">
             {recovery.map((t) => {
-              const badge = roomBadge(t.affects_room);
+              const badge = roomBadge(baseline, t.affects_room);
               const holder = t.blocking_company ?? t.responsible_company;
               return (
                 <li
@@ -162,9 +169,9 @@ export default function FunnelView({
                   )}
                   <span
                     className="hidden rounded-full px-2 py-0.5 text-[10px] font-semibold text-paper md:inline"
-                    style={{ backgroundColor: companyColour(holder) }}
+                    style={{ backgroundColor: companyColour(baseline, holder) }}
                   >
-                    {companyName(holder)}
+                    {companyName(baseline, holder)}
                   </span>
                   <span className="w-20 flex-shrink-0 text-right font-mono text-[11px] font-semibold text-red-700">
                     {GBP.format(t.cost_per_day)}/day

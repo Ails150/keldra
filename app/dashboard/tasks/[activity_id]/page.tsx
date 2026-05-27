@@ -1,10 +1,16 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import {
-  companyName,
+  DEFAULT_BASELINE,
+  type Baseline,
   companyColour,
+  companyName,
   daysOpen,
   roomByCode,
+  loadBaseline,
   taskById,
 } from "../../lib/baseline-seed";
 
@@ -21,16 +27,29 @@ function fmt(iso: string): string {
     : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export default async function TaskPage({
-  params,
-}: {
-  params: Promise<{ activity_id: string }>;
-}) {
-  const { activity_id } = await params;
-  const task = taskById(decodeURIComponent(activity_id));
-  if (!task) notFound();
+export default function TaskPage() {
+  const params = useParams();
+  const activityId = decodeURIComponent(String(params.activity_id ?? ""));
+  const [baseline, setBaseline] = useState<Baseline>(DEFAULT_BASELINE);
+  useEffect(() => setBaseline(loadBaseline()), []);
 
-  const room = roomByCode(task.affects_room);
+  const task = taskById(baseline, activityId);
+
+  if (!task) {
+    return (
+      <main className="mx-auto max-w-2xl px-8 py-10">
+        <Link href="/dashboard" className="text-xs font-medium text-accent hover:text-accent-deep">
+          ← Back to dashboard
+        </Link>
+        <p className="mt-6 text-sm text-ink-mid">
+          Task <span className="font-mono">{activityId}</span> not found in the
+          current baseline.
+        </p>
+      </main>
+    );
+  }
+
+  const room = roomByCode(baseline, task.affects_room);
   const statusLabel =
     task.status === "not_started_should_be"
       ? "Not started — should be running"
@@ -80,22 +99,19 @@ export default async function TaskPage({
 
       <div className="rounded-2xl border border-paper-line bg-paper-card p-5 space-y-3">
         <Row label="Responsible">
-          <CompanyChip slug={task.responsible_company} />
+          <CompanyChip baseline={baseline} slug={task.responsible_company} />
         </Row>
         {task.blocking_company && (
           <Row label="Held by">
-            <CompanyChip slug={task.blocking_company} />
+            <CompanyChip baseline={baseline} slug={task.blocking_company} />
           </Row>
         )}
         {room && (
           <Row label="Affects room">
-            <Link
-              href="/dashboard"
-              className="text-sm font-medium text-ink"
-            >
+            <span className="text-sm font-medium text-ink">
               {room.code} · {room.name}{" "}
               <span className="text-ink-mid">(target {room.target})</span>
-            </Link>
+            </span>
           </Row>
         )}
       </div>
@@ -133,16 +149,18 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function CompanyChip({ slug }: { slug: string }) {
+function CompanyChip({ baseline, slug }: { baseline: Baseline; slug: string }) {
   return (
     <span className="inline-flex items-center gap-2">
       <span
         className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-bold text-paper"
-        style={{ backgroundColor: companyColour(slug) }}
+        style={{ backgroundColor: companyColour(baseline, slug) }}
       >
-        {companyName(slug).slice(0, 2).toUpperCase()}
+        {companyName(baseline, slug).slice(0, 2).toUpperCase()}
       </span>
-      <span className="text-sm font-medium text-ink">{companyName(slug)}</span>
+      <span className="text-sm font-medium text-ink">
+        {companyName(baseline, slug)}
+      </span>
     </span>
   );
 }

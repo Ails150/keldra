@@ -196,21 +196,113 @@ export const SITE_DIARY = {
     "Earth bar MER1 still not started. Brackets for fibre runs still missing from Cental. No movement on external lights — Marco still waiting on Lawrence sign-off (3w). Doors and FOK still blocked on Sellafield. Finnings generator A kick-off tomorrow per programme.",
 };
 
-// ---------- helpers ----------
+// ---------- loadable baseline ----------
 
-export const companyBySlug = (slug: string): Company | undefined =>
-  COMPANIES.find((c) => c.slug === slug);
+export type Blocker = {
+  title: string;
+  held_by_company: string | null;
+  affects_room: string | null;
+  days_open: number;
+  cost_per_day: number;
+  affects_bu: boolean;
+};
 
-export const roomByCode = (code: string | null): CriticalRoom | undefined =>
-  code ? CRITICAL_ROOMS.find((r) => r.code === code) : undefined;
+export type Diary = {
+  submitted_by: string;
+  submitted_at_label: string;
+  manpower: { men: number; activity: string; company: string }[];
+  notes: string;
+};
 
-export function companyColour(slug: string | null): string {
-  const c = slug ? companyBySlug(slug) : undefined;
+export type Baseline = {
+  project: { name: string; baseline_revision_date: string };
+  companies: Company[];
+  rooms: CriticalRoom[];
+  tasks: BaselineTask[];
+  diary: Diary;
+  blockers: Blocker[];
+};
+
+// The static May-27 seed — used until a live ingest overrides it.
+export const DEFAULT_BASELINE: Baseline = {
+  project: { name: "DUB-16 Cx", baseline_revision_date: "2026-04-21" },
+  companies: COMPANIES,
+  rooms: CRITICAL_ROOMS,
+  tasks: BASELINE_TASKS,
+  diary: SITE_DIARY,
+  blockers: [],
+};
+
+const BASELINE_KEY = "keldra_baseline";
+
+// Live ingest writes the merged baseline here; views read it, falling back to
+// the static seed. clearBaseline() is the "reset to May-27 seed" demo control.
+export function loadBaseline(): Baseline {
+  if (typeof window === "undefined") return DEFAULT_BASELINE;
+  try {
+    const raw = window.localStorage.getItem(BASELINE_KEY);
+    if (!raw) return DEFAULT_BASELINE;
+    const p = JSON.parse(raw) as Partial<Baseline>;
+    return {
+      project: p.project ?? DEFAULT_BASELINE.project,
+      companies: p.companies?.length ? p.companies : DEFAULT_BASELINE.companies,
+      rooms: p.rooms ?? [],
+      tasks: p.tasks ?? [],
+      diary: p.diary ?? DEFAULT_BASELINE.diary,
+      blockers: p.blockers ?? [],
+    };
+  } catch {
+    return DEFAULT_BASELINE;
+  }
+}
+
+export function saveBaseline(b: Baseline): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(BASELINE_KEY, JSON.stringify(b));
+  } catch {
+    /* quota — ignore */
+  }
+}
+
+export function clearBaseline(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(BASELINE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function isIngested(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return !!window.localStorage.getItem(BASELINE_KEY);
+  } catch {
+    return false;
+  }
+}
+
+// ---------- pure helpers (operate on a Baseline) ----------
+
+export function companyBySlug(b: Baseline, slug: string): Company | undefined {
+  return b.companies.find((c) => c.slug === slug);
+}
+
+export function roomByCode(
+  b: Baseline,
+  code: string | null,
+): CriticalRoom | undefined {
+  return code ? b.rooms.find((r) => r.code === code) : undefined;
+}
+
+export function companyColour(b: Baseline, slug: string | null): string {
+  const c = slug ? companyBySlug(b, slug) : undefined;
   return c ? BRAND[c.colour] : BRAND.inkMuted;
 }
 
-export function companyName(slug: string | null): string {
-  return (slug && companyBySlug(slug)?.name) || slug || "—";
+export function companyName(b: Baseline, slug: string | null): string {
+  return (slug && companyBySlug(b, slug)?.name) || slug || "—";
 }
 
 // Working days (Mon–Fri) between today and an ISO target.
@@ -235,8 +327,8 @@ export function daysOpen(task: BaselineTask, from: Date = new Date()): number {
 }
 
 // A task is BU-affecting if it touches a priority-1 BU room.
-export function affectsBu(task: BaselineTask): boolean {
-  const r = roomByCode(task.affects_room);
+export function affectsBu(b: Baseline, task: BaselineTask): boolean {
+  const r = roomByCode(b, task.affects_room);
   return !!r && r.priority === 1;
 }
 
@@ -249,12 +341,12 @@ export function holdingCompany(task: BaselineTask): string | null {
 }
 
 // Tasks the baseline says should be running today but aren't progressing.
-export function varianceTasks(): BaselineTask[] {
-  const active = BASELINE_TASKS.filter(
+export function varianceTasks(b: Baseline): BaselineTask[] {
+  const active = b.tasks.filter(
     (t) => t.status === "blocked" || t.status === "not_started_should_be",
   );
   const rank = (t: BaselineTask): number => {
-    const r = roomByCode(t.affects_room);
+    const r = roomByCode(b, t.affects_room);
     if (t.status === "blocked" && r?.priority === 1) return 0;
     if (t.status === "not_started_should_be" && r?.priority === 1) return 1;
     if (t.status === "blocked" && (r?.tag === "MMR1" || r?.tag === "MMR2")) return 2;
@@ -278,19 +370,19 @@ export type CompanyRollup = {
 
 // Companies holding things up (excludes the main contractor — Johnny's own org
 // — since this board answers "who is holding ME up"). Ranked by £/day.
-export function companyRollups(): CompanyRollup[] {
+export function companyRollups(b: Baseline): CompanyRollup[] {
   const map = new Map<string, BaselineTask[]>();
-  for (const t of BASELINE_TASKS) {
+  for (const t of b.tasks) {
     const h = holdingCompany(t);
     if (!h) continue;
-    const c = companyBySlug(h);
+    const c = companyBySlug(b, h);
     if (!c || c.role === "Main contractor") continue;
     (map.get(h) ?? map.set(h, []).get(h)!).push(t);
   }
   const out: CompanyRollup[] = [];
   for (const [slug, tasks] of map.entries()) {
-    const company = companyBySlug(slug)!;
-    const buTasks = tasks.filter(affectsBu);
+    const company = companyBySlug(b, slug)!;
+    const buTasks = tasks.filter((t) => affectsBu(b, t));
     const oldest = Math.max(...tasks.map((t) => daysOpen(t)), 0);
     const worst = tasks
       .slice()
@@ -307,19 +399,19 @@ export function companyRollups(): CompanyRollup[] {
   return out.sort((a, b) => b.totalPerDay - a.totalPerDay);
 }
 
-export function taskById(id: string): BaselineTask | undefined {
-  return BASELINE_TASKS.find((t) => t.activity_id === id);
+export function taskById(b: Baseline, id: string): BaselineTask | undefined {
+  return b.tasks.find((t) => t.activity_id === id);
 }
 
-export function tasksForCompany(slug: string): BaselineTask[] {
-  return BASELINE_TASKS.filter(
+export function tasksForCompany(b: Baseline, slug: string): BaselineTask[] {
+  return b.tasks.filter(
     (t) => holdingCompany(t) === slug || t.responsible_company === slug,
   );
 }
 
 // Recovery list — everything not progressing, costliest first.
-export function recoveryTasks(): BaselineTask[] {
-  return BASELINE_TASKS.filter((t) => t.cost_per_day > 0).sort(
-    (a, b) => b.cost_per_day - a.cost_per_day,
-  );
+export function recoveryTasks(b: Baseline): BaselineTask[] {
+  return b.tasks
+    .filter((t) => t.cost_per_day > 0)
+    .sort((a, b2) => b2.cost_per_day - a.cost_per_day);
 }
