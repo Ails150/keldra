@@ -92,6 +92,18 @@ function entry(
 const JOHNNY = { name: "Johnny McKenna", company_slug: "ardmac", role: "Construction Manager" };
 const KELDRA = { name: "Keldra", company_slug: "system", role: "System" };
 const PAWEL = { name: "Pawel — Cental", company_slug: "cental", role: "Site lead" };
+const GER = { name: "Ger Hersee", company_slug: "ardmac", role: "Project Engineer" };
+const CATHAL = { name: "Cathal Doyle — Sellafield Design", company_slug: "sellafield-design", role: "Design Lead" };
+const MAEVE = { name: "Maeve O'Connor — Sellafield Design", company_slug: "sellafield-design", role: "Design Engineer" };
+const MARCO = { name: "Marco Visconti — Lawrence/Marco", company_slug: "lawrence-marco", role: "Drawings Lead" };
+const PADRAIG = { name: "Padraig Connors — Finnings", company_slug: "finnings", role: "Procurement Lead" };
+
+// Reused recipients.
+const TO_JOHNNY = { name: "Johnny McKenna", company_slug: "ardmac" };
+const TO_SELLAFIELD = { name: "Cathal Doyle — Sellafield Design", company_slug: "sellafield-design" };
+const TO_SELLAFIELD_DOORS = { name: "Maeve O'Connor — Sellafield Design", company_slug: "sellafield-design" };
+const TO_MARCO = { name: "Marco Visconti — Drawings Lead", company_slug: "lawrence-marco" };
+const TO_PADRAIG = { name: "Padraig Connors — Finnings Procurement", company_slug: "finnings" };
 
 function seed(): Activity[] {
   return [
@@ -141,6 +153,143 @@ function seed(): Activity[] {
     entry("b03", "ELE-ADMIN-1020", "chase", "outbound", "email", "2026-05-22T11:00:00", JOHNNY,
       "Third chase on AD1-4 bracketery. No response to either previous. Escalating alongside ELE-COLO-1030.",
       { recipient: { name: "Pawel — Cental", company_slug: "cental" }, subject: "AD1-4 bracketery — third chase" }),
+
+    // ===== Sellafield Design — 18 chases / 4 responses (~22% · ~11d) =====
+    // Water services (MEC-COLO-1040) + FOK doors (SEC-COLO-1000). Slow, not silent.
+    entry("s01", "MEC-COLO-1040", "chase", "outbound", "email", "2026-03-10T08:40:00", JOHNNY,
+      "Kicking off COLO 1-4 water services & connections — we need the Status A spec to release first-fix. When can you issue?",
+      { recipient: TO_SELLAFIELD, subject: "MEC-COLO-1040 water services — Status A needed" }),
+    entry("s02", "SEC-COLO-1000", "chase", "outbound", "keldra", "2026-03-13T09:10:00", GER,
+      "Chasing the FOK door-type schedule for Security COLO. Door procurement is gated on your sign-off — when can we expect it?",
+      { recipient: TO_SELLAFIELD_DOORS, subject: "SEC-COLO FOK door types — schedule?" }),
+    entry("s03", "MEC-COLO-1040", "chase", "outbound", "email", "2026-03-18T10:05:00", JOHNNY,
+      "Following up on the water services package. No issue date yet — MMR1 first-fix is gated on this.",
+      { recipient: TO_SELLAFIELD, subject: "MEC-COLO-1040 water services — follow-up" }),
+    entry("s04", "SEC-COLO-1000", "chase", "outbound", "keldra", "2026-03-24T08:25:00", GER,
+      "FOK doors — no schedule yet. Door delivery slips every week this stays open.",
+      { recipient: TO_SELLAFIELD_DOORS }),
+    entry("s05", "MEC-COLO-1040", "chase", "outbound", "email", "2026-03-27T14:30:00", JOHNNY,
+      "Water services spec still outstanding. Can you give me a firm Status A date this week?",
+      { recipient: TO_SELLAFIELD, subject: "MEC-COLO-1040 — firm date please" }),
+    entry("s06", "SEC-COLO-1000", "chase", "outbound", "keldra", "2026-03-31T09:00:00", GER,
+      "Following up on FOK door types. Can you confirm which types are signed off so we can release the order?",
+      { recipient: TO_SELLAFIELD_DOORS }),
+    entry("s07", "MEC-COLO-1040", "chase", "outbound", "email", "2026-04-06T08:15:00", JOHNNY,
+      "Chasing water services again — we're now three weeks past the planned start for MEC-COLO-1040.",
+      { recipient: TO_SELLAFIELD, subject: "MEC-COLO-1040 — three weeks overdue" }),
+    entry("s08", "SEC-COLO-1000", "chase", "outbound", "keldra", "2026-04-09T11:20:00", GER,
+      "FOK doors still pending. We need the full type schedule to place the procurement.",
+      { recipient: TO_SELLAFIELD_DOORS }),
+    entry("s09", "MEC-COLO-1040", "chase", "outbound", "email", "2026-04-14T09:45:00", JOHNNY,
+      "Any movement on the water services Status A? M&E first-fix can't proceed without it.",
+      { recipient: TO_SELLAFIELD, subject: "MEC-COLO-1040 — Status A?" }),
+    entry("s10", "SEC-COLO-1000", "chase", "outbound", "keldra", "2026-04-20T08:50:00", GER,
+      "FOK door schedule — third chase. Security COLO completion depends on it.",
+      { recipient: TO_SELLAFIELD_DOORS }),
+    entry("s11", "MEC-COLO-1040", "chase", "outbound", "email", "2026-04-23T10:30:00", JOHNNY,
+      "Water services spec — fourth week open. This is becoming critical path. Please advise.",
+      { recipient: TO_SELLAFIELD, subject: "MEC-COLO-1040 — critical path" }),
+    entry("s12", "SEC-COLO-1000", "chase", "outbound", "keldra", "2026-04-28T09:15:00", GER,
+      "Any update on FOK door types? We're holding the door order waiting on you.",
+      { recipient: TO_SELLAFIELD_DOORS }),
+    entry("s13", "MEC-COLO-1040", "chase", "outbound", "email", "2026-05-01T08:30:00", JOHNNY,
+      "Still no Status A on water services. We need to talk timelines today.",
+      { recipient: TO_SELLAFIELD, subject: "MEC-COLO-1040 — timelines call" }),
+    entry("s14", "MEC-COLO-1040", "chase", "outbound", "email", "2026-05-06T07:50:00", JOHNNY,
+      "Cathal — escalating formally. The water services spec has been open since 13 March. We have logged 12+ chases. MMR1 first-fix cannot start without Status A — this is now the critical path to BU. Please confirm a release date by 13 May or we escalate to client governance.",
+      { recipient: { name: "Cathal Doyle — Sellafield Design Director", company_slug: "sellafield-design" }, subject: "FORMAL: MEC-COLO-1040 — water services spec overdue" }),
+    entry("s14b", "MEC-COLO-1040", "system", "internal", "keldra", "2026-05-06T07:52:00", KELDRA,
+      "Letter sent to Cathal Doyle — Sellafield Design Director. Read receipt: NOT YET OPENED."),
+    entry("s15", "SEC-COLO-1000", "chase", "outbound", "keldra", "2026-05-11T09:05:00", GER,
+      "FOK doors — types 4-6 still outstanding per your last note. Timeline?",
+      { recipient: TO_SELLAFIELD_DOORS }),
+    entry("s16", "MEC-COLO-1040", "chase", "outbound", "email", "2026-05-13T08:40:00", JOHNNY,
+      "Post-escalation: still awaiting water services release. Director sign-off was due last week.",
+      { recipient: TO_SELLAFIELD, subject: "MEC-COLO-1040 — still awaiting release" }),
+    entry("s17", "SEC-COLO-1000", "chase", "outbound", "keldra", "2026-05-20T09:30:00", GER,
+      "FOK doors — still awaiting types 4-6 sign-off. This is holding Security COLO.",
+      { recipient: TO_SELLAFIELD_DOORS }),
+    entry("s18", "MEC-COLO-1040", "chase", "outbound", "email", "2026-05-26T08:20:00", JOHNNY,
+      "Water services spec — no release yet. Raising at Thursday governance call.",
+      { recipient: TO_SELLAFIELD, subject: "MEC-COLO-1040 — governance escalation" }),
+    entry("sr1", "MEC-COLO-1040", "response", "inbound", "email", "2026-03-23T16:20:00", CATHAL,
+      "Hi Johnny — water services package is with our M&E consultant for review. Expecting comments back end of next week, will issue Status A once incorporated.",
+      { recipient: TO_JOHNNY, subject: "RE: MEC-COLO-1040 water services" }),
+    entry("sr2", "SEC-COLO-1000", "response", "inbound", "email", "2026-04-13T15:40:00", MAEVE,
+      "Apologies for the delay. FOK schedule needs structural input on the SER wall build-up before we can finalise door types. Chasing internally.",
+      { recipient: TO_JOHNNY, subject: "RE: SEC-COLO FOK door types" }),
+    entry("sr3", "MEC-COLO-1040", "response", "inbound", "email", "2026-05-05T17:10:00", CATHAL,
+      "Water services Status A is drafted but awaiting director sign-off before release. Hoping to clear this week.",
+      { recipient: TO_JOHNNY, subject: "RE: MEC-COLO-1040 — Status A" }),
+    entry("sr4", "SEC-COLO-1000", "response", "inbound", "email", "2026-05-18T14:05:00", MAEVE,
+      "Partial issue on FOK doors attached — types 1-3 confirmed, types 4-6 still under review with the client security team.",
+      { recipient: TO_JOHNNY, subject: "RE: SEC-COLO FOK door types — partial" }),
+
+    // ===== Lawrence → Marco — 11 chases / 1 response (~9% · ~21d) =====
+    // External Service Support Steel (FAB-ADMIN-1120) — Marco can't sign without Lawrence's lights spec.
+    entry("m01", "FAB-ADMIN-1120", "chase", "outbound", "email", "2026-03-25T09:00:00", JOHNNY,
+      "Marco — we need the external service support steel drawings signed off. Modular fab is waiting. Any update?",
+      { recipient: TO_MARCO, subject: "FAB-ADMIN-1120 steel drawings — sign-off" }),
+    entry("m02", "FAB-ADMIN-1120", "chase", "outbound", "keldra", "2026-03-30T10:15:00", GER,
+      "Marco, chasing the steel drawings again. Lawrence's external lights spec is the dependency — has it reached you?",
+      { recipient: TO_MARCO }),
+    entry("m03", "FAB-ADMIN-1120", "chase", "outbound", "email", "2026-04-02T08:30:00", JOHNNY,
+      "Steel drawings for external service support — still unsigned. Marco, what's blocking you?",
+      { recipient: TO_MARCO, subject: "FAB-ADMIN-1120 — what's blocking?" }),
+    entry("m04", "FAB-ADMIN-1120", "chase", "outbound", "keldra", "2026-04-07T11:00:00", GER,
+      "Marco — third chase. We can't cut steel without your sign-off. Is the lights spec still the holdup?",
+      { recipient: TO_MARCO }),
+    entry("m05", "FAB-ADMIN-1120", "chase", "outbound", "email", "2026-04-13T09:20:00", JOHNNY,
+      "External steel drawings — two weeks past when we needed them. Please advise.",
+      { recipient: TO_MARCO, subject: "FAB-ADMIN-1120 — overdue" }),
+    entry("m06", "FAB-ADMIN-1120", "chase", "outbound", "keldra", "2026-04-28T10:40:00", GER,
+      "Marco, following your partial response — when can you issue the full steel package?",
+      { recipient: TO_MARCO }),
+    entry("m07", "FAB-ADMIN-1120", "chase", "outbound", "email", "2026-05-04T08:50:00", JOHNNY,
+      "Steel drawings — lighting bracket details still outstanding. Has Lawrence issued the lights spec yet?",
+      { recipient: TO_MARCO, subject: "FAB-ADMIN-1120 — lighting brackets" }),
+    entry("m08", "FAB-ADMIN-1120", "chase", "outbound", "keldra", "2026-05-07T09:35:00", GER,
+      "Marco — still waiting on the full steel sign-off. Fab slot is slipping.",
+      { recipient: TO_MARCO }),
+    entry("m09", "FAB-ADMIN-1120", "chase", "outbound", "email", "2026-05-12T10:10:00", JOHNNY,
+      "External service steel — no movement. This is holding the facility modules.",
+      { recipient: TO_MARCO, subject: "FAB-ADMIN-1120 — holding modules" }),
+    entry("m10", "FAB-ADMIN-1120", "chase", "outbound", "keldra", "2026-05-15T08:45:00", GER,
+      "Marco, fifth-plus chase on the steel drawings. Need a date.",
+      { recipient: TO_MARCO }),
+    entry("m11", "FAB-ADMIN-1120", "chase", "outbound", "email", "2026-05-20T09:25:00", JOHNNY,
+      "Steel drawings still unsigned. Raising at Thursday governance call.",
+      { recipient: TO_MARCO, subject: "FAB-ADMIN-1120 — governance escalation" }),
+    entry("mr1", "FAB-ADMIN-1120", "response", "inbound", "email", "2026-04-24T16:50:00", MARCO,
+      "Johnny — reviewed the external service steel drawings. I can sign the primary supports, but the lighting bracket details depend on Lawrence's spec which I still don't have. Can't issue the full package yet.",
+      { recipient: TO_JOHNNY, subject: "RE: FAB-ADMIN-1120 steel drawings" }),
+
+    // ===== Finnings — 6 chases / 2 responses (~33% · ~9d) =====
+    // Sprinkler diesel pumps (PRO-1110) + Generator A (FAB-2000). Deflective: supplier delays.
+    entry("f01", "PRO-1110", "chase", "outbound", "email", "2026-03-02T08:30:00", JOHNNY,
+      "Padraig — where are we on the sprinkler diesel pump gensets (PRO-1110)? It's overdue and holding the FER BU room.",
+      { recipient: TO_PADRAIG, subject: "PRO-1110 diesel pumps — delivery date?" }),
+    entry("f02", "PRO-1110", "chase", "outbound", "keldra", "2026-03-05T10:00:00", GER,
+      "Padraig, chasing the diesel pump delivery date. We need it for the sprinkler package.",
+      { recipient: TO_PADRAIG }),
+    entry("f03", "FAB-2000", "chase", "outbound", "email", "2026-04-13T09:10:00", JOHNNY,
+      "Padraig — Generator A install (FAB-2000) is due to start soon. Is the unit on site or in transit?",
+      { recipient: TO_PADRAIG, subject: "FAB-2000 Generator A — on site?" }),
+    entry("f04", "PRO-1110", "chase", "outbound", "keldra", "2026-04-17T11:30:00", GER,
+      "Diesel pump gensets — still no firm date. The 14-week lead time you quoted lands when exactly?",
+      { recipient: TO_PADRAIG }),
+    entry("f05", "FAB-2000", "chase", "outbound", "email", "2026-04-30T08:40:00", JOHNNY,
+      "Padraig, Generator A has slipped again per your note. We need a committed delivery date.",
+      { recipient: TO_PADRAIG, subject: "FAB-2000 — committed date needed" }),
+    entry("f06", "PRO-1110", "chase", "outbound", "keldra", "2026-05-07T09:50:00", GER,
+      "Padraig — diesel pumps and Generator A both outstanding. Both are on the BU critical path now.",
+      { recipient: TO_PADRAIG }),
+    entry("fr1", "PRO-1110", "response", "inbound", "email", "2026-03-09T15:25:00", PADRAIG,
+      "Johnny — the diesel pump gensets are with the manufacturer, we've been quoted a 14-week lead time from order. I'm pushing for an earlier slot but it's a supplier constraint.",
+      { recipient: TO_JOHNNY, subject: "RE: PRO-1110 diesel pumps" }),
+    entry("fr2", "FAB-2000", "response", "inbound", "email", "2026-04-27T16:15:00", PADRAIG,
+      "Generator A delivery has slipped again — our supplier flagged a parts shortage. Best case now early June. I'll confirm a firm date when I have it.",
+      { recipient: TO_JOHNNY, subject: "RE: FAB-2000 Generator A" }),
   ];
 }
 
