@@ -22,6 +22,7 @@ import PromisesView from "./views/promises";
 import ScheduleView from "./views/schedule";
 import IntelligenceView from "./views/intelligence";
 import AuditView from "./views/audit";
+import MapView from "./views/map-view";
 import InviteOrgModal from "./views/invite-org-modal";
 import BlockerDetailPanel from "./views/blocker-detail-panel";
 
@@ -32,6 +33,7 @@ type Tab =
   | "constraints"
   | "promises"
   | "schedule"
+  | "map"
   | "intelligence"
   | "audit";
 
@@ -42,6 +44,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "constraints", label: "Constraints" },
   { id: "promises", label: "Promises" },
   { id: "schedule", label: "Schedule" },
+  { id: "map", label: "Map" },
   { id: "intelligence", label: "Intelligence" },
   { id: "audit", label: "Audit" },
 ];
@@ -89,6 +92,7 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
   const [blockerMap, setBlockerMap] = useState<BlockerMap | null>(null);
   const [activeBlockerId, setActiveBlockerId] = useState<string | null>(null);
   const [assetFilter, setAssetFilter] = useState<string[] | null>(null);
+  const [mapZone, setMapZone] = useState<string | null>(null);
 
   useEffect(() => {
     const stored = readStoredProject();
@@ -214,6 +218,10 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
           break;
         case "filter": // e.g. filter:unowned — surfaced on the constraints view
           setTab("constraints");
+          break;
+        case "zone": // zone:<zone_id> — open the map, highlight the zone
+          setMapZone(value || null);
+          setTab("map");
           break;
         case "tab":
           if (TABS.some((t) => t.id === value)) setTab(value as Tab);
@@ -472,6 +480,16 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
             viewingAs={active}
             blockerMap={blockerMap}
             onOpenBlocker={openBlocker}
+          />
+        )}
+        {tab === "map" && (
+          <MapView
+            project={project}
+            viewingAs={active}
+            blockerMap={blockerMap}
+            onOpenBlocker={openBlocker}
+            onAlertAction={handleAlertAction}
+            highlightZone={mapZone}
           />
         )}
         {tab === "intelligence" && (

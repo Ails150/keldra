@@ -1,9 +1,36 @@
 "use client";
 
+import { useState } from "react";
 import type { Blocker, BlockerMap, BlockerStateName } from "../lib/blocker-state";
 import { daysInState } from "../lib/blocker-state";
 import { deriveOrgColour, getInitials, getLinkedBlockers } from "../utils";
 import { slipDays, type ParsedXer } from "../../onboarding/lib/xer-parser";
+
+type FieldCapture = {
+  kind: "photo" | "voice";
+  dataUrl: string | null;
+  caption: string;
+  by: string;
+  ts: string;
+  blockerId: string;
+  blockerTitle: string;
+  duration: number | null;
+};
+
+function truncateCap(s: string): string {
+  return s.length > 22 ? s.slice(0, 21) + "…" : s;
+}
+
+function timeAgo(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -107,6 +134,7 @@ export default function AssetDetailPanel({
   onOpenBlocker,
   xer,
 }: Props) {
+  const [lightbox, setLightbox] = useState<FieldCapture | null>(null);
   if (!asset) return null;
 
   const activityId = (asset.activity_id ?? "").toString().trim();
@@ -115,6 +143,43 @@ export default function AssetDetailPanel({
       ? xer.activities.find((a) => a.task_code === activityId) ?? null
       : null;
   const activitySlip = activity ? slipDays(activity) : 0;
+
+  // Photo / voice evidence captured in Field mode lives on the events of any
+  // blocker linked to this asset.
+  const thisId = (asset.asset_id ?? "").toString().trim();
+  const photos: FieldCapture[] = [];
+  const voices: FieldCapture[] = [];
+  if (blockerMap) {
+    for (const b of Object.values(blockerMap)) {
+      if (!b.linked_assets.some((id) => id.trim() === thisId)) continue;
+      for (const e of b.events) {
+        const p = (e.payload ?? {}) as any;
+        const base = {
+          caption: (p.caption ?? "").toString(),
+          by: (p.captured_by ?? e.actor ?? "—").toString(),
+          ts: e.timestamp,
+          blockerId: b.id,
+          blockerTitle: b.description,
+        };
+        if (p.has_photo)
+          photos.push({
+            ...base,
+            kind: "photo",
+            dataUrl: p.photo_data_url ?? null,
+            duration: null,
+          });
+        if (p.has_voice)
+          voices.push({
+            ...base,
+            kind: "voice",
+            dataUrl: p.voice_data_url ?? null,
+            duration: typeof p.voice_duration === "number" ? p.voice_duration : null,
+          });
+      }
+    }
+  }
+  photos.sort((a, b) => b.ts.localeCompare(a.ts));
+  voices.sort((a, b) => b.ts.localeCompare(a.ts));
 
   const ownerName = (asset.owner_name ?? "").toString().trim();
   const ownerOrg = (asset.owner_org ?? "").toString().trim();
@@ -305,37 +370,121 @@ export default function AssetDetailPanel({
             )}
           </section>
 
-          {/* Photo evidence stub */}
+          {/* Photo evidence — captured via Keldra Field */}
           <section>
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-2">
-              Photo evidence
-            </p>
-            <div className="rounded-2xl border border-dashed border-paper-line bg-paper-warm/40 p-4">
-              <p
-                className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-accent-deep"
-                style={{ fontFamily: "var(--font-geist-mono, ui-monospace, monospace)" }}
-              >
-                Pilot Week 3 · Keldra Field
+            <div className="mb-2 flex items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid">
+                Photo evidence
               </p>
-              <div className="mt-3 flex items-start gap-3">
-                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-paper-card text-ink-mid">
-                  <CameraIcon />
+              {photos.length > 0 && (
+                <span className="rounded-full bg-paper-warm px-2 py-0.5 text-[10px] font-semibold text-ink-mid">
+                  {photos.length} {photos.length === 1 ? "capture" : "captures"}
                 </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-ink">
-                    Photo evidence coming pilot week 3
-                  </p>
-                  <p
-                    className="mt-1 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
-                    style={{ fontSize: 12, lineHeight: 1.5 }}
-                  >
-                    Via Keldra Field mobile app — fork of Vantro (live on App
-                    Store with photo upload since May 2026). Field staff snap
-                    photo, GPS tags location, attaches to asset automatically.
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
+
+            {photos.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-paper-line bg-paper-warm/40 p-4 text-center">
+                <p className="text-sm text-ink">
+                  No site evidence captured yet.
+                </p>
+                <p className="mt-1 text-xs text-ink-mid">
+                  Use Keldra Field on a phone to add photos.
+                </p>
+                <a
+                  href="/field/capture"
+                  className="mt-3 inline-flex rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-accent"
+                >
+                  Open Field mode
+                </a>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {photos.slice(0, 6).map((c, i) => (
+                  <button
+                    key={`${c.blockerId}-${i}`}
+                    type="button"
+                    onClick={() => setLightbox(c)}
+                    className="group overflow-hidden rounded-xl border border-paper-line bg-paper-warm/40 text-left"
+                  >
+                    <div className="flex h-20 w-full items-center justify-center bg-paper-warm">
+                      {c.dataUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={c.dataUrl}
+                          alt={c.caption || "Site evidence"}
+                          className="h-20 w-full object-cover transition-transform group-hover:scale-105"
+                        />
+                      ) : (
+                        <span className="flex flex-col items-center gap-1 px-1 text-center text-ink-mid">
+                          <CameraIcon />
+                          <span className="text-[9px] leading-tight">
+                            {c.caption ? truncateCap(c.caption) : "Photo"}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    <p className="truncate px-1.5 py-1 text-[9px] text-ink-mid">
+                      {c.by} · {timeAgo(c.ts)}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+            {photos.length > 6 && (
+              <button
+                type="button"
+                onClick={() => setLightbox(photos[0])}
+                className="mt-2 text-[11px] font-medium text-accent hover:text-accent-deep"
+              >
+                Show all {photos.length}
+              </button>
+            )}
+          </section>
+
+          {/* Voice notes — captured via Keldra Field */}
+          <section>
+            <div className="mb-2 flex items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid">
+                Voice notes
+              </p>
+              {voices.length > 0 && (
+                <span className="rounded-full bg-paper-warm px-2 py-0.5 text-[10px] font-semibold text-ink-mid">
+                  {voices.length}
+                </span>
+              )}
+            </div>
+            {voices.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-paper-line bg-paper-warm/40 px-4 py-3 text-xs text-ink-mid">
+                No voice notes captured yet.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {voices.map((c, i) => (
+                  <li
+                    key={`${c.blockerId}-v-${i}`}
+                    className="rounded-xl border border-paper-line bg-paper-card p-3"
+                  >
+                    {c.dataUrl ? (
+                      <audio controls src={c.dataUrl} className="w-full" />
+                    ) : (
+                      <p className="text-xs italic text-ink-mid">
+                        Audio not stored (too large for local cache)
+                      </p>
+                    )}
+                    <div className="mt-1.5 flex items-center justify-between text-[11px] text-ink-mid">
+                      <span>
+                        {c.by} · {timeAgo(c.ts)}
+                      </span>
+                      {c.duration ? <span>{c.duration}s</span> : null}
+                    </div>
+                    {c.caption && (
+                      <p className="mt-1 text-xs text-ink">{c.caption}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           {/* Sign-off chain stub */}
@@ -403,6 +552,59 @@ export default function AssetDetailPanel({
           </button>
         </footer>
       </aside>
+
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-6"
+          onClick={() => setLightbox(null)}
+        >
+          <div
+            className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-paper-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setLightbox(null)}
+              aria-label="Close"
+              className="absolute right-3 top-3 z-10 rounded-full bg-paper-card/90 px-2 py-1 text-ink-mid transition-colors hover:text-ink"
+            >
+              ✕
+            </button>
+            {lightbox.dataUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={lightbox.dataUrl}
+                alt={lightbox.caption || "Site evidence"}
+                className="max-h-[60vh] w-full bg-ink/5 object-contain"
+              />
+            ) : (
+              <div className="flex h-48 items-center justify-center bg-paper-warm text-ink-mid">
+                <CameraIcon />
+              </div>
+            )}
+            <div className="p-4">
+              {lightbox.caption && (
+                <p className="text-sm text-ink">{lightbox.caption}</p>
+              )}
+              <p className="mt-1 text-xs text-ink-mid">
+                Captured by {lightbox.by} · {timeAgo(lightbox.ts)}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = lightbox.blockerId;
+                  setLightbox(null);
+                  onClose();
+                  onOpenBlocker(id);
+                }}
+                className="mt-3 text-xs font-medium text-accent hover:text-accent-deep"
+              >
+                {lightbox.blockerTitle} →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

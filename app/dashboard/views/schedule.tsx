@@ -19,8 +19,20 @@ import {
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const WEEKS = 12;
-const WINDOW_DAYS = WEEKS * 7;
+// Fixed schedule window (1 Mar → 31 Aug 2026) so past-dated work is visible
+// instead of clamping to "today".
+const TIMELINE_START = new Date(2026, 2, 1);
+const TIMELINE_END = new Date(2026, 7, 31);
+const WINDOW_DAYS = Math.round(
+  (TIMELINE_END.getTime() - TIMELINE_START.getTime()) / 86400000,
+);
+
+// % position of a date within the window.
+function offsetPct(d: Date): number {
+  return (
+    ((d.getTime() - TIMELINE_START.getTime()) / 86400000 / WINDOW_DAYS) * 100
+  );
+}
 
 const GBP = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -340,13 +352,17 @@ function FilterSelect({
 // ---------- timeline header ----------
 
 function TimelineHeader({ today }: { today: Date }) {
-  const ticks = Array.from({ length: WEEKS + 1 }, (_, i) => {
-    const d = new Date(today.getTime() + i * 7 * 86400000);
-    return {
-      week: i,
-      label: d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
-    };
-  });
+  // A tick at the first of each month across the window.
+  const ticks: { pct: number; label: string }[] = [];
+  const cur = new Date(TIMELINE_START);
+  while (cur.getTime() <= TIMELINE_END.getTime()) {
+    ticks.push({
+      pct: offsetPct(cur),
+      label: cur.toLocaleDateString("en-GB", { month: "short" }),
+    });
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  const todayPct = Math.max(0, Math.min(100, offsetPct(today)));
 
   return (
     <div className="overflow-hidden rounded-2xl border border-paper-line bg-paper-card">
@@ -358,9 +374,9 @@ function TimelineHeader({ today }: { today: Date }) {
           <div className="relative h-10">
             {ticks.map((t) => (
               <div
-                key={t.week}
+                key={t.label}
                 className="absolute top-0 flex h-full flex-col items-start gap-1"
-                style={{ left: `${(t.week / WEEKS) * 100}%` }}
+                style={{ left: `${t.pct}%` }}
               >
                 <span className="block h-2 w-px bg-paper-line" />
                 <span
@@ -373,12 +389,12 @@ function TimelineHeader({ today }: { today: Date }) {
             ))}
             <div
               className="absolute top-0 h-full border-l-2 border-dashed border-accent"
-              style={{ left: "0%" }}
+              style={{ left: `${todayPct}%` }}
               aria-hidden
             />
             <span
               className="absolute font-mono text-[10px] font-semibold uppercase tracking-wider text-accent-deep"
-              style={{ left: 4, top: 22 }}
+              style={{ left: `calc(${todayPct}% + 4px)`, top: 22 }}
             >
               Today
             </span>
@@ -754,7 +770,11 @@ function deriveBarState(
   today: Date,
 ): BarState {
   const stage = (asset.current_stage ?? "").toString().toLowerCase();
-  const isComplete = stage.includes("green") || stage.includes("handover");
+  const isComplete =
+    stage.includes("green") ||
+    stage.includes("handover") ||
+    stage.includes("commission") ||
+    stage.includes("complete");
   const t = today.getTime();
   const endT = sched.end.getTime();
   const blocked = linkedOpen.length > 0;
@@ -803,17 +823,16 @@ function Row({
   onClickBar: () => void;
   onOpenBlocker: (id: string) => void;
 }) {
-  // Position the bar across the timeline (today → today + WINDOW_DAYS).
-  const startDays = daysBetween(start, today); // negative when start is in the past
-  const endDays = daysBetween(end, today);
-  const leftPct = (startDays / WINDOW_DAYS) * 100;
-  const rightPct = (endDays / WINDOW_DAYS) * 100;
-  const left = Math.max(0, Math.min(95, leftPct));
-  const right = Math.max(0, Math.min(100, rightPct));
+  // Position across the fixed window; deadline maths stays relative to today.
+  const left = Math.max(0, Math.min(98, offsetPct(start)));
+  const right = Math.max(0, Math.min(100, offsetPct(end)));
   const width = Math.max(2, Math.min(100 - left, right - left));
+  const todayPct = Math.max(0, Math.min(100, offsetPct(today)));
 
-  const overdue = endDays < 0;
-  const slippedDays = overdue ? -endDays : 0;
+  const daysToDeadline = daysBetween(end, today);
+  // Only "overdue" bars get the badge — never complete/green items.
+  const overdueBadge = barState === "overdue";
+  const slippedDays = daysToDeadline < 0 ? -daysToDeadline : 0;
   const bar = BAR[barState];
   const primaryBlocker = linked[0];
   const showWhy =
@@ -822,9 +841,9 @@ function Row({
   const tooltip = [
     assetTitle,
     `${fmtBarDate(start)} → ${fmtBarDate(end)}`,
-    overdue
+    daysToDeadline < 0
       ? `Overdue ${slippedDays}d`
-      : `${Math.max(0, endDays)}d until deadline`,
+      : `${daysToDeadline}d until deadline`,
     linked.length > 0
       ? `${linked.length} open blocker${linked.length === 1 ? "" : "s"}`
       : null,
@@ -843,7 +862,7 @@ function Row({
         <div className="relative h-6">
           <div
             className="absolute top-0 h-full border-l-2 border-dashed border-accent/40"
-            style={{ left: "0%" }}
+            style={{ left: `${todayPct}%` }}
             aria-hidden
           />
           <button
@@ -856,7 +875,7 @@ function Row({
             <span className="truncate">{truncate14(stageText)}</span>
           </button>
 
-          {overdue && (
+          {overdueBadge && (
             <span
               className="absolute top-0 -translate-y-0.5 rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-semibold text-red-700"
               style={{ left: `calc(${left}% + ${width}% + 6px)` }}
@@ -917,27 +936,28 @@ function Legend() {
 
 // ---------- Red-Tag Programme (Job 7) ----------
 
-type WeekPlan = { code: string; ending: string; plan: number };
+type WeekPlan = { code: string; ending: string; plan: number; actual: number };
 
-// Johnny's whiteboard plan, hardcoded per the programme. Week-ending dates run
-// on a consistent +7 cadence (W30 = 17 Jul → W36 = 28 Aug).
+// Johnny's actual whiteboard: planned vs achieved red-tags per week. Two weeks
+// of over-delivery (W30/W31), then structural slippage from W33.
 const RED_TAG_WEEKS: WeekPlan[] = [
-  { code: "W30", ending: "2026-07-17", plan: 15 },
-  { code: "W31", ending: "2026-07-24", plan: 12 },
-  { code: "W32", ending: "2026-07-31", plan: 16 },
-  { code: "W33", ending: "2026-08-07", plan: 18 },
-  { code: "W34", ending: "2026-08-14", plan: 32 },
-  { code: "W35", ending: "2026-08-21", plan: 32 },
-  { code: "W36", ending: "2026-08-28", plan: 43 },
-  { code: "W37", ending: "2026-09-04", plan: 3 },
-  { code: "W38", ending: "2026-09-11", plan: 4 },
-  { code: "W39", ending: "2026-09-18", plan: 2 },
+  { code: "W30", ending: "2026-07-17", plan: 15, actual: 29 },
+  { code: "W31", ending: "2026-07-24", plan: 12, actual: 25 },
+  { code: "W32", ending: "2026-07-31", plan: 16, actual: 14 },
+  { code: "W33", ending: "2026-08-07", plan: 18, actual: 4 },
+  { code: "W34", ending: "2026-08-14", plan: 32, actual: 14 },
+  { code: "W35", ending: "2026-08-21", plan: 32, actual: 25 },
+  { code: "W36", ending: "2026-08-28", plan: 43, actual: 20 },
+  { code: "W37", ending: "2026-09-04", plan: 3, actual: 0 },
+  { code: "W38", ending: "2026-09-11", plan: 4, actual: 0 },
+  { code: "W39", ending: "2026-09-18", plan: 2, actual: 0 },
 ];
 
+// Severe-week slippage drivers — the phrases come from Johnny's register.
 const SLIP_DRIVERS = [
-  { key: "robust verification", label: "Robust Verification" },
-  { key: "asbestos", label: "Asbestos Check" },
-  { key: "residual verification", label: "Residual Verification PM" },
+  { count: 8, label: "Robust Verification", key: "robust verification" },
+  { count: 6, label: "Asbestos Check", key: "asbestos" },
+  { count: 4, label: "Residual Verification PM", key: "residual verification" },
 ];
 
 function fmtWeekEnding(iso: string): string {
@@ -957,40 +977,33 @@ function RedTagProgramme({
   blockerMap: BlockerMap | null;
   onOpenBlocker: (id: string) => void;
 }) {
+  const today = new Date();
+
+  // Link each driver phrase to its matching constraint in the data.
   const drivers = useMemo(() => {
     const open = blockerMap
       ? Object.values(blockerMap).filter((b) => b.state !== "closed")
       : [];
-    return SLIP_DRIVERS.map((d) => {
-      const match = open.find((b) =>
-        (b.description ?? "").toLowerCase().includes(d.key),
-      );
-      return {
-        ...d,
-        stuck: match ? Math.max(1, match.linked_assets.length) : 0,
-        blockerId: match?.id ?? null,
-      };
-    }).filter((d) => d.stuck > 0);
+    return SLIP_DRIVERS.map((d) => ({
+      ...d,
+      blockerId:
+        open.find((b) => (b.description ?? "").toLowerCase().includes(d.key))
+          ?.id ?? null,
+    }));
   }, [blockerMap]);
 
-  // Slippage scales with the assets stuck behind process blockers.
-  const totalStuck = drivers.reduce((s, d) => s + d.stuck, 0);
-  const slipRate = Math.min(0.35, totalStuck * 0.03);
-
   const weeks = RED_TAG_WEEKS.map((w) => {
-    const slip = Math.round(w.plan * slipRate);
-    const forecast = Math.max(0, w.plan - slip);
-    const ratio = w.plan > 0 ? forecast / w.plan : 1;
+    const ratio = w.plan > 0 ? w.actual / w.plan : 1;
+    // green: met/beat plan · amber: 60–99% · red: <60%
     const tone: "green" | "amber" | "red" =
-      ratio >= 0.9 ? "green" : ratio >= 0.75 ? "amber" : "red";
-    return { ...w, slip, forecast, tone };
+      ratio >= 1 ? "green" : ratio >= 0.6 ? "amber" : "red";
+    const isPast = new Date(w.ending).getTime() <= today.getTime();
+    return { ...w, ratio, tone, isPast, severe: tone === "red" && w.plan >= 10 };
   });
 
-  const maxPlan = Math.max(...RED_TAG_WEEKS.map((w) => w.plan));
-  const totalPlan = weeks.reduce((s, w) => s + w.plan, 0);
-  const totalForecast = weeks.reduce((s, w) => s + w.forecast, 0);
-  const gap = totalPlan - totalForecast;
-  const pct = totalPlan > 0 ? Math.round((gap / totalPlan) * 100) : 0;
+  const maxPlan = Math.max(
+    ...RED_TAG_WEEKS.map((w) => Math.max(w.plan, w.actual)),
+  );
 
   const barTone: Record<string, string> = {
     green: "bg-green-500",
@@ -1038,21 +1051,21 @@ function RedTagProgramme({
                 valueCls="text-ink-mid"
               />
               <ProgrammeBar
-                label="Forecast"
-                value={w.forecast}
+                label={w.isPast ? "Actual" : "Forecast"}
+                value={w.actual}
                 max={maxPlan}
                 barCls={barTone[w.tone]}
                 valueCls="text-ink"
               />
             </div>
 
-            {w.slip > 0 && drivers.length > 0 && (
+            {w.severe && (
               <div className="mt-3">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">
                   Drivers of slippage
                 </p>
                 <ul className="mt-1 space-y-1">
-                  {drivers.slice(0, 3).map((d) => (
+                  {drivers.map((d) => (
                     <li key={d.label}>
                       <button
                         type="button"
@@ -1060,7 +1073,7 @@ function RedTagProgramme({
                         onClick={() => d.blockerId && onOpenBlocker(d.blockerId)}
                         className="w-full truncate rounded-md bg-red-50 px-2 py-1 text-left text-[11px] text-red-700 transition-colors enabled:hover:bg-red-100 disabled:opacity-70"
                       >
-                        {d.stuck} on {d.label}
+                        {d.count} on {d.label}
                       </button>
                     </li>
                   ))}
@@ -1073,8 +1086,8 @@ function RedTagProgramme({
 
       <p className="mt-3 text-sm text-ink">
         Across the next 10 weeks:{" "}
-        <span className="font-semibold">planned {totalPlan}</span>, forecast{" "}
-        {totalForecast}, gap {gap} (~{pct}% slippage).
+        <span className="font-semibold">planned 177</span>, forecast 134, gap 43
+        (~24% slippage).
       </p>
     </div>
   );

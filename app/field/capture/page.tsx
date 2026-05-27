@@ -9,6 +9,45 @@ import { createCapturedBlocker } from "../../dashboard/lib/blocker-state";
 
 const MAX_SECONDS = 90;
 
+// Downscale a photo to a modest JPEG data URL so it fits in localStorage.
+async function fileToDataUrl(file: File, max = 900): Promise<string> {
+  const raw = await new Promise<string>((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result as string);
+    fr.onerror = () => rej(new Error("read failed"));
+    fr.readAsDataURL(file);
+  });
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = () => rej(new Error("decode failed"));
+      im.src = raw;
+    });
+    const scale = Math.min(1, max / Math.max(img.width, img.height));
+    const w = Math.round(img.width * scale);
+    const h = Math.round(img.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return raw;
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", 0.7);
+  } catch {
+    return raw;
+  }
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result as string);
+    fr.onerror = () => rej(new Error("read failed"));
+    fr.readAsDataURL(blob);
+  });
+}
+
 export default function FieldCapture() {
   const { project, blockerMap, persist, name, assets } = useField();
 
@@ -21,11 +60,15 @@ export default function FieldCapture() {
   const [submitting, setSubmitting] = useState(false);
   const [doneId, setDoneId] = useState<string | null>(null);
   const [recError, setRecError] = useState<string | null>(null);
+  const [voiceData, setVoiceData] = useState<string | null>(null);
+  const [voiceDuration, setVoiceDuration] = useState(0);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const secondsRef = useRef(0);
+  const photoFileRef = useRef<File | null>(null);
 
   function stopRecording() {
     if (timerRef.current) {
@@ -68,13 +111,25 @@ export default function FieldCapture() {
           if (prev) URL.revokeObjectURL(prev);
           return URL.createObjectURL(blob);
         });
+        setVoiceDuration(secondsRef.current);
+        blobToDataUrl(blob)
+          .then(setVoiceData)
+          .catch(() => setVoiceData(null));
         streamRef.current?.getTracks().forEach((t) => t.stop());
       };
       recorderRef.current = rec;
       rec.start();
       setRecording(true);
       setSeconds(0);
-      timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
+      secondsRef.current = 0;
+      timerRef.current = setInterval(
+        () =>
+          setSeconds((s) => {
+            secondsRef.current = s + 1;
+            return s + 1;
+          }),
+        1000,
+      );
     } catch {
       setRecError("Microphone unavailable or permission denied.");
     }
@@ -83,6 +138,7 @@ export default function FieldCapture() {
   function onPhoto(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    photoFileRef.current = file;
     setPhotoUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
@@ -95,13 +151,17 @@ export default function FieldCapture() {
     const base = blockerMap ?? {};
     const description =
       text.trim() || `Field capture${assetId ? ` on ${assetId}` : ""}`;
+    const photoDataUrl = photoFileRef.current
+      ? await fileToDataUrl(photoFileRef.current).catch(() => null)
+      : null;
     const { map, id } = await createCapturedBlocker(base, {
       actor: name && name !== "there" ? name : "Field user",
       description,
       assetId: assetId || undefined,
-      note: text.trim() || undefined,
-      hasVoice: Boolean(audioUrl),
-      hasPhoto: Boolean(photoUrl),
+      caption: text.trim() || undefined,
+      photoDataUrl,
+      voiceDataUrl: voiceData,
+      voiceDuration: voiceData ? voiceDuration : undefined,
     });
     persist(map);
     setSubmitting(false);
@@ -148,6 +208,9 @@ export default function FieldCapture() {
               setAudioUrl(null);
               setPhotoUrl(null);
               setSeconds(0);
+              setVoiceData(null);
+              setVoiceDuration(0);
+              photoFileRef.current = null;
             }}
             className="min-h-[48px] w-full rounded-xl border-2 border-paper-line text-sm font-semibold text-ink active:bg-paper-warm"
           >

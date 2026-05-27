@@ -257,20 +257,38 @@ export async function createCapturedBlocker(
     description: string;
     assetId?: string;
     note?: string;
-    hasVoice?: boolean;
-    hasPhoto?: boolean;
+    caption?: string;
+    photoDataUrl?: string | null;
+    voiceDataUrl?: string | null;
+    voiceDuration?: number;
   },
 ): Promise<{ map: BlockerMap; id: string }> {
   const nowIso = new Date().toISOString();
   const id = `F-${Date.now().toString(36).toUpperCase()}`;
   const stamp = new Date().toLocaleString("en-GB");
   const content = `${params.actor} captured field evidence at ${stamp}`;
+  // localStorage can't hold large blobs — keep modest data URLs, drop oversized
+  // ones (the flag still records that evidence was attached).
+  const CAP = 1_500_000;
+  const photo =
+    params.photoDataUrl && params.photoDataUrl.length <= CAP
+      ? params.photoDataUrl
+      : null;
+  const voice =
+    params.voiceDataUrl && params.voiceDataUrl.length <= CAP
+      ? params.voiceDataUrl
+      : null;
+  const caption = (params.caption ?? params.note ?? "").trim();
   const evt = await buildEvent(undefined, "field-capture", params.actor, nowIso, {
     note: content,
-    text: params.note ?? "",
+    caption,
     asset: params.assetId ?? null,
-    voice: Boolean(params.hasVoice),
-    photo: Boolean(params.hasPhoto),
+    captured_by: params.actor,
+    has_photo: Boolean(params.photoDataUrl),
+    photo_data_url: photo,
+    has_voice: Boolean(params.voiceDataUrl),
+    voice_data_url: voice,
+    voice_duration: params.voiceDuration ?? null,
   });
 
   const blocker: Blocker = {
