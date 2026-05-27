@@ -106,3 +106,72 @@ export function nextStage(raw: unknown): CxStage {
 export function stageMeta(raw: unknown): StageMeta {
   return STAGE_META[normalizeStage(raw)];
 }
+
+// ---------- P6 site-map Cx stages ----------
+// The real DUB-16 commissioning flow as it reads on the programme. Site module
+// install does not begin until 17 Aug 26, so today every in-flight task is
+// off-site (L1/L2-L3); the later stages stay empty by design — that emptiness
+// is the point. "Owner unclear" is Keldra's wedge: work nobody on site owns.
+
+import { BRAND } from "@/lib/brand";
+
+export type MapStageKey =
+  | "l1"
+  | "l2l3"
+  | "module"
+  | "onsite"
+  | "preenergy"
+  | "greentag"
+  | "unclear";
+
+export type MapStage = {
+  key: MapStageKey;
+  label: string;
+  caption: string;
+  fill: string;
+};
+
+// Dark→light purple ramp, teal terminus for Green Tag/BU, red for owner-unclear.
+export const MAP_STAGES: MapStage[] = [
+  { key: "l1", label: "L1 Off-Site", caption: "off-site factory witness test in progress", fill: BRAND.cxOffsite },
+  { key: "l2l3", label: "L2/L3 Off-Site", caption: "off-site acceptance / integrated", fill: BRAND.purpleDeep },
+  { key: "module", label: "Module Install", caption: "on-site, starts 17 Aug 26", fill: BRAND.purple },
+  { key: "onsite", label: "On-Site Cx", caption: "L1/L2/L3 on-site", fill: BRAND.cxOnsite },
+  { key: "preenergy", label: "Pre-Energization", caption: "ahead of power-on, 03 Sep 26", fill: BRAND.cxPreEnergy },
+  { key: "greentag", label: "Green Tag / BU", caption: "commissioned · 02 Dec 26", fill: BRAND.teal },
+  { key: "unclear", label: "Owner unclear", caption: "no one on site owns the next move", fill: BRAND.dangerInk },
+];
+
+const MAP_STAGE_BY_KEY: Record<MapStageKey, MapStage> = MAP_STAGES.reduce(
+  (acc, s) => {
+    acc[s.key] = s;
+    return acc;
+  },
+  {} as Record<MapStageKey, MapStage>,
+);
+
+export function mapStageMeta(key: MapStageKey): MapStage {
+  return MAP_STAGE_BY_KEY[key];
+}
+
+// Companies that hold work without owning the next physical move on site —
+// when one of these is blocking, accountability is genuinely unclear.
+const OFF_SITE_HOLDERS = new Set(["sellafield-design", "lawrence-marco", "ssci-team"]);
+
+// Derive a Cx map stage from a baseline task. We only have status + holder, and
+// the whole project is pre-install today, so dots land on the early stages or
+// flag as owner-unclear; the on-site/energization/green-tag stages stay empty.
+export function taskMapStage(task: {
+  status: string;
+  blocking_company: string | null;
+}): MapStageKey {
+  if (
+    (task.status === "blocked" || task.status === "not_started_should_be") &&
+    task.blocking_company &&
+    OFF_SITE_HOLDERS.has(task.blocking_company)
+  ) {
+    return "unclear";
+  }
+  if (task.status === "on_track" || task.status === "complete") return "l2l3";
+  return "l1"; // blocked (clear owner) or not-yet-started, stalled at the front
+}

@@ -11,6 +11,12 @@ export const BRAND = {
   purple: "#8a3dd6",
   purpleDeep: "#5e25a3",
 
+  // Site-map Cx ramp — dark→light purple for the off-site/on-site stages,
+  // terminating in `teal` for Green Tag / BU; `dangerInk` flags owner-unclear.
+  cxOffsite: "#3a1366",
+  cxOnsite: "#a877e0",
+  cxPreEnergy: "#c9a6ec",
+
   border: "#e8dcf0",
   successInk: "#3b6d11",
   successBg: "#eaf3de",

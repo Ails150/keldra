@@ -1,13 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { BlockerMap } from "../lib/blocker-state";
-import { filterAssetsByRole, getLinkedBlockers, roleLabel } from "../utils";
-import { stageMeta } from "../lib/cx-stages";
-import AssetDetailPanel from "./asset-detail-panel";
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { roleLabel } from "../utils";
+import { BRAND } from "@/lib/brand";
+import {
+  MAP_STAGES,
+  mapStageMeta,
+  taskMapStage,
+} from "../lib/cx-stages";
+import { type Baseline, companyName, loadBaseline } from "../lib/baseline-seed";
 
 const GBP = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -15,55 +19,45 @@ const GBP = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 0,
 });
 
+// Stylised top-down layout of DUB-16. Each zone is a critical room (or, for the
+// BU rooms, a group) read straight from the baseline; dots are baseline tasks
+// whose affects_room points here.
 type Zone = {
   id: string;
   label: string;
+  // Baseline room codes that belong to this zone; `bu: true` matches every BU-* room.
+  codes: string[];
+  bu?: boolean;
   x: number;
   y: number;
   w: number;
   h: number;
 };
 
-// Stylised top-down layout of DUB-12 Building 4 (880×520 viewBox).
 const ZONES: Zone[] = [
-  { id: "mer1", label: "MER1 Main Electrical Room", x: 20, y: 40, w: 280, h: 200 },
-  { id: "roof", label: "Roof above Colo", x: 320, y: 40, w: 240, h: 120 },
-  { id: "admin", label: "Admin Plant", x: 580, y: 40, w: 200, h: 200 },
-  { id: "mgr2", label: "MGR2", x: 320, y: 180, w: 240, h: 60 },
-  { id: "colo1", label: "Colo Hall 1", x: 20, y: 270, w: 380, h: 200 },
-  { id: "colo2", label: "Colo Hall 2", x: 420, y: 270, w: 360, h: 200 },
-  { id: "other", label: "Other", x: 590, y: 478, w: 190, h: 34 },
+  { id: "mmr1", label: "MMR1", codes: ["MMR1"], x: 20, y: 44, w: 200, h: 150 },
+  { id: "mmr2", label: "MMR2", codes: ["MMR2"], x: 240, y: 44, w: 200, h: 150 },
+  { id: "mer1-lv", label: "MER1 LV", codes: ["MER1-LV"], x: 460, y: 44, w: 180, h: 150 },
+  { id: "mer2-lv", label: "MER2 LV", codes: ["MER2-LV"], x: 660, y: 44, w: 180, h: 150 },
+  { id: "upm1", label: "UPM1", codes: ["UPM1"], x: 20, y: 214, w: 200, h: 150 },
+  { id: "upm2", label: "UPM2", codes: ["UPM2"], x: 240, y: 214, w: 200, h: 150 },
+  { id: "earth-m1", label: "MER1 Earth Bar", codes: ["EARTH-M1"], x: 460, y: 214, w: 180, h: 150 },
+  { id: "earth-m2", label: "MER2 Earth Bar", codes: ["EARTH-M2"], x: 660, y: 214, w: 180, h: 150 },
+  { id: "bu", label: "BU rooms", codes: [], bu: true, x: 20, y: 384, w: 620, h: 210 },
+  { id: "sec-colo", label: "Security COLO", codes: ["SEC-COLO"], x: 660, y: 384, w: 180, h: 210 },
 ];
 
-function zoneForLocation(loc: string): string {
-  const s = (loc ?? "").toString().toLowerCase();
-  if (s.includes("mer1")) return "mer1";
-  if (s.includes("roof")) return "roof";
-  if (s.includes("admin")) return "admin";
-  if (s.includes("mgr2")) return "mgr2";
-  if (s.includes("colo hall 2")) return "colo2";
-  if (s.includes("colo hall 1")) return "colo1";
-  if (s.includes("colo")) return "colo1";
-  return "other";
+function zoneMatches(zone: Zone, code: string | null): boolean {
+  if (!code) return false;
+  if (zone.bu) return code.startsWith("BU-");
+  return zone.codes.includes(code);
 }
 
-// Dot fill/stroke by Cx stage; owner-unclear assets render grey + dashed.
-function dotStyle(asset: any): { fill: string; stroke: string; dashed: boolean } {
-  const owner = (asset.owner_name ?? "").toString().trim();
-  if (owner === "") return { fill: "#B4B2A9", stroke: "#807E76", dashed: true };
-  const m = stageMeta(asset.current_stage);
-  return { fill: m.dotFill, stroke: m.dotStroke, dashed: false };
-}
-
+// Heat by number of at-risk tasks (blocked / should-be-running) in the room.
 function zoneTint(count: number): { bg: string; stroke: string; text: string } {
-  if (count >= 6) return { bg: "#FCEBEB", stroke: "#A32D2D", text: "#A32D2D" };
-  if (count >= 3) return { bg: "#FAEEDA", stroke: "#854F0B", text: "#854F0B" };
-  return { bg: "#EAF3DE", stroke: "#3B6D11", text: "#3B6D11" };
-}
-
-function shortId(id: string): string {
-  const parts = (id ?? "").toString().split("-");
-  return parts.length > 1 ? parts.slice(1).join("-") : id;
+  if (count >= 4) return { bg: BRAND.dangerBg, stroke: BRAND.dangerInk, text: BRAND.dangerInk };
+  if (count >= 2) return { bg: BRAND.warningBg, stroke: BRAND.warningInk, text: BRAND.warningInk };
+  return { bg: BRAND.successBg, stroke: BRAND.successInk, text: BRAND.successInk };
 }
 
 type Props = {
@@ -76,55 +70,36 @@ type Props = {
 };
 
 export default function MapView({
-  project,
   viewingAs,
-  blockerMap,
-  onOpenBlocker,
   onAlertAction,
   highlightZone,
 }: Props) {
-  const [activeAsset, setActiveAsset] = useState<any | null>(null);
+  const router = useRouter();
+  const [baseline, setBaseline] = useState<Baseline>(loadBaseline);
+  useEffect(() => setBaseline(loadBaseline()), []);
 
-  const roleAssets = useMemo(
-    () =>
-      filterAssetsByRole(
-        project.uploads.assets,
-        viewingAs.role,
-        viewingAs.orgName,
-      ),
-    [project.uploads.assets, viewingAs.role, viewingAs.orgName],
+  const seesAll = viewingAs.role === "main-contractor" || viewingAs.role === "client";
+  const orgSlug = useMemo(
+    () => baseline.companies.find((c) => c.name === viewingAs.orgName)?.slug ?? null,
+    [baseline.companies, viewingAs.orgName],
   );
 
-  // Per-zone: which assets sit there, open-blocker count + combined £/day, and
-  // whether the zone is in the current role's scope.
   const zoneData = useMemo(() => {
-    const byZone = new Map<string, any[]>();
-    for (const a of roleAssets) {
-      const z = zoneForLocation(a.location ?? a.building ?? "");
-      const arr = byZone.get(z) ?? [];
-      arr.push(a);
-      byZone.set(z, arr);
-    }
-    const seesAll =
-      viewingAs.role === "main-contractor" || viewingAs.role === "client";
-
     return ZONES.map((zone) => {
-      const assets = byZone.get(zone.id) ?? [];
-      const ids = new Set(
-        assets.map((a) => (a.asset_id ?? "").toString().trim()),
+      const tasks = baseline.tasks.filter((t) => zoneMatches(zone, t.affects_room));
+      const atRisk = tasks.filter(
+        (t) => t.status === "blocked" || t.status === "not_started_should_be",
       );
-      const blockers = blockerMap
-        ? Object.values(blockerMap).filter(
-            (b) =>
-              b.state !== "closed" &&
-              b.linked_assets.some((id) => ids.has(id.trim())),
-          )
-        : [];
-      const cost = blockers.reduce((s, b) => s + b.cost_per_day, 0);
-      const inScope = seesAll || assets.length > 0;
-      return { zone, assets, blockers, count: blockers.length, cost, inScope };
-    }).filter((z) => z.zone.id !== "other" || z.assets.length > 0);
-  }, [roleAssets, blockerMap, viewingAs.role]);
+      const cost = atRisk.reduce((s, t) => s + t.cost_per_day, 0);
+      const ownsHere =
+        !!orgSlug &&
+        tasks.some(
+          (t) => t.responsible_company === orgSlug || t.blocking_company === orgSlug,
+        );
+      const inScope = seesAll || ownsHere;
+      return { zone, tasks, count: atRisk.length, cost, inScope };
+    });
+  }, [baseline.tasks, orgSlug, seesAll]);
 
   return (
     <section className="mx-auto max-w-6xl px-8 space-y-4">
@@ -134,7 +109,7 @@ export default function MapView({
             className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
             style={{ fontSize: 28, lineHeight: 1.15 }}
           >
-            DUB-12 Building 4 · Site map
+            DUB-16 · Site map
           </h1>
           <p
             className="mt-1 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
@@ -146,30 +121,29 @@ export default function MapView({
         </div>
         <div className="flex flex-col gap-2 text-[11px] text-ink-mid">
           <div className="flex items-center gap-3">
-            <span className="font-semibold uppercase tracking-wide">Zone heat</span>
-            <Swatch color="#A32D2D" label="6+" />
-            <Swatch color="#854F0B" label="3–5" />
-            <Swatch color="#3B6D11" label="0–2" />
+            <span className="font-semibold uppercase tracking-wide">Room heat</span>
+            <Swatch color={BRAND.dangerInk} label="4+ at risk" />
+            <Swatch color={BRAND.warningInk} label="2–3" />
+            <Swatch color={BRAND.successInk} label="0–1" />
           </div>
-          <div className="flex items-center gap-3">
-            <span className="font-semibold uppercase tracking-wide">Asset</span>
-            <Dot color="#A32D2D" label="RT" />
-            <Dot color="#F4A340" label="On YT" />
-            <Dot color="#5BA13B" label="On GT" />
-            <Dot color="#B4B2A9" label="Owner unclear" />
+          <div className="flex max-w-xl flex-wrap items-center justify-end gap-x-3 gap-y-1">
+            <span className="font-semibold uppercase tracking-wide">Cx stage</span>
+            {MAP_STAGES.map((s) => (
+              <Dot key={s.key} color={s.fill} label={s.label} />
+            ))}
           </div>
         </div>
       </header>
 
       <div className="overflow-hidden rounded-2xl border border-paper-line bg-paper-warm">
         <svg
-          viewBox="0 0 880 520"
+          viewBox="0 0 880 620"
           className="w-full"
-          style={{ height: 600 }}
+          style={{ height: 640 }}
           role="img"
-          aria-label="DUB-12 site map"
+          aria-label="DUB-16 site map"
         >
-          {zoneData.map(({ zone, assets, blockers, count, cost, inScope }) => {
+          {zoneData.map(({ zone, tasks, count, cost, inScope }) => {
             const tint = zoneTint(count);
             const highlighted = highlightZone === zone.id;
             if (!inScope) {
@@ -181,26 +155,20 @@ export default function MapView({
                     width={zone.w}
                     height={zone.h}
                     rx={10}
-                    fill="#EFEAF2"
-                    stroke="#C9C3D0"
+                    fill={BRAND.cream}
+                    stroke={BRAND.paperLine}
                     strokeWidth={0.5}
                   />
-                  <text x={zone.x + 12} y={zone.y + 22} fontSize={13} fill="#7A7580">
+                  <text x={zone.x + 12} y={zone.y + 22} fontSize={13} fill={BRAND.inkMuted}>
                     {zone.label}
                   </text>
-                  <text x={zone.x + 12} y={zone.y + 40} fontSize={10} fill="#9A95A0">
+                  <text x={zone.x + 12} y={zone.y + 40} fontSize={10} fill={BRAND.inkMuted}>
                     Not in {viewingAs.orgName} scope
                   </text>
                 </g>
               );
             }
-            const topBlockers = blockers
-              .slice()
-              .sort((a, b) => b.cost_per_day - a.cost_per_day)
-              .slice(0, 2)
-              .map((b) => `• ${b.description}`)
-              .join("\n");
-            const zoneTip = `${zone.label}\n${count} open blocker${count === 1 ? "" : "s"} · ${GBP.format(cost)}/day${topBlockers ? `\n${topBlockers}` : ""}`;
+            const zoneTip = `${zone.label}\n${tasks.length} task${tasks.length === 1 ? "" : "s"} · ${count} at risk · ${GBP.format(cost)}/day`;
             return (
               <g key={zone.id}>
                 <rect
@@ -210,7 +178,7 @@ export default function MapView({
                   height={zone.h}
                   rx={10}
                   fill={tint.bg}
-                  stroke={highlighted ? "#8a3dd6" : tint.stroke}
+                  stroke={highlighted ? BRAND.purple : tint.stroke}
                   strokeWidth={highlighted ? 2.5 : 0.5}
                   className="cursor-pointer"
                   onClick={() => onAlertAction?.("tab:constraints")}
@@ -232,63 +200,59 @@ export default function MapView({
                   y={zone.y + 38}
                   fontSize={10}
                   fill={tint.text}
-                  opacity={0.8}
+                  opacity={0.85}
                   className="pointer-events-none"
                 >
-                  {count} open blocker{count === 1 ? "" : "s"} ·{" "}
-                  {GBP.format(cost)}/day
+                  {count > 0
+                    ? `${count} at risk · ${GBP.format(cost)}/day`
+                    : tasks.length > 0
+                      ? `${tasks.length} task${tasks.length === 1 ? "" : "s"} · on track`
+                      : "No tasks mapped"}
                 </text>
 
-                {assets.map((a, i) => {
-                  const cols = Math.min(4, Math.max(1, assets.length));
-                  const rows = Math.ceil(assets.length / cols);
-                  const padX = 20;
-                  const padTop = 50;
-                  const padBottom = 16;
+                {tasks.map((t, i) => {
+                  const cols = Math.min(4, Math.max(1, tasks.length));
+                  const rows = Math.ceil(tasks.length / cols);
+                  const padX = 22;
+                  const padTop = 52;
+                  const padBottom = 18;
                   const cellW = (zone.w - 2 * padX) / cols;
-                  const cellH = Math.max(
-                    24,
-                    (zone.h - padTop - padBottom) / rows,
-                  );
+                  const cellH = Math.max(28, (zone.h - padTop - padBottom) / rows);
                   const col = i % cols;
                   const row = Math.floor(i / cols);
                   const cx = zone.x + padX + (col + 0.5) * cellW;
                   const cy = zone.y + padTop + (row + 0.5) * cellH;
 
-                  const open = getLinkedBlockers(a, blockerMap).filter(
-                    (b) => b.state !== "closed",
-                  );
-                  const r = open.length >= 3 ? 11 : open.length >= 1 ? 9 : 6;
-                  const cd = open.reduce((s, b) => s + b.cost_per_day, 0);
-                  const st = dotStyle(a);
-                  const tip = `${a.asset_id} · ${a.asset_type}\nStage: ${a.current_stage || "—"}\nOwner: ${a.owner_name || "Owner unclear"}\n${open.length} open blocker${open.length === 1 ? "" : "s"}${cd ? ` · ${GBP.format(cd)}/day` : ""}`;
+                  const stage = mapStageMeta(taskMapStage(t));
+                  const r =
+                    t.status === "blocked" ? 11 : t.status === "not_started_should_be" ? 9 : 7;
+                  const tip = `${t.activity_id} · ${t.name}\nStage: ${stage.label}\n${t.cost_per_day > 0 ? `${GBP.format(t.cost_per_day)}/day · ` : ""}held by ${companyName(baseline, t.blocking_company ?? t.responsible_company)}`;
 
                   return (
                     <g
-                      key={a.asset_id ?? i}
+                      key={t.activity_id}
                       className="cursor-pointer"
-                      onClick={() => setActiveAsset(a)}
+                      onClick={() => router.push(`/dashboard/tasks/${t.activity_id}`)}
                     >
                       <circle
                         cx={cx}
                         cy={cy}
                         r={r}
-                        fill={st.fill}
-                        stroke={st.stroke}
-                        strokeWidth={1.4}
-                        strokeDasharray={st.dashed ? "3 2" : undefined}
+                        fill={stage.fill}
+                        stroke={BRAND.ink}
+                        strokeWidth={1.2}
                       >
                         <title>{tip}</title>
                       </circle>
                       <text
                         x={cx}
                         y={cy + r + 9}
-                        fontSize={8}
+                        fontSize={7.5}
                         textAnchor="middle"
-                        fill={st.stroke}
+                        fill={BRAND.ink}
                         className="pointer-events-none"
                       >
-                        {shortId(a.asset_id ?? "")}
+                        {t.activity_id}
                       </text>
                     </g>
                   );
@@ -300,19 +264,9 @@ export default function MapView({
       </div>
 
       <p className="text-center text-xs text-ink-mid">
-        Click any zone or asset · live state from blocker chain · 0 secs latency
+        Click any room or task · live from the DUB-16 baseline · site install
+        starts 17 Aug 26, so every dot is still off-site
       </p>
-
-      <AssetDetailPanel
-        asset={activeAsset}
-        blockerMap={blockerMap}
-        xer={project.uploads.xer}
-        onClose={() => setActiveAsset(null)}
-        onOpenBlocker={(id) => {
-          setActiveAsset(null);
-          onOpenBlocker(id);
-        }}
-      />
     </section>
   );
 }
