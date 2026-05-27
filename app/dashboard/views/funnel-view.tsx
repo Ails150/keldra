@@ -24,16 +24,55 @@ const GBP = new Intl.NumberFormat("en-GB", {
 });
 
 // P6 Cx flow funnel. Off-site heavy — site module install doesn't begin until
-// 17 Aug 26, so everything downstream is zero today.
-const STAGES = [
-  { label: "L1 Off-Site Verification", n: 34, legacy: "Red Tag (legacy) = L1/L2 Off-Site" },
-  { label: "L2 Off-Site Acceptance", n: 18, legacy: "Red Tag (legacy) = L1/L2 Off-Site" },
-  { label: "L3 Integrated Off-Site Cx", n: 8, legacy: null },
-  { label: "On Site", n: 0, legacy: "Site module installation starts 17 Aug 26" },
-  { label: "Pre-Energization", n: 0, legacy: "Yellow Tag (legacy) = Pre-Energization" },
-  { label: "Green Tag", n: 0, legacy: "Green Tag (legacy) = Post-Energization · 02 Dec 26" },
-  { label: "Beneficial Use", n: 0, legacy: "Beneficial Use · 02 Dec 26" },
+// 17 Aug 26, so everything downstream is zero today. `stuck` = top reasons the
+// assets sitting at that stage aren't moving (grouped from the integration
+// register), shown inline under the bar so directors see WHY, not just how many.
+type Stage = {
+  label: string;
+  n: number;
+  legacy: string | null;
+  stuck: { count: number; reason: string }[];
+};
+
+const STAGES: Stage[] = [
+  {
+    label: "L1 Off-Site Verification",
+    n: 34,
+    legacy: "Red Tag (legacy) = L1/L2 Off-Site",
+    stuck: [
+      { count: 6, reason: "Awaiting Status A submittal from Ardmac" },
+      { count: 5, reason: "Cental bracketery dependency" },
+      { count: 4, reason: "Design clarification open with Sellafield" },
+    ],
+  },
+  {
+    label: "L2 Off-Site Acceptance",
+    n: 18,
+    legacy: "Red Tag (legacy) = L1/L2 Off-Site",
+    stuck: [
+      { count: 4, reason: "FAT scheduling not confirmed" },
+      { count: 3, reason: "Witness rep availability" },
+      { count: 3, reason: "Documentation incomplete" },
+    ],
+  },
+  {
+    label: "L3 Integrated Off-Site Cx",
+    n: 8,
+    legacy: null,
+    stuck: [
+      { count: 2, reason: "Cross-system integration test pending" },
+      { count: 1, reason: "Sign-off chain unclear (Onnec / Evolution)" },
+    ],
+  },
+  { label: "On Site", n: 0, legacy: "Site module installation starts 17 Aug 26", stuck: [] },
+  { label: "Pre-Energization", n: 0, legacy: "Yellow Tag (legacy) = Pre-Energization", stuck: [] },
+  { label: "Green Tag", n: 0, legacy: "Green Tag (legacy) = Post-Energization · 02 Dec 26", stuck: [] },
+  { label: "Beneficial Use", n: 0, legacy: "Beneficial Use · 02 Dec 26", stuck: [] },
 ];
+
+function truncate(s: string, n = 50): string {
+  return s.length > n ? `${s.slice(0, n - 1)}…` : s;
+}
 
 function roomBadge(
   b: Baseline,
@@ -123,6 +162,23 @@ export default function FunnelView({
                 <span className="text-sm font-semibold">{s.label}</span>
                 <span className="text-xs opacity-90">{s.n}</span>
               </div>
+              {s.stuck.length > 0 && (
+                <div className="mx-auto mt-1.5 max-w-md space-y-0.5">
+                  {s.stuck.slice(0, 3).map((r) => (
+                    <div key={r.reason} className="flex items-baseline gap-2">
+                      <span
+                        className="font-mono text-[12px] font-semibold tabular-nums"
+                        style={{ color: BRAND.dangerInk }}
+                      >
+                        {r.count}
+                      </span>
+                      <span className="text-[12px]" style={{ color: BRAND.inkMuted }}>
+                        {truncate(r.reason)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {i < STAGES.length - 1 && (
                 <div className="py-1 text-center text-[11px] text-ink-mid">↓</div>
               )}

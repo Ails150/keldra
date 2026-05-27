@@ -23,7 +23,8 @@ export const COMPANIES: Company[] = [
   { slug: "sellafield-design", name: "Sellafield Design", role: "Design", colour: "blue", punchLine: "MMR1 design pending — 4 weeks open." },
   { slug: "lawrence-marco", name: "Lawrence → Marco", role: "Design", colour: "amber", punchLine: "External lights spec unsigned — Marco can't cut drawings." },
   { slug: "auto-fire", name: "Auto Fire", role: "Subcontractor", colour: "pink" },
-  { slug: "t-bourke", name: "T Bourke", role: "Subcontractor", colour: "teal" },
+  { slug: "t-bourke", name: "T Bourke", role: "Subcontractor", colour: "teal", punchLine: "Mechanical sub — CRAH connections, COLO 1-4." },
+  { slug: "onnec", name: "Onnec", role: "Subcontractor", colour: "indigo", punchLine: "Telecoms sub — fibre crew standing idle on Cental's brackets." },
   { slug: "ardmac", name: "Ardmac", role: "Main contractor", colour: "purple" },
   { slug: "dornans", name: "Dornans", role: "Subcontractor", colour: "green" },
   { slug: "finnings", name: "Finnings", role: "Subcontractor", colour: "slate", punchLine: "Sprinkler diesel pump generators — affects FER BU room." },
@@ -113,7 +114,7 @@ function d(s: string): string {
 export const BASELINE_TASKS: BaselineTask[] = [
   // ---- variance heroes ----
   { activity_id: "ELE-MER-1010", name: "Install Earth Bar MER1", wbs_path: "Electrical Fit Out MER1", responsible_company: "ardmac", planned_start: d("13-May-26"), planned_end: d("14-May-26"), planned_manpower: 4, actual_manpower: 0, status: "not_started_should_be", blocked_reason: "Earth bar install was due 13-14 May. Day 2 with zero men assigned.", blocking_company: "ardmac", affects_room: "EARTH-M1", cost_per_day: 18000 },
-  { activity_id: "ELE-COLO-1030", name: "Telecoms Bracketery and Containment", wbs_path: "COLO 1-4 Electrical", responsible_company: "t-bourke", planned_start: d("13-Mar-26"), planned_end: d("20-Apr-26"), planned_manpower: 4, actual_manpower: 4, status: "blocked", blocked_reason: "Cental have not installed brackets — T Bourke cannot run fibre. Open since March.", blocking_company: "cental", affects_room: "BU-MMR", cost_per_day: 20000 },
+  { activity_id: "ELE-COLO-1030", name: "Telecoms Bracketery and Containment", wbs_path: "COLO 1-4 Electrical", responsible_company: "onnec", planned_start: d("13-Mar-26"), planned_end: d("20-Apr-26"), planned_manpower: 4, actual_manpower: 4, status: "blocked", blocked_reason: "Cental have not installed brackets — Onnec cannot run fibre. Open since March.", blocking_company: "cental", affects_room: "BU-MMR", cost_per_day: 20000 },
   { activity_id: "ELE-ADMIN-1020", name: "Install high level Bracketery and Containment AD1-4", wbs_path: "Elec AD01-04", responsible_company: "ardmac", planned_start: d("01-Apr-26"), planned_end: d("01-May-26"), planned_manpower: 3, actual_manpower: 0, status: "blocked", blocked_reason: "Cental bracketery dependency. Affects MMR mech complete date 29-Jun.", blocking_company: "cental", affects_room: "BU-MMR", cost_per_day: 12000 },
   { activity_id: "MEC-COLO-1040", name: "Water services and connections COLO 1-4", wbs_path: "Mechanical Modules 1-4", responsible_company: "ardmac", planned_start: d("21-Apr-26"), planned_end: d("28-Apr-26"), planned_manpower: 5, actual_manpower: 0, status: "blocked", blocked_reason: "Sellafield Design holding water services spec. 4 weeks open. MMR1 mech first fix cannot start.", blocking_company: "sellafield-design", affects_room: "MMR1", cost_per_day: 15000 },
   { activity_id: "FAB-ADMIN-1120", name: "External Service Support Steel", wbs_path: "Facility Modules", responsible_company: "ardmac", planned_start: d("16-Mar-26"), planned_end: d("24-Apr-26"), planned_manpower: 4, actual_manpower: 0, status: "blocked", blocked_reason: "Lawrence has not signed external lights spec. Marco cannot cut steel drawings. 3 weeks unanswered. Not an Ardmac issue.", blocking_company: "lawrence-marco", affects_room: "BU-MMR", cost_per_day: 10000 },
@@ -190,7 +191,7 @@ export const SITE_DIARY = {
   manpower: [
     { men: 1, activity: "modular lighting", company: "cental" },
     { men: 3, activity: "containment", company: "ardmac" },
-    { men: 4, activity: "bass cabling", company: "t-bourke" },
+    { men: 4, activity: "fibre containment", company: "onnec" },
   ],
   notes:
     "Earth bar MER1 still not started. Brackets for fibre runs still missing from Cental. No movement on external lights — Marco still waiting on Lawrence sign-off (3w). Doors and FOK still blocked on Sellafield. Finnings generator A kick-off tomorrow per programme.",

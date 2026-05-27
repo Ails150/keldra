@@ -34,6 +34,7 @@ export const BRAND = {
   green: "#16a34a",
   slate: "#64748b",
   navy: "#1e3a5f",
+  indigo: "#4f46e5",
 } as const;
 
 export type BrandColour = keyof typeof BRAND;
