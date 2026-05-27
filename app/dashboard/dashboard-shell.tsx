@@ -26,9 +26,11 @@ import AuditView from "./views/audit";
 import MapView from "./views/map-view";
 import InviteOrgModal from "./views/invite-org-modal";
 import BlockerDetailPanel from "./views/blocker-detail-panel";
+import PlannedVsActualView from "./views/planned-vs-actual";
 
 type Tab =
   | "today"
+  | "variance"
   | "funnel"
   | "people"
   | "assets"
@@ -41,6 +43,7 @@ type Tab =
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "today", label: "Today" },
+  { id: "variance", label: "Planned vs Actual" },
   { id: "funnel", label: "Funnel" },
   { id: "people", label: "People" },
   { id: "assets", label: "Assets" },
@@ -456,6 +459,7 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
             onAlertAction={handleAlertAction}
           />
         )}
+        {tab === "variance" && <PlannedVsActualView />}
         {tab === "funnel" && (
           <FunnelView
             project={project}
