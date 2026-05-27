@@ -21,6 +21,7 @@ import {
   varianceTasks,
   workingDaysUntil,
 } from "../lib/baseline-seed";
+import { listSilentTasks, type SilentTask } from "@/lib/activity";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -61,6 +62,7 @@ export default function TodayView({
   onAlertAction?: (target: string) => void;
 }) {
   const [baseline] = useState<Baseline>(() => loadBaseline());
+  const [silent] = useState<SilentTask[]>(() => listSilentTasks());
 
   const variance = varianceTasks(baseline);
   const rollups = companyRollups(baseline).slice(0, 6);
@@ -220,6 +222,62 @@ export default function TodayView({
           </div>
         </div>
       )}
+
+      {/* Silence report — blocked tasks losing money with no recent chase */}
+      <div className="rounded-xl" style={{ border: `0.5px solid ${BRAND.border}`, padding: "18px 20px" }}>
+        <div className="flex items-center justify-between gap-3">
+          <h2
+            className="font-[family-name:var(--font-fraunces)] text-ink"
+            style={{ fontSize: 15 }}
+          >
+            Silence report
+          </h2>
+          <span
+            className="rounded-full px-2 py-0.5 font-mono text-[11px]"
+            style={{ backgroundColor: BRAND.dangerBg, color: BRAND.dangerInk }}
+          >
+            {silent.length} task{silent.length === 1 ? "" : "s"} · £
+            {Math.round(silent.reduce((s, t) => s + t.cost_per_day, 0) / 1000)}k/day
+          </span>
+        </div>
+        <p className="mt-1 text-[12px] italic text-ink-mid">
+          Blocked tasks losing money with no chase logged in 14+ days.
+        </p>
+        {silent.length === 0 ? (
+          <p className="mt-3 text-[13px] text-ink-mid">
+            No silent tasks — every blocked item has a recent chase logged.
+          </p>
+        ) : (
+          <ul className="mt-2">
+            {silent.slice(0, 5).map((t) => (
+              <li key={t.activity_id} style={{ borderBottom: `0.5px solid ${BRAND.border}` }}>
+                <Link
+                  href={`/dashboard/tasks/${t.activity_id}`}
+                  className="flex items-center justify-between gap-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="font-mono text-[11px] text-ink-mid">{t.activity_id}</p>
+                    <p className="truncate text-[13px] font-medium text-ink">{t.name}</p>
+                    <p className="text-[11px] text-ink-mid">
+                      Held by {companyName(baseline, t.held_by)} · {t.days_silent}d silent
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0 text-right">
+                    <p
+                      className="font-[family-name:var(--font-fraunces)]"
+                      style={{ fontSize: 16, color: BRAND.dangerInk }}
+                    >
+                      £{Math.round(t.cost_per_day / 1000)}k/day
+                    </p>
+                    <p className="text-[10px] text-ink-mid">{t.days_open}d open</p>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-2 text-[11px] text-ink-mid">View all silent tasks →</p>
+      </div>
 
       {/* (D) Constraint priority by BU impact */}
       {priority.length > 0 && (

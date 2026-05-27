@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import {
@@ -12,6 +12,15 @@ import {
   loadBaseline,
   roomByCode,
 } from "../../lib/baseline-seed";
+import {
+  type Activity,
+  isUnanswered,
+  listActivityForCompany,
+  metricsFor,
+} from "@/lib/activity";
+import { ActivityTimeline } from "../../activity-ui";
+
+type CommFilter = "all" | "outbound" | "inbound" | "needed";
 
 const GBP = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -22,8 +31,29 @@ const GBP = new Intl.NumberFormat("en-GB", {
 export default function CompanyPage() {
   const params = useParams();
   const slug = String(params.slug ?? "");
+  const router = useRouter();
   const [baseline, setBaseline] = useState<Baseline>(DEFAULT_BASELINE);
+  const [activity, setActivity] = useState<Activity[]>([]);
+  const [filter, setFilter] = useState<CommFilter>("all");
   useEffect(() => setBaseline(loadBaseline()), []);
+  useEffect(() => {
+    if (slug) setActivity(listActivityForCompany(slug));
+  }, [slug]);
+
+  const commMetrics = metricsFor(activity);
+  const shownComm = useMemo(
+    () =>
+      activity.filter((e) =>
+        filter === "all"
+          ? true
+          : filter === "outbound"
+            ? e.direction === "outbound"
+            : filter === "inbound"
+              ? e.direction === "inbound"
+              : isUnanswered(e, activity),
+      ),
+    [activity, filter],
+  );
 
   const company = companyBySlug(baseline, slug);
 
@@ -164,6 +194,58 @@ export default function CompanyPage() {
           ))
         )}
       </Card>
+
+      {/* Communication history */}
+      <section className="rounded-xl" style={{ border: `0.5px solid ${BRAND.border}` }}>
+        <div className="px-5 py-4" style={{ borderBottom: `0.5px solid ${BRAND.border}` }}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-[family-name:var(--font-fraunces)] text-ink" style={{ fontSize: 18 }}>
+              Communication history
+            </h2>
+            <p className="font-mono text-[12px] text-ink-mid">
+              {activity.length} entries · {commMetrics.outbound_count} chases ·{" "}
+              {commMetrics.inbound_count} responses · response rate{" "}
+              {commMetrics.response_rate}%
+            </p>
+          </div>
+          <p className="mt-1 text-[13px] italic text-ink-mid">
+            Every interaction logged across all tasks where {company.name} is held
+            by or recipient.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {(
+              [
+                ["all", "All"],
+                ["outbound", "Outbound only"],
+                ["inbound", "Inbound only"],
+                ["needed", "Responses needed"],
+              ] as [CommFilter, string][]
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setFilter(id)}
+                className="rounded-full px-3 py-1 text-xs font-medium"
+                style={
+                  filter === id
+                    ? { backgroundColor: BRAND.ink, color: BRAND.cream }
+                    : { border: `0.5px solid ${BRAND.border}`, color: BRAND.inkMuted }
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <ActivityTimeline
+          entries={shownComm}
+          taskLabel={(id) => {
+            const t = baseline.tasks.find((x) => x.activity_id === id);
+            return t ? `${id} · ${t.name.slice(0, 24)}${t.name.length > 24 ? "…" : ""}` : id;
+          }}
+          onTaskClick={(id) => router.push(`/dashboard/tasks/${id}`)}
+        />
+      </section>
     </main>
   );
 }
