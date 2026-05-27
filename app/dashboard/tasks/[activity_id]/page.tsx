@@ -17,6 +17,7 @@ import {
 import {
   type Activity,
   type SilenceMetrics,
+  buildSynopsis,
   listActivityForTask,
   metricsFor,
 } from "@/lib/activity";
@@ -82,6 +83,8 @@ export default function TaskPage() {
     task.status === "not_started_should_be"
       ? "Not started — should be running"
       : task.status.charAt(0).toUpperCase() + task.status.slice(1);
+
+  const synopsis = buildSynopsis(task, activity, baseline);
 
   const silence =
     metrics && metrics.outbound_count > 0 && metrics.days_since_last_outbound > 14
@@ -183,6 +186,40 @@ export default function TaskPage() {
                 </p>
               )}
             </div>
+
+            {synopsis.length > 0 && (
+              <div style={{ padding: "12px 20px", borderBottom: `0.5px solid ${BRAND.border}` }}>
+                <p
+                  style={{
+                    fontSize: 10,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    color: BRAND.inkMuted,
+                    fontWeight: 600,
+                  }}
+                >
+                  Synopsis
+                </p>
+                <div className="mt-1">
+                  {synopsis.map((r, i) => (
+                    <div
+                      key={i}
+                      className="flex flex-wrap items-baseline"
+                      style={{ gap: 8, padding: "4px 0" }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 500, color: BRAND.ink }}>
+                        {r.bold}
+                      </span>
+                      <span
+                        style={{ fontSize: 12, color: BRAND.inkMuted, flex: "1 1 0%", minWidth: 0 }}
+                      >
+                        {r.detail}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="overflow-y-auto" style={{ maxHeight: "60vh" }}>
               <ActivityTimeline entries={activity} />

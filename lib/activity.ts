@@ -2,7 +2,14 @@
 // task. Persisted in localStorage (mirrors the baseline pattern). The moat:
 // silence is computed and surfaced as a first-class signal.
 
-import { loadBaseline, holdingCompany } from "@/app/dashboard/lib/baseline-seed";
+import {
+  loadBaseline,
+  holdingCompany,
+  companyName,
+  daysOpen,
+  type Baseline,
+  type BaselineTask,
+} from "@/app/dashboard/lib/baseline-seed";
 
 export type ActivityType =
   | "chase"
@@ -303,4 +310,165 @@ export function isUnanswered(entry: Activity, all: Activity[]): boolean {
       new Date(e.created_at).getTime() > sent &&
       new Date(e.created_at).getTime() <= sent + 7 * DAY,
   );
+}
+
+// ---------- synopsis (executive summary of a task's trail) ----------
+
+export type SynopsisRow = { bold: string; detail: string };
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function fmtDMY(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+}
+function fmtDM(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+function dateDaysSince(iso: string, now: number): number {
+  const a = new Date(now);
+  a.setHours(0, 0, 0, 0);
+  const b = new Date(iso);
+  b.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.floor((a.getTime() - b.getTime()) / DAY));
+}
+function relTimeWords(iso: string, now: number): string {
+  const ms = now - new Date(iso).getTime();
+  if (ms < 60_000) return "just now";
+  const mins = Math.floor(ms / 60_000);
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+  const hrs = Math.floor(ms / 3_600_000);
+  if (hrs < 24) return `${hrs} hour${hrs === 1 ? "" : "s"} ago`;
+  const days = Math.floor(ms / DAY);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+function firstName(name: string): string {
+  return name.split(/[\s—-]+/).filter(Boolean)[0] ?? name;
+}
+function lastSentence(text: string): string {
+  const parts = text.trim().split(/[.!?]\s+/).filter(Boolean);
+  const s = (parts[parts.length - 1] ?? text).trim().replace(/[.!?]+$/, "").trim();
+  return s.charAt(0).toLowerCase() + s.slice(1);
+}
+function modeOf(arr: string[]): string {
+  const m = new Map<string, number>();
+  let best = arr[0] ?? "";
+  let bestN = 0;
+  for (const x of arr) {
+    const n = (m.get(x) ?? 0) + 1;
+    m.set(x, n);
+    if (n > bestN) {
+      bestN = n;
+      best = x;
+    }
+  }
+  return best;
+}
+function readStatusFrom(entries: Activity[]): string | null {
+  for (const e of entries) {
+    if (e.type !== "system") continue;
+    const b = e.body.toLowerCase();
+    if (b.includes("not yet opened") || b.includes("not opened") || b.includes("unread")) {
+      return "NOT YET OPENED";
+    }
+    if (b.includes("opened") || b.includes("read receipt: read")) return "OPENED";
+  }
+  return null;
+}
+function actionShort(e: Activity): string {
+  switch (e.type) {
+    case "note":
+      return lastSentence(e.body);
+    case "status_change":
+      return e.metadata.new_status ? `moved task to ${e.metadata.new_status}` : "updated status";
+    case "chase":
+      return e.recipient ? `chased ${firstName(e.recipient.name)}` : "sent a chase";
+    case "response":
+      return "replied";
+    case "cost_change":
+      return "changed the cost of delay";
+    default:
+      return lastSentence(e.body);
+  }
+}
+
+// Auto-computed executive summary for a task's activity trail — 4-6 rows, each
+// row skipped when its source data isn't present.
+export function buildSynopsis(
+  task: BaselineTask,
+  entries: Activity[],
+  b: Baseline,
+): SynopsisRow[] {
+  const rows: SynopsisRow[] = [];
+  const now = Date.now();
+  const asc = [...entries].sort(
+    (a, z) => new Date(a.created_at).getTime() - new Date(z.created_at).getTime(),
+  );
+
+  // Row 1 — age + start (always available)
+  rows.push({
+    bold: `${daysOpen(task)} days open`,
+    detail: `· since ${fmtDMY(task.planned_start)}`,
+  });
+
+  // Row 2 — outbound chases
+  const outbound = asc.filter((e) => e.direction === "outbound");
+  if (outbound.length > 0) {
+    rows.push({
+      bold: `${outbound.length} outbound chase${outbound.length === 1 ? "" : "s"}`,
+      detail: `sent by ${modeOf(outbound.map((e) => e.actor.name))}`,
+    });
+  }
+
+  // Row 3 — responses
+  const responses = asc.filter((e) => e.direction === "inbound" && e.type === "response");
+  if (responses.length > 0) {
+    const company = companyName(b, responses[0].actor.company_slug);
+    const who = firstName(responses[0].actor.name);
+    const dates = responses.map((e) => fmtDM(e.created_at)).join(" + ");
+    const stuck = task.status === "blocked" || task.status === "not_started_should_be";
+    rows.push({
+      bold: `${responses.length} response${responses.length === 1 ? "" : "s"}`,
+      detail: `from ${company} (${who}, ${dates})${stuck ? " — neither led to action" : ""}`,
+    });
+  }
+
+  // Row 4 — formal escalation
+  const esc = asc.find(
+    (e) => e.direction === "outbound" && (e.subject ?? "").toUpperCase().includes("FORMAL"),
+  );
+  if (esc) {
+    const recip = esc.recipient?.name?.split(" — ")[0] ?? esc.recipient?.name ?? "recipient";
+    const read = readStatusFrom(asc);
+    rows.push({
+      bold: `Formal escalation to ${recip}`,
+      detail: `on ${fmtDM(esc.created_at)} · ${dateDaysSince(esc.created_at, now)} days ago${read ? ` · ${read}` : ""}`,
+    });
+  }
+
+  // Row 5 — cost change
+  const cost = asc.find((e) => e.type === "cost_change" && e.metadata.new_cost != null);
+  if (cost) {
+    const oldK = Math.round((cost.metadata.old_cost ?? 0) / 1000);
+    const newK = Math.round((cost.metadata.new_cost ?? 0) / 1000);
+    const reason = cost.metadata.cost_change_reason
+      ? lastSentence(cost.metadata.cost_change_reason)
+      : "";
+    rows.push({
+      bold: `Cost raised from £${oldK}k to £${newK}k/day`,
+      detail: `on ${fmtDM(cost.created_at)}${reason ? ` (${reason})` : ""}`,
+    });
+  }
+
+  // Row 6 — last activity
+  const last = asc[asc.length - 1];
+  if (last) {
+    rows.push({
+      bold: `Last activity ${relTimeWords(last.created_at, now)}`,
+      detail: `· ${last.actor.name} ${actionShort(last)}`,
+    });
+  }
+
+  return rows;
 }
