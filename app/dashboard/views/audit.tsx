@@ -70,7 +70,7 @@ export default function AuditView({
           <button
             type="button"
             onClick={() => {
-              if (confirm("Reset all blockers to their initial state from the uploaded CSV?")) {
+              if (confirm("Reset all blocker state to initial demo state? This cannot be undone.")) {
                 void onResetBlockers();
               }
             }}

@@ -11,10 +11,10 @@ import {
   type ParsedRegister,
 } from "../lib/register-parser";
 import {
-  DUB12_ASSETS_CSV,
-  DUB12_CONSTRAINTS_CSV,
-  DUB12_TEAM_CSV,
-} from "../sample-data/dub12";
+  DUB16_ASSETS_CSV,
+  DUB16_CONSTRAINTS_CSV,
+  DUB16_TEAM_CSV,
+} from "../sample-data/dub16";
 import { parseXer, type ParsedXer } from "../lib/xer-parser";
 import { DUB12_XER } from "../sample-data/dub12-xer";
 
@@ -291,15 +291,15 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
   // Auto-fills all four uploads with the DUB-12 sample so the demo can run
   // without manually dropping files. Builds a register from the constraint log
   // so the 4th card lands in its done-state too.
-  async function loadDub12Sample() {
+  async function loadDub16Sample() {
     setParsing(true);
     setParseError(null);
     try {
-      const team = parseCsv(DUB12_TEAM_CSV);
-      const assets = parseCsv(DUB12_ASSETS_CSV);
-      const constraints = parseCsv(DUB12_CONSTRAINTS_CSV);
+      const team = parseCsv(DUB16_TEAM_CSV);
+      const assets = parseCsv(DUB16_ASSETS_CSV);
+      const constraints = parseCsv(DUB16_CONSTRAINTS_CSV);
       const register = await buildRegisterFromConstraintRows(
-        "dub12-constraint-log.csv",
+        "dub16-constraint-log.csv",
         constraints,
       );
       const xer = await parseXer(
@@ -307,11 +307,16 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
       );
       setFormData((prev) => ({
         ...prev,
+        project: {
+          ...prev.project,
+          name: prev.project.name?.trim() ? prev.project.name : "DUB-16 Cx",
+          client: prev.project.client?.trim() ? prev.project.client : "Microsoft",
+        },
         template: prev.template ?? "mercury-red-tag",
         uploads: { team, assets, constraints, register, xer },
       }));
     } catch {
-      setParseError("Could not load the DUB-12 sample data.");
+      setParseError("Could not load the DUB-16 sample data.");
     } finally {
       setParsing(false);
     }
@@ -407,12 +412,12 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
           </h2>
           <button
             type="button"
-            onClick={loadDub12Sample}
+            onClick={loadDub16Sample}
             disabled={parsing}
             className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/5 px-3 py-1.5 text-xs font-medium text-accent-deep transition-colors hover:bg-accent/10 disabled:opacity-50"
           >
             <span aria-hidden>⚡</span>
-            Load DUB-12 sample
+            Load DUB-16 sample
           </button>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">

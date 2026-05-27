@@ -4,46 +4,15 @@ import { useState } from "react";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { BlockerMap } from "../lib/blocker-state";
 import { filterAssetsByRole, isBlankOwner, roleLabel } from "../utils";
+import {
+  CX_STAGES,
+  STAGE_META,
+  normalizeStage,
+  type CxStage,
+} from "../lib/cx-stages";
 import AssetDetailPanel from "./asset-detail-panel";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
-const COLUMN_ORDER = [
-  "Designed",
-  "Delivered",
-  "Installed",
-  "Red-tag candidate",
-  "Red-tagged",
-  "Yellow",
-  "Green",
-  "Other",
-];
-
-function bucketFor(stage: string): string {
-  const s = (stage ?? "").toString().trim();
-  if (!s) return "Other";
-  const lower = s.toLowerCase();
-  if (lower.includes("delivered") && lower.includes("not installed")) return "Delivered";
-  if (lower.includes("delivered")) return "Delivered";
-  if (lower.includes("installed")) return "Installed";
-  if (lower.includes("red-tag candidate") || lower === "red candidate") return "Red-tag candidate";
-  if (lower.includes("red")) return "Red-tagged";
-  if (lower.includes("yellow")) return "Yellow";
-  if (lower.includes("green") || lower.includes("handover")) return "Green";
-  if (lower.includes("design")) return "Designed";
-  return "Other";
-}
-
-function stageCardClasses(stage: string): string {
-  const s = (stage || "").toLowerCase();
-  if (s.includes("delivered") && s.includes("not installed"))
-    return "bg-zinc-100 border-zinc-200 text-zinc-700";
-  if (s.includes("green") || s.includes("handover"))
-    return "bg-green-50 border-green-200 text-green-900";
-  if (s.includes("yellow")) return "bg-yellow-50 border-yellow-200 text-yellow-900";
-  if (s.includes("red")) return "bg-red-50 border-red-200 text-red-900";
-  return "bg-paper-card border-paper-line text-ink";
-}
 
 export default function AssetsView({
   project,
@@ -72,17 +41,13 @@ export default function AssetsView({
       ? new Set(highlightIds.map((s) => s.trim()))
       : null;
 
-  const buckets = new Map<string, any[]>();
-  COLUMN_ORDER.forEach((b) => buckets.set(b, []));
+  const buckets = new Map<CxStage, any[]>();
+  CX_STAGES.forEach((s) => buckets.set(s, []));
   assets.forEach((a: any) => {
-    const b = bucketFor(a.current_stage ?? "");
-    if (!buckets.has(b)) buckets.set(b, []);
-    buckets.get(b)!.push(a);
+    buckets.get(normalizeStage(a.current_stage))!.push(a);
   });
 
-  const visibleCols = COLUMN_ORDER.filter((c) => (buckets.get(c)?.length ?? 0) > 0);
-
-  if (visibleCols.length === 0) {
+  if (assets.length === 0) {
     return (
       <section className="mx-auto max-w-6xl px-8">
         <Header role={role} count={0} viewingAs={viewingAs} />
@@ -115,43 +80,44 @@ export default function AssetsView({
         </div>
       )}
 
-      <div className="mt-6 grid gap-3" style={{ gridTemplateColumns: `repeat(${visibleCols.length}, minmax(220px, 1fr))` }}>
-        {visibleCols.map((col) => {
+      <div
+        className="mt-6 grid gap-3"
+        style={{ gridTemplateColumns: `repeat(${CX_STAGES.length}, minmax(180px, 1fr))` }}
+      >
+        {CX_STAGES.map((col) => {
           const items = buckets.get(col) ?? [];
+          const meta = STAGE_META[col];
           return (
             <div
               key={col}
               className="rounded-2xl border border-paper-line bg-paper-warm/40 p-3"
             >
-              <div className="flex items-center justify-between mb-2 px-1">
-                <p className="text-xs font-semibold text-ink">{col}</p>
-                <span className="text-xs text-ink-mid">{items.length}</span>
+              <div className="mb-2 px-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-ink">{col}</p>
+                  <span className="text-xs text-ink-mid">{items.length}</span>
+                </div>
+                <p className="mt-0.5 text-[10px] leading-tight text-ink-mid">
+                  {meta.caption}
+                </p>
               </div>
               <ul className="space-y-2">
                 {items.slice(0, 8).map((a: any, i: number) => {
                   const ownerBlank = isBlankOwner(a);
-                  const stage = a.current_stage ?? col;
-                  const isHighlighted = highlightSet?.has((a.asset_id ?? "").toString().trim());
-                  const highlight = isHighlighted
-                    ? "ring-2 ring-accent"
-                    : role === "client" && col === "Yellow"
-                      ? "ring-2 ring-yellow-400"
-                      : "";
+                  const isHighlighted = highlightSet?.has(
+                    (a.asset_id ?? "").toString().trim(),
+                  );
+                  const highlight = isHighlighted ? "ring-2 ring-accent" : "";
                   return (
                     <li key={a.asset_id ?? `${col}-${i}`}>
                       <button
                         type="button"
                         onClick={() => setSelectedAsset(a)}
-                        className={`block w-full cursor-pointer rounded-xl border p-3 text-left transition-shadow hover:shadow-sm ${stageCardClasses(stage)} ${highlight}`}
+                        className={`block w-full cursor-pointer rounded-xl border p-3 text-left transition-shadow hover:shadow-sm ${meta.bg} ${meta.border} ${meta.text} ${highlight}`}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="font-mono text-[11px] opacity-80">{a.asset_id ?? "—"}</p>
-                          {role === "client" && col === "Yellow" && (
-                            <span className="rounded-full bg-yellow-200 px-2 py-0.5 text-[10px] font-semibold text-yellow-900">
-                              Awaiting witness
-                            </span>
-                          )}
-                        </div>
+                        <p className="font-mono text-[11px] opacity-80">
+                          {a.asset_id ?? "—"}
+                        </p>
                         <p className="mt-1 text-xs font-medium leading-tight">
                           {a.asset_type ?? "—"}
                         </p>

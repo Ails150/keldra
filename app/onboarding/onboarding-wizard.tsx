@@ -14,8 +14,8 @@ const INITIAL: WizardData = {
   phase: null,
   org: { name: "", type: null, colour: "#8a3dd6" },
   project: {
-    name: "DUB-12 Building 4",
-    client: "",
+    name: "DUB-16 Cx",
+    client: "Microsoft",
     sector: "",
     startDate: "",
     handoverDate: "",

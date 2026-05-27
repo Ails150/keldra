@@ -82,15 +82,10 @@ function PageHeader() {
         </p>
       </div>
 
-      <div className="rounded-2xl border-2 border-dashed border-accent-deep/40 bg-paper-warm/60 px-5 py-4">
-        <p className="text-sm text-ink leading-relaxed">
-          This is what Keldra becomes after 6 months of pilot data. Every screen
-          below is future-state — hardcoded for preview. Real intelligence
-          arrives once <span className="font-semibold">30+ blockers</span> and{" "}
-          <span className="font-semibold">60+ days of project history</span> are
-          captured.
-        </p>
-      </div>
+      <p className="text-xs italic text-ink-mid">
+        Horizon 2–3 preview · Becomes real with 30+ blockers and 60+ days of
+        project history captured.
+      </p>
     </header>
   );
 }

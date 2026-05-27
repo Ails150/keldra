@@ -1,0 +1,9 @@
+name,email,organisation,role,trade,deputy,phone
+Tom Walsh,tom.walsh@mercuryeng.com,Mercury Engineering,Main contractor lead,M&E,Johnny McKenna,+353871234560
+Johnny McKenna,johnny.mckenna@ardmac.com,Ardmac,Construction Manager,M&E,Lawrence Burke,+353871234561
+Lawrence Burke,lawrence.burke@ardmac.com,Ardmac,Design coordination,Design,Johnny McKenna,+353871234562
+Killian Duggen FPK,killian.duggen@fpk.ie,Cental,ATS commissioning,Power,Laurence O'Carroll,+353871234563
+Laurence O'Carroll,laurence.ocarroll@cental.ie,Cental,TCP panels,Controls,Killian Duggen FPK,+353871234564
+Philly Johnston Automatic,philly.johnston@autofire.ie,Auto Fire,Fire alarm panels,Fire,Tom Walsh,+353871234565
+Standard Controls,controls@standardcontrols.ie,Cental,BMS / DOO,Controls,Laurence O'Carroll,+353871234566
+David O'Brien,david.obrien@microsoft.com,Microsoft,Client witness,Client,Tom Walsh,+353871234567

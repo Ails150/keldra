@@ -1,0 +1,51 @@
+asset_id,asset_type,current_stage,owner_name,owner_org,location,system,red_tag_date,yellow_tag_date,green_date,notes,activity_id
+DUB16-MER1-AHU01,Air Handling Unit,RT,Cental,Cental,MER1 Main Electrical Room,Cooling,2026-04-20,,,,A1100
+DUB16-MER1-AHU02,Air Handling Unit,RT,Cental,Cental,MER1 Main Electrical Room,Cooling,2026-04-21,,,,A1110
+DUB16-MER1-AHU03,Air Handling Unit,RT,Cental,Cental,MER1 Main Electrical Room,Cooling,2026-04-22,,,,
+DUB16-ADMIN-AHU01,Air Handling Unit,RT,Lawrence Burke,Ardmac,Admin Plant,Cooling,2026-04-23,,,,
+DUB16-MER1-HRU01,Heat Rejection Unit,RT,TBourke,TBourke,Roof above Colo,Cooling,2026-04-24,,,,A2010
+DUB16-MER1-HRU02,Heat Rejection Unit,RT,TBourke,TBourke,Roof above Colo,Cooling,2026-04-25,,,,A2020
+DUB16-MGR2-HRU01,Heat Rejection Unit,RT,TBourke,TBourke,MGR2,Cooling,2026-04-26,,,,
+DUB16-COLO1-PNL01,Distribution Panel,Off GT,Cental,Cental,Colo Hall 1,Power,2026-04-27,2026-05-11,2026-05-23,,A1010
+DUB16-COLO1-PNL02,Distribution Panel,On YT,Cental,Cental,Colo Hall 1,Power,2026-04-28,2026-05-12,2026-05-24,,A1020
+DUB16-COLO1-CRAC01,CRAC Unit,On YT,TBourke,TBourke,Colo Hall 1,Cooling,2026-04-29,2026-05-13,2026-05-25,,
+DUB16-COLO1-CRAC02,CRAC Unit,On YT,Cental,Cental,Colo Hall 1,Cooling,2026-04-30,2026-05-14,2026-05-26,,
+DUB16-COLO1-CRAC03,CRAC Unit,Off GT,Cental,Cental,Colo Hall 2,Cooling,2026-05-01,2026-05-15,2026-05-27,,
+DUB16-COLO1-CRAC04,CRAC Unit,On GT,Cental,Cental,Colo Hall 2,Cooling,2026-05-02,2026-05-16,2026-05-28,,
+DUB16-COLO1-UPM01,UPS Module,On YT,Cental,Cental,Colo Hall 1,Power,2026-05-03,2026-05-17,2026-05-29,,A1030
+DUB16-COLO1-UPM02,UPS Module,On GT,Cental,Cental,Colo Hall 1,Power,2026-05-04,2026-05-18,2026-05-30,,
+DUB16-COLO1-EWSD01,Vesda Fire Panel,Off GT,Philly Johnston Automatic,Auto Fire,Colo Hall 1,Fire,2026-05-05,2026-05-19,2026-05-31,,
+DUB16-COLO1-EWSD02,Vesda Fire Panel,Off YT,Philly Johnston Automatic,Auto Fire,Colo Hall 1,Fire,2026-05-06,2026-05-20,,,
+DUB16-COLO1-EWSD03,Vesda Fire Panel,Off YT,Philly Johnston Automatic,Auto Fire,Colo Hall 1,Fire,2026-05-07,2026-05-21,,,
+DUB16-COLO1-EWSD04,Vesda Fire Panel,Off YT,Philly Johnston Automatic,Auto Fire,Colo Hall 2,Fire,2026-05-08,2026-05-22,,,
+DUB16-COLO1-EWSD05,Vesda Fire Panel,Off YT,Philly Johnston Automatic,Auto Fire,Colo Hall 2,Fire,2026-05-09,2026-05-23,,,
+DUB16-COLO1-EWSD06,Vesda Fire Panel,RT,Philly Johnston Automatic,Auto Fire,Colo Hall 1,Fire,2026-04-20,,,,
+DUB16-COLO1-EWSD07,Vesda Fire Panel,RT,Philly Johnston Automatic,Auto Fire,Colo Hall 1,Fire,2026-04-21,,,,
+DUB16-COLO1-EWSD08,Vesda Fire Panel,Delivered,,Auto Fire,Colo Hall 1,Fire,,,,,
+DUB16-COLO1-ATS01,Auto Transfer Switch,RT,Killian Duggen FPK,Cental,Colo Hall 1,Power,2026-04-23,,,,
+DUB16-COLO1-ATS02,Auto Transfer Switch,RT,Killian Duggen FPK,Cental,Colo Hall 1,Power,2026-04-24,,,,
+DUB16-COLO1-ATS03,Auto Transfer Switch,RT,Killian Duggen FPK,Cental,Colo Hall 1,Power,2026-04-25,,,,
+DUB16-COLO1-ATS04,Auto Transfer Switch,Off YT,Killian Duggen FPK,Cental,Colo Hall 1,Power,2026-04-26,2026-05-10,,,
+DUB16-COLO1-ATS05,Auto Transfer Switch,Off YT,Killian Duggen FPK,Cental,Colo Hall 1,Power,2026-04-27,2026-05-11,,,
+DUB16-COLO1-ATS06,Auto Transfer Switch,Off YT,Killian Duggen FPK,Cental,Colo Hall 1,Power,2026-04-28,2026-05-12,,,
+DUB16-COLO1-ATS07,Auto Transfer Switch,Off YT,Killian Duggen FPK,Cental,Colo Hall 2,Power,2026-04-29,2026-05-13,,,
+DUB16-COLO1-ATS08,Auto Transfer Switch,Off YT,Killian Duggen FPK,Cental,Colo Hall 2,Power,2026-04-30,2026-05-14,,,
+DUB16-COLO1-ATS09,Auto Transfer Switch,Off GT,Killian Duggen FPK,Cental,Colo Hall 1,Power,2026-05-01,2026-05-15,2026-05-27,,
+DUB16-COLO1-ATS10,Auto Transfer Switch,RT,Killian Duggen FPK,Cental,Colo Hall 1,Power,2026-05-02,,,,
+DUB16-COLO1-ATS11,Auto Transfer Switch,RT,Killian Duggen FPK,Cental,Colo Hall 1,Power,2026-05-03,,,,
+DUB16-COLO1-ATS12,Auto Transfer Switch,RT,Killian Duggen FPK,Cental,Colo Hall 1,Power,2026-05-04,,,,
+DUB16-COLO1-ATS13,Auto Transfer Switch,RT,Killian Duggen FPK,Cental,Colo Hall 1,Power,2026-05-05,,,,
+DUB16-COLO1-EWS01,Earthing System,On YT,Cental,Cental,Colo Hall 1,Power,2026-05-06,2026-05-20,2026-06-01,,A2100
+DUB16-COLO1-EWS02,Earthing System,Off GT,Cental,Cental,Colo Hall 1,Power,2026-05-07,2026-05-21,2026-06-02,,
+DUB16-COLO1-RIO01,Remote I/O Panel,Off YT,Standard Controls,Cental,Colo Hall 1,Controls,2026-05-08,2026-05-22,,,
+DUB16-COLO1-RIO02,Remote I/O Panel,Off YT,Standard Controls,Cental,Colo Hall 1,Controls,2026-05-09,2026-05-23,,,
+DUB16-COLO1-RIO03,Remote I/O Panel,On YT,Standard Controls,Cental,Colo Hall 2,Controls,2026-04-20,2026-05-04,2026-05-16,,
+DUB16-COLO1-PDP01,Pressure Differential Panel,Off GT,Cental,Cental,Colo Hall 1,Controls,2026-04-21,2026-05-05,2026-05-17,,
+DUB16-COLO1-PDP02,Pressure Differential Panel,Off GT,Cental,Cental,Colo Hall 1,Controls,2026-04-22,2026-05-06,2026-05-18,,
+DUB16-COLO1-PDP03,Pressure Differential Panel,Off YT,Cental,Cental,Colo Hall 2,Controls,2026-04-23,2026-05-07,,,
+DUB16-COLO1-PDP04,Pressure Differential Panel,Delivered,,Cental,Colo Hall 2,Controls,,,,,
+DUB16-COLO1-CC01,BAS Central Controller,Delivered,,Cental,Colo Hall 1,Controls,,,,,
+DUB16-COLO1-TCP01,TCP Panel,RT,Laurence O'Carroll,Cental,Colo Hall 1,Controls,2026-04-26,,,,
+DUB16-COLO1-ACU01,ACU Panel,RT,Cental,Cental,Colo Hall 1,Cooling,2026-04-27,,,,
+DUB16-COLO1-ACU02,ACU Panel,RT,Cental,Cental,Colo Hall 1,Cooling,2026-04-28,,,,
+DUB16-COLO1-ASB01,Ancillary Switchboard,Delivered,,Dornans,Colo Hall 1,Power,,,,,

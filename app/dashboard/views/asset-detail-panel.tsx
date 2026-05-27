@@ -5,6 +5,8 @@ import type { Blocker, BlockerMap, BlockerStateName } from "../lib/blocker-state
 import { daysInState } from "../lib/blocker-state";
 import { deriveOrgColour, getInitials, getLinkedBlockers } from "../utils";
 import { slipDays, type ParsedXer } from "../../onboarding/lib/xer-parser";
+import { normalizeStage, nextStage, stageMeta } from "../lib/cx-stages";
+import { deriveDocCompletion } from "../lib/doc-completion";
 
 type FieldCapture = {
   kind: "photo" | "voice";
@@ -51,10 +53,8 @@ const STAGE_BADGE: { match: (s: string) => boolean; classes: string }[] = [
 ];
 
 function badgeFor(stage: string): string {
-  const s = (stage ?? "").toString().toLowerCase().trim();
-  if (!s) return "bg-paper-warm text-ink-mid";
-  const hit = STAGE_BADGE.find((b) => b.match(s));
-  return hit?.classes ?? "bg-paper-warm text-ink-mid";
+  const m = stageMeta(stage);
+  return `${m.bg} ${m.text}`;
 }
 
 const STATE_PILL: Record<BlockerStateName, { label: string; classes: string }> = {
@@ -95,13 +95,11 @@ function locationChain(asset: any): string[] {
 }
 
 function daysSinceStageDate(asset: any): number {
-  const stage = (asset?.current_stage ?? "").toString().toLowerCase();
+  const stage = normalizeStage(asset?.current_stage);
   let key: string | null = null;
-  if (stage.includes("green") || stage.includes("handover")) key = "green_date";
-  else if (stage.includes("yellow")) key = "yellow_tag_date";
-  else if (stage.includes("red")) key = "red_tag_date";
-  else if (stage.includes("installed")) key = "installed_date";
-  else if (stage.includes("delivered")) key = "delivered_date";
+  if (stage === "On GT" || stage === "Off GT") key = "green_date";
+  else if (stage === "On YT" || stage === "Off YT") key = "yellow_tag_date";
+  else if (stage === "RT") key = "red_tag_date";
   const d = key ? parseDate(asset?.[key]) : null;
   if (!d) return 0;
   return Math.max(0, Math.round((Date.now() - d.getTime()) / 86400000));
@@ -181,6 +179,14 @@ export default function AssetDetailPanel({
   photos.sort((a, b) => b.ts.localeCompare(a.ts));
   voices.sort((a, b) => b.ts.localeCompare(a.ts));
 
+  const docs = deriveDocCompletion(asset);
+  const docBar =
+    docs.percentage >= 100
+      ? "bg-green-500"
+      : docs.percentage >= 80
+        ? "bg-amber-500"
+        : "bg-red-500";
+
   const ownerName = (asset.owner_name ?? "").toString().trim();
   const ownerOrg = (asset.owner_org ?? "").toString().trim();
   const ownerBlank = ownerName === "";
@@ -243,7 +249,7 @@ export default function AssetDetailPanel({
             </p>
             <div className="flex items-center gap-3">
               <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${badgeFor(stage)}`}>
-                {stage || "—"}
+                {normalizeStage(stage)}
               </span>
               <span className="text-xs text-ink-mid">
                 {daysInStage} {daysInStage === 1 ? "day" : "days"} in this stage
@@ -487,6 +493,54 @@ export default function AssetDetailPanel({
             )}
           </section>
 
+          {/* Documents · Procore */}
+          <section>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid">
+                Documents · Procore
+              </p>
+              <a
+                href="https://app.procore.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] font-medium text-accent hover:text-accent-deep"
+              >
+                Open in Procore →
+              </a>
+            </div>
+            <div className="rounded-2xl border border-paper-line bg-paper-card p-3">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-paper-warm">
+                <div
+                  className={`h-full ${docBar}`}
+                  style={{ width: `${docs.percentage}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-ink">
+                {docs.complete} of {docs.total} complete · {docs.percentage}%
+              </p>
+              {docs.missing.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">
+                    Missing:
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {docs.missing.map((m) => (
+                      <span
+                        key={m}
+                        className="rounded-full bg-paper-warm px-2 py-0.5 text-[10px] text-ink-mid"
+                      >
+                        {m}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="mt-2 text-[10px] italic text-ink-mid">
+                Source: Procore · last sync ~2h ago
+              </p>
+            </div>
+          </section>
+
           {/* Sign-off chain stub */}
           <section>
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-2">
@@ -529,12 +583,12 @@ export default function AssetDetailPanel({
             type="button"
             onClick={() =>
               alert(
-                "Stage transition — photo evidence required — Keldra Field deliverable pilot week 3.",
+                `Advance ${asset.asset_id ?? "asset"} to ${nextStage(stage)} — photo evidence required (Keldra Field).`,
               )
             }
             className="rounded-xl bg-ink px-3.5 py-2 text-xs font-medium text-paper transition-colors hover:bg-accent"
           >
-            Move to next stage
+            Move to {nextStage(stage)}
           </button>
           <button
             type="button"

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { BlockerMap } from "../lib/blocker-state";
 import { filterAssetsByRole, getLinkedBlockers, roleLabel } from "../utils";
+import { stageMeta } from "../lib/cx-stages";
 import AssetDetailPanel from "./asset-detail-panel";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -46,21 +47,12 @@ function zoneForLocation(loc: string): string {
   return "other";
 }
 
-// Dot fill/stroke by asset state.
+// Dot fill/stroke by Cx stage; owner-unclear assets render grey + dashed.
 function dotStyle(asset: any): { fill: string; stroke: string; dashed: boolean } {
   const owner = (asset.owner_name ?? "").toString().trim();
-  const stage = (asset.current_stage ?? "").toString().toLowerCase();
-  const ownerless = owner === "" || stage.includes("owner unclear");
-  if (ownerless) return { fill: "#B4B2A9", stroke: "#807E76", dashed: true };
-  if (stage.includes("red") && stage.includes("tag"))
-    return { fill: "#A32D2D", stroke: "#6E1E1E", dashed: false };
-  if (stage.includes("red"))
-    return { fill: "#E24B4A", stroke: "#A3302F", dashed: false };
-  if (stage.includes("yellow"))
-    return { fill: "#EF9F27", stroke: "#B5740F", dashed: false };
-  if (stage.includes("green") || stage.includes("commission"))
-    return { fill: "#97C459", stroke: "#5E8A2E", dashed: false };
-  return { fill: "#B4B2A9", stroke: "#807E76", dashed: false };
+  if (owner === "") return { fill: "#B4B2A9", stroke: "#807E76", dashed: true };
+  const m = stageMeta(asset.current_stage);
+  return { fill: m.dotFill, stroke: m.dotStroke, dashed: false };
 }
 
 function zoneTint(count: number): { bg: string; stroke: string; text: string } {
@@ -161,9 +153,9 @@ export default function MapView({
           </div>
           <div className="flex items-center gap-3">
             <span className="font-semibold uppercase tracking-wide">Asset</span>
-            <Dot color="#A32D2D" label="Red-tagged" />
-            <Dot color="#EF9F27" label="Yellow" />
-            <Dot color="#97C459" label="Green" />
+            <Dot color="#A32D2D" label="RT" />
+            <Dot color="#F4A340" label="On YT" />
+            <Dot color="#5BA13B" label="On GT" />
             <Dot color="#B4B2A9" label="Owner unclear" />
           </div>
         </div>

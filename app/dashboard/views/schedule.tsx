@@ -56,14 +56,11 @@ const STATUS_BAR: Record<
   },
 };
 
-type Mode = "by-job" | "by-task" | "by-week" | "modular-flow" | "p6-timeline";
+type Mode = "programme" | "p6-detail";
 
 const MODE_LABELS: Record<Mode, string> = {
-  "by-job": "By job",
-  "by-task": "By task",
-  "by-week": "By week",
-  "modular-flow": "Modular flow",
-  "p6-timeline": "P6 timeline",
+  programme: "Programme",
+  "p6-detail": "P6 detail",
 };
 
 type Props = {
@@ -79,7 +76,7 @@ export default function ScheduleView({
   blockerMap,
   onOpenBlocker,
 }: Props) {
-  const [mode, setMode] = useState<Mode>("by-job");
+  const [mode, setMode] = useState<Mode>("programme");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [filterOrg, setFilterOrg] = useState<string>("all");
   const [filterStage, setFilterStage] = useState<string>("all");
@@ -184,107 +181,67 @@ export default function ScheduleView({
         </div>
 
         <div className="flex items-center gap-1 rounded-full border border-paper-line bg-paper-card p-1">
-          {(
-            [
-              "by-job",
-              "by-task",
-              "by-week",
-              "modular-flow",
-              "p6-timeline",
-            ] as Mode[]
-          ).map(
-            (m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                  mode === m
-                    ? "bg-ink text-paper"
-                    : "text-ink-mid hover:text-ink"
-                }`}
-              >
-                {MODE_LABELS[m]}
-              </button>
-            ),
-          )}
+          {(["programme", "p6-detail"] as Mode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                mode === m ? "bg-ink text-paper" : "text-ink-mid hover:text-ink"
+              }`}
+            >
+              {MODE_LABELS[m]}
+            </button>
+          ))}
         </div>
       </header>
 
-      <RedTagProgramme blockerMap={blockerMap} onOpenBlocker={onOpenBlocker} />
-
-      {mode === "by-task" && (
-        <div className="flex flex-wrap items-center gap-3">
-          <FilterSelect
-            label="Org"
-            value={filterOrg}
-            onChange={setFilterOrg}
-            options={[
-              { value: "all", label: "All orgs" },
-              ...orgOptions.map((o) => ({ value: o, label: o })),
-            ]}
+      {mode === "programme" && (
+        <>
+          <RedTagProgramme
+            blockerMap={blockerMap}
+            onOpenBlocker={onOpenBlocker}
           />
-          <FilterSelect
-            label="Stage"
-            value={filterStage}
-            onChange={setFilterStage}
-            options={[
-              { value: "all", label: "All stages" },
-              { value: "blocked", label: "Blocked" },
-              { value: "red", label: "Red / slipping" },
-              { value: "yellow", label: "Yellow / at-risk" },
-              { value: "green", label: "Green / on-track" },
-            ]}
+
+          <TimelineHeader today={today} />
+          <ByJobRows
+            enriched={enriched}
+            today={today}
+            expanded={expanded}
+            onToggleExpand={(key) => {
+              setExpanded((prev) => {
+                const next = new Set(prev);
+                if (next.has(key)) next.delete(key);
+                else next.add(key);
+                return next;
+              });
+            }}
+            onOpenBlocker={onOpenBlocker}
           />
-        </div>
+          <Legend />
+
+          {enriched.some((e) => isModularAsset(e.asset)) && (
+            <div className="pt-2">
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-mid">
+                Modular flow
+              </h2>
+              <ModularFlow
+                enriched={enriched}
+                today={today}
+                onOpenBlocker={onOpenBlocker}
+              />
+            </div>
+          )}
+        </>
       )}
 
-      {(mode === "by-job" || mode === "by-task") && (
-        <TimelineHeader today={today} />
-      )}
-
-      {mode === "by-job" && (
-        <ByJobRows
-          enriched={enriched}
-          today={today}
-          expanded={expanded}
-          onToggleExpand={(key) => {
-            setExpanded((prev) => {
-              const next = new Set(prev);
-              if (next.has(key)) next.delete(key);
-              else next.add(key);
-              return next;
-            });
-          }}
-          onOpenBlocker={onOpenBlocker}
-        />
-      )}
-      {mode === "by-task" && (
-        <ByTaskRows
-          enriched={enriched}
-          today={today}
-          filterOrg={filterOrg}
-          filterStage={filterStage}
-          onOpenBlocker={onOpenBlocker}
-        />
-      )}
-      {mode === "by-week" && <ByWeekView enriched={enriched} today={today} />}
-      {mode === "modular-flow" && (
-        <ModularFlow
-          enriched={enriched}
-          today={today}
-          onOpenBlocker={onOpenBlocker}
-        />
-      )}
-      {mode === "p6-timeline" && (
+      {mode === "p6-detail" && (
         <P6Timeline
           xer={project.uploads.xer}
           assets={project.uploads.assets ?? []}
           onOpenAsset={setActiveAsset}
         />
       )}
-
-      {(mode === "by-job" || mode === "by-task") && <Legend />}
 
       <AssetDetailPanel
         asset={activeAsset}

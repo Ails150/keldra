@@ -18,7 +18,8 @@ import TodayView from "./views/today";
 import PeopleView from "./views/people";
 import AssetsView from "./views/assets";
 import ConstraintsView from "./views/constraints";
-import PromisesView from "./views/promises";
+import ActivityView from "./views/activity-view";
+import FunnelView from "./views/funnel-view";
 import ScheduleView from "./views/schedule";
 import IntelligenceView from "./views/intelligence";
 import AuditView from "./views/audit";
@@ -28,10 +29,11 @@ import BlockerDetailPanel from "./views/blocker-detail-panel";
 
 type Tab =
   | "today"
+  | "funnel"
   | "people"
   | "assets"
   | "constraints"
-  | "promises"
+  | "activity"
   | "schedule"
   | "map"
   | "intelligence"
@@ -39,10 +41,11 @@ type Tab =
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "today", label: "Today" },
+  { id: "funnel", label: "Funnel" },
   { id: "people", label: "People" },
   { id: "assets", label: "Assets" },
   { id: "constraints", label: "Constraints" },
-  { id: "promises", label: "Promises" },
+  { id: "activity", label: "Activity" },
   { id: "schedule", label: "Schedule" },
   { id: "map", label: "Map" },
   { id: "intelligence", label: "Intelligence" },
@@ -447,6 +450,14 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
             onAlertAction={handleAlertAction}
           />
         )}
+        {tab === "funnel" && (
+          <FunnelView
+            project={project}
+            viewingAs={active}
+            blockerMap={blockerMap}
+            onAlertAction={handleAlertAction}
+          />
+        )}
         {tab === "people" && (
           <PeopleView
             project={project}
@@ -473,7 +484,15 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
             onOpenBlocker={openBlocker}
           />
         )}
-        {tab === "promises" && <PromisesView project={project} viewingAs={active} />}
+        {tab === "activity" && (
+          <ActivityView
+            project={project}
+            viewingAs={active}
+            blockerMap={blockerMap}
+            onOpenBlocker={openBlocker}
+            onAlertAction={handleAlertAction}
+          />
+        )}
         {tab === "schedule" && (
           <ScheduleView
             project={project}
