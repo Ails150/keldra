@@ -1,24 +1,54 @@
 "use client";
 
+import Link from "next/link";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { BlockerMap } from "../lib/blocker-state";
+import { roleLabel } from "../utils";
+import { BRAND } from "@/lib/brand";
 import {
-  filterAssetsByRole,
-  filterConstraintsByRole,
-  filterPeopleByRole,
-  isBlankOwner,
-  roleLabel,
-} from "../utils";
-import TodayRitual from "./today-ritual";
-import SmartAlerts from "./smart-alerts";
+  BASELINE_TASKS,
+  BU_TARGET,
+  COMPANIES,
+  MILESTONES,
+  SITE_DIARY,
+  type BaselineTask,
+  affectsBu,
+  companyColour,
+  companyName,
+  companyRollups,
+  daysOpen,
+  roomByCode,
+  varianceTasks,
+  workingDaysUntil,
+} from "../lib/baseline-seed";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+const GBP = new Intl.NumberFormat("en-GB", {
+  style: "currency",
+  currency: "GBP",
+  maximumFractionDigits: 0,
+});
+
+function roomBadge(code: string | null): { label: string; bg: string } | null {
+  const r = roomByCode(code);
+  if (!r) return null;
+  const bg =
+    r.tag === "BU"
+      ? "bg-red-100 text-red-700"
+      : r.tag === "Earth"
+        ? "bg-blue-100 text-blue-800"
+        : r.tag === "Security"
+          ? "bg-purple-100 text-purple-800"
+          : "bg-amber-100 text-amber-800";
+  return { label: r.code, bg };
+}
 
 export default function TodayView({
   project,
   viewingAs,
-  blockerMap,
-  onOpenBlocker,
+  blockerMap: _blockerMap,
+  onOpenBlocker: _onOpenBlocker,
   onAlertAction,
 }: {
   project: WizardData;
@@ -27,303 +57,288 @@ export default function TodayView({
   onOpenBlocker: (id: string) => void;
   onAlertAction?: (target: string) => void;
 }) {
-  const team = filterPeopleByRole(
-    project.uploads.team,
-    viewingAs.role,
-    viewingAs.orgName,
-  );
-  const assets = filterAssetsByRole(
-    project.uploads.assets,
-    viewingAs.role,
-    viewingAs.orgName,
-  );
-  const constraints = filterConstraintsByRole(
-    project.uploads.constraints,
-    viewingAs.role,
-    viewingAs.orgName,
-    project.uploads.team,
-  );
-  const unclear = constraints.filter(isBlankOwner);
-  const role = viewingAs.role;
+  const variance = varianceTasks();
+  const rollups = companyRollups();
+  const buDays = workingDaysUntil(BU_TARGET);
 
-  // Stat tiles
-  const tiles: {
-    label: string;
-    value: string | number;
-    sub?: string;
-    target?: string;
-  }[] =
-    role === "client"
-      ? [
-          { label: "Open constraints", value: constraints.length, sub: "Critical / client", target: "tab:constraints" },
-          { label: "Awaiting sign-off", value: assets.filter((a) => (a.current_stage ?? "").toLowerCase().includes("yellow")).length, sub: "Yellow → Green", target: "tab:assets" },
-          { label: "Orgs on project", value: new Set((project.uploads.team ?? []).map((p: any) => (p.organisation ?? "").toString().trim()).filter(Boolean)).size, sub: "Visible to you", target: "tab:people" },
-        ]
-      : role === "design"
-        ? [
-            { label: "Open design RFIs", value: constraints.length, sub: "Awaiting your action", target: "tab:constraints" },
-            { label: "Assets with RFIs", value: assets.length, sub: "Across the register", target: "tab:assets" },
-            { label: "Owner unclear", value: unclear.length, sub: "On design constraints", target: "filter:unowned" },
-          ]
-        : role === "subcontractor"
-          ? [
-              { label: "Your open items", value: constraints.length, sub: `On ${viewingAs.orgName}`, target: "tab:constraints" },
-              { label: "Your assets", value: assets.length, sub: "Owned + interfaced", target: "tab:assets" },
-              { label: "Owner unclear", value: unclear.length, sub: "Need someone to grab", target: "filter:unowned" },
-            ]
-          : [
-              { label: "Open constraints", value: constraints.length, sub: "Across the project", target: "tab:constraints" },
-              { label: "Owner unclear", value: unclear.length, sub: "Top of the pile", target: "filter:unowned" },
-              { label: "People on project", value: team.length || project.uploads.team?.length || 0, sub: "Across all orgs", target: "tab:people" },
-            ];
+  const plannedTotal = SITE_DIARY.manpower.reduce((s, m) => s + m.men, 0);
+  const activeTasks = BASELINE_TASKS.filter(
+    (t) => t.status === "blocked" || t.status === "on_track",
+  ).length;
 
-  // Today's walks — captioned per role
-  const walks = walksForRole(role);
-  const promises = promisesForRole(role);
+  const priority = BASELINE_TASKS.filter(
+    (t) => affectsBu(t) && t.cost_per_day > 0,
+  )
+    .sort((a, b) => b.cost_per_day - a.cost_per_day)
+    .slice(0, 5);
+
+  const topRollups = rollups.slice(0, 6);
 
   return (
-    <section className="mx-auto max-w-6xl px-8 space-y-8">
-      <header>
-        <h1
-          className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
-          style={{ fontSize: 32, lineHeight: 1.1 }}
-        >
-          Today
-        </h1>
-        <p
-          className="mt-1.5 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
-          style={{ fontSize: 16 }}
-        >
-          What needs your attention from the {roleLabel(role)} seat.
-        </p>
-      </header>
-
-      {blockerMap && (
-        <SmartAlerts
-          projectName={project.project.name}
-          blockerMap={blockerMap}
-          assets={project.uploads.assets ?? []}
-          people={project.uploads.team ?? []}
-          xer={project.uploads.xer}
-          onAction={onAlertAction}
-        />
-      )}
-
-      {blockerMap && (
-        <TodayRitual map={blockerMap} onOpen={onOpenBlocker} />
-      )}
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {tiles.map((t) => {
-          const clickable = Boolean(t.target && onAlertAction);
-          return (
-            <button
-              key={t.label}
-              type="button"
-              disabled={!clickable}
-              onClick={() => t.target && onAlertAction?.(t.target)}
-              className={`rounded-2xl border border-paper-line bg-paper-card p-5 text-left transition-shadow ${
-                clickable ? "cursor-pointer hover:shadow-sm" : "cursor-default"
-              }`}
+    <section className="mx-auto max-w-6xl px-8 space-y-7">
+      {/* (A) BU countdown strip */}
+      <div
+        className="rounded-2xl px-6 py-5"
+        style={{ backgroundColor: BRAND.ink, color: BRAND.cream }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-5">
+          <div>
+            <p
+              className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: BRAND.cream, opacity: 0.7 }}
             >
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid">
-                {t.label}
-              </p>
-              <p
-                className="mt-2 font-[family-name:var(--font-fraunces)] font-semibold text-ink"
-                style={{ fontSize: 40, lineHeight: 1 }}
+              Beneficial Use target (11 rooms)
+            </p>
+            <p
+              className="mt-1 font-[family-name:var(--font-fraunces)] font-semibold"
+              style={{ fontSize: 30, lineHeight: 1.1 }}
+            >
+              02 Dec 2026 · {buDays} working days remaining
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              "Power on Grangecastle · 03 Sep 26",
+              "Yellow Tag · 04 Nov 26",
+              "Green Tag · 02 Dec 26",
+              "IST 02 Dec – 28 Jan · TOC 29 Jan – 08 Apr 27",
+            ].map((c) => (
+              <span
+                key={c}
+                className="rounded-full px-3 py-1 text-[11px] font-medium"
+                style={{
+                  color: BRAND.cream,
+                  border: `1px solid ${BRAND.purple}`,
+                }}
               >
-                {t.value}
-              </p>
-              {t.sub && <p className="mt-1 text-xs text-ink-mid">{t.sub}</p>}
-            </button>
-          );
-        })}
-      </div>
-
-      {unclear.length > 0 && (
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-3">
-            Needs your attention
-          </h2>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {unclear.slice(0, 4).map((c: any, i: number) => (
-              <button
-                type="button"
-                key={c.id ?? i}
-                onClick={() => c.id && onOpenBlocker(c.id)}
-                className="rounded-2xl border border-red-200 bg-red-50/60 p-4 text-left transition-shadow hover:shadow-[0_4px_20px_-8px_rgba(220,38,38,0.4)]"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-mono text-xs text-red-700">{c.id ?? "—"}</p>
-                    <p className="mt-1 text-sm text-ink">{c.description ?? "—"}</p>
-                  </div>
-                  <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
-                    Owner unclear
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-2 text-xs text-ink-mid">
-                  <span>
-                    Deadline:{" "}
-                    <span className="font-medium text-ink">
-                      {c.deadline ?? "—"}
-                    </span>
-                  </span>
-                  <span className="text-accent">Open →</span>
-                </div>
-              </button>
+                {c}
+              </span>
             ))}
           </div>
         </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Panel title="Today's walks" caption={walks.caption}>
-          <ul className="space-y-3">
-            {walks.items.map((w) => (
-              <li key={w.title} className="flex items-start gap-3">
-                <span className="mt-0.5 inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-paper-warm text-xs font-bold text-ink">
-                  {w.time}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-ink">{w.title}</p>
-                  <p className="text-xs text-ink-mid">{w.location}</p>
-                </div>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${w.tone}`}
-                >
-                  {w.tag}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-
-        <Panel title={promises.title} caption={promises.caption}>
-          <ul className="space-y-3">
-            {promises.items.map((p) => (
-              <li key={p.title} className="flex items-start gap-3">
-                <span
-                  className={`mt-1.5 inline-block h-2 w-2 flex-shrink-0 rounded-full ${p.dot}`}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-ink">{p.title}</p>
-                  <p className="text-xs text-ink-mid">{p.by}</p>
-                </div>
-                <span className="text-xs font-medium text-ink-mid">{p.due}</span>
-              </li>
-            ))}
-          </ul>
-        </Panel>
       </div>
+
+      {/* (B) Baseline variance card */}
+      <div>
+        <h1
+          className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
+          style={{ fontSize: 26, lineHeight: 1.1 }}
+        >
+          Why haven&apos;t you started these?
+        </h1>
+        <p className="mt-1 text-sm text-ink-mid">
+          Tasks the baseline says should be running today.
+        </p>
+        <p
+          className="font-[family-name:var(--font-fraunces)] italic text-ink-mid"
+          style={{ fontSize: 13 }}
+        >
+          Programme: Ardmac DUB-16, revision 21-Apr-26.
+        </p>
+
+        <div className="mt-4 overflow-hidden rounded-2xl border border-paper-line bg-paper-card">
+          <ul className="divide-y divide-paper-line">
+            {variance.map((t) => (
+              <VarianceRow key={t.activity_id} task={t} />
+            ))}
+          </ul>
+          <div className="border-t border-paper-line bg-paper-warm/40 px-4 py-3 text-xs text-ink-mid">
+            Johnny submitted site diary at {SITE_DIARY.submitted_at_label} ·{" "}
+            {plannedTotal} men deployed across {activeTasks} active tasks ·
+            Programme revision 21-Apr-26 ·{" "}
+            <a href="#whiteboard" className="text-accent hover:text-accent-deep">
+              View diary →
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* (C) Companies holding things up */}
+      <div>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-mid">
+          Companies holding things up
+        </h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {topRollups.map((r) => (
+            <Link
+              key={r.company.slug}
+              href={`/dashboard/companies/${r.company.slug}`}
+              className="block rounded-2xl border border-paper-line bg-paper-card p-4 transition-shadow hover:shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold text-paper"
+                    style={{ backgroundColor: BRAND[r.company.colour] }}
+                  >
+                    {r.company.name.slice(0, 2).toUpperCase()}
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-ink">
+                      {r.company.name}
+                    </p>
+                    <p className="text-[11px] text-ink-mid">{r.company.role}</p>
+                  </div>
+                </div>
+                <p className="font-mono text-sm font-semibold text-red-700">
+                  {GBP.format(r.totalPerDay)}/day
+                </p>
+              </div>
+              {r.company.punchLine && (
+                <p
+                  className="mt-2 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
+                  style={{ fontSize: 13 }}
+                >
+                  {r.company.punchLine}
+                </p>
+              )}
+              <div className="mt-2 flex items-center gap-2 text-[11px] text-ink-mid">
+                <span>
+                  {r.blockerCount} blocker{r.blockerCount === 1 ? "" : "s"} ·{" "}
+                  {r.buCount} affecting BU · oldest {r.oldestWeeks}w
+                </span>
+                {r.worstRoom && (
+                  <span className="rounded-full bg-paper-warm px-2 py-0.5 font-mono text-[10px] text-ink">
+                    {r.worstRoom}
+                  </span>
+                )}
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* (D) Constraint priority by BU impact */}
+      <div>
+        <div className="mb-2 flex items-baseline justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-mid">
+            Constraint priority · BU impact
+          </h2>
+          <button
+            type="button"
+            onClick={() => onAlertAction?.("tab:constraints")}
+            className="text-[11px] font-medium text-accent hover:text-accent-deep"
+          >
+            View all constraints →
+          </button>
+        </div>
+        <ul className="space-y-2">
+          {priority.map((t) => {
+            const badge = roomBadge(t.affects_room);
+            return (
+              <li
+                key={t.activity_id}
+                className="flex items-center gap-3 rounded-xl border border-paper-line bg-paper-card px-4 py-2.5 text-sm"
+              >
+                <span className="font-mono text-[11px] text-ink-mid">
+                  {t.activity_id}
+                </span>
+                <span className="flex-1 truncate text-ink">{t.name}</span>
+                {badge && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.bg}`}
+                  >
+                    {badge.label}
+                  </span>
+                )}
+                <span className="font-mono text-[11px] font-semibold text-red-700">
+                  {GBP.format(t.cost_per_day)}/day
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      {/* (E) Daily whiteboard / site diary */}
+      <div id="whiteboard" className="rounded-2xl border border-paper-line bg-paper-warm/40 p-5">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-deep">
+            Daily whiteboard · {viewingAs.orgName} ({roleLabel(viewingAs.role)})
+          </p>
+          <p className="text-[11px] text-ink-mid">
+            {SITE_DIARY.submitted_by} · {SITE_DIARY.submitted_at_label}
+          </p>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {SITE_DIARY.manpower.map((m) => (
+            <span
+              key={m.activity}
+              className="inline-flex items-center gap-2 rounded-full bg-paper-card px-3 py-1 text-xs"
+            >
+              <span
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-paper"
+                style={{ backgroundColor: companyColour(m.company) }}
+              >
+                {m.men}
+              </span>
+              <span className="text-ink">{m.activity}</span>
+              <span className="text-ink-mid">· {companyName(m.company)}</span>
+            </span>
+          ))}
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-ink">{SITE_DIARY.notes}</p>
+      </div>
+
+      <p className="text-center text-[11px] text-ink-mid">
+        Live computation from the Ardmac DUB-16 baseline · {COMPANIES.length}{" "}
+        companies · {MILESTONES.length} milestones tracked
+      </p>
     </section>
   );
 }
 
-function Panel({
-  title,
-  caption,
-  children,
-}: {
-  title: string;
-  caption?: string;
-  children: React.ReactNode;
-}) {
+function VarianceRow({ task }: { task: BaselineTask }) {
+  const badge = roomBadge(task.affects_room);
+  const statusLabel =
+    task.status === "blocked" ? "Blocked" : "Not started — should be";
   return (
-    <div className="rounded-2xl border border-paper-line bg-paper-card p-5">
-      <div className="mb-3">
-        <h3 className="text-sm font-semibold text-ink">{title}</h3>
-        {caption && <p className="text-xs text-ink-mid">{caption}</p>}
+    <li className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-xs text-accent-deep">
+            {task.activity_id}
+          </span>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${task.status === "blocked" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"}`}
+          >
+            {statusLabel}
+          </span>
+          {badge && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.bg}`}
+            >
+              {badge.label}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-sm font-medium text-ink">{task.name}</p>
+        {task.blocked_reason && (
+          <p className="mt-0.5 text-xs text-ink-mid">{task.blocked_reason}</p>
+        )}
+        <p className="mt-1 text-[11px] text-ink-mid">
+          Responsible:{" "}
+          <span style={{ color: companyColour(task.responsible_company) }}>
+            {companyName(task.responsible_company)}
+          </span>
+        </p>
       </div>
-      {children}
-    </div>
+      <div className="flex items-center gap-3 sm:flex-col sm:items-end">
+        {task.cost_per_day > 0 && (
+          <span className="font-mono text-xs font-semibold text-red-700">
+            {GBP.format(task.cost_per_day)}/day
+          </span>
+        )}
+        <span className="text-[11px] text-ink-mid">
+          {daysOpen(task)}d open
+        </span>
+        <Link
+          href={`/dashboard/tasks/${task.activity_id}`}
+          className="rounded-full bg-ink px-3 py-1 text-[10px] font-medium text-paper transition-colors hover:bg-accent"
+        >
+          Open →
+        </Link>
+      </div>
+    </li>
   );
-}
-
-function walksForRole(role: ViewingAs["role"]) {
-  switch (role) {
-    case "subcontractor":
-      return {
-        caption: "Your patches today (Ardmac scope)",
-        items: [
-          { time: "09", title: "Drywall close-up — Colo Hall 2", location: "Colo Hall 2", tag: "Ardmac", tone: "bg-blue-100 text-blue-800" },
-          { time: "11", title: "Containment QC walk", location: "MER1 Main Electrical Room", tag: "Joint", tone: "bg-purple-100 text-purple-800" },
-          { time: "15", title: "Snag close-out with Mercury", location: "Colo Hall 2", tag: "Interface", tone: "bg-orange-100 text-orange-800" },
-        ],
-      };
-    case "client":
-      return {
-        caption: "Witness slots booked with you",
-        items: [
-          { time: "10", title: "Yellow → Green witness — MER1-UPM-01", location: "MER1 Main Electrical Room", tag: "Sign-off", tone: "bg-yellow-100 text-yellow-800" },
-          { time: "14", title: "IST dry-run review", location: "Admin Plant", tag: "Witness", tone: "bg-yellow-100 text-yellow-800" },
-        ],
-      };
-    case "design":
-      return {
-        caption: "Design queries on site today",
-        items: [
-          { time: "10", title: "RFI-072 walk-down — chilled water tie-in", location: "Colo Hall 1", tag: "Design", tone: "bg-green-100 text-green-800" },
-          { time: "13", title: "As-built mark-up review", location: "Admin Plant", tag: "RFI", tone: "bg-green-100 text-green-800" },
-        ],
-      };
-    default:
-      return {
-        caption: "Your day across the site",
-        items: [
-          { time: "08", title: "Morning stand-up — all subs", location: "Site canteen", tag: "Lead", tone: "bg-red-100 text-red-700" },
-          { time: "10", title: "Ardmac drywall closure walk", location: "Colo Hall 2", tag: "Joint", tone: "bg-blue-100 text-blue-800" },
-          { time: "14", title: "Yellow → Green review with client", location: "MER1 Main Electrical Room", tag: "Witness", tone: "bg-yellow-100 text-yellow-800" },
-        ],
-      };
-  }
-}
-
-function promisesForRole(role: ViewingAs["role"]) {
-  const base = {
-    title: "Your promises",
-    caption: "Open promises tied to you",
-  };
-  switch (role) {
-    case "subcontractor":
-      return {
-        ...base,
-        caption: "Ardmac promises in/out",
-        items: [
-          { title: "Drywall snag close-out — Colo Hall 2", by: "Lawrence → Mercury", due: "Today 16:00", dot: "bg-yellow-500" },
-          { title: "Containment QC sign-off pack", by: "Niamh → Mercury", due: "Tomorrow", dot: "bg-blue-500" },
-          { title: "Punch-list returned to Mercury", by: "Cormac · kept", due: "Yesterday", dot: "bg-green-500" },
-        ],
-      };
-    case "client":
-      return {
-        title: "Promises to you",
-        caption: "Deliverables awaiting your sign-off",
-        items: [
-          { title: "L5 handover pack — MER1 Main Electrical Room", by: "Mercury → Client", due: "Fri", dot: "bg-yellow-500" },
-          { title: "IST dry-run report", by: "Mercury → Client", due: "Mon", dot: "bg-blue-500" },
-          { title: "Witness slot confirmation", by: "Sarah · pending", due: "Today", dot: "bg-orange-500" },
-        ],
-      };
-    case "design":
-      return {
-        title: "Open RFIs from site",
-        caption: "Design responses owed",
-        items: [
-          { title: "RFI-072 — chilled water tie-in", by: "Mercury → Central", due: "Overdue", dot: "bg-red-500" },
-          { title: "RFI-074 — MER1 cable tray clash", by: "Ardmac → Central", due: "Today", dot: "bg-yellow-500" },
-          { title: "RFI-070 — closed", by: "Central · kept", due: "Yesterday", dot: "bg-green-500" },
-        ],
-      };
-    default:
-      return {
-        ...base,
-        items: [
-          { title: "Rev D drawing — MER1 containment", by: "Lawrence → you", due: "Overdue 2d", dot: "bg-red-500" },
-          { title: "MER1-UPM-01 commissioning slot", by: "Patrick → you", due: "Today 14:00", dot: "bg-yellow-500" },
-          { title: "Snag-list close-out", by: "Cormac · kept", due: "Yesterday", dot: "bg-green-500" },
-        ],
-      };
-  }
 }
