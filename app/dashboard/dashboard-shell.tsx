@@ -51,7 +51,6 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "holding-back", label: "Holding back" },
   { id: "assets", label: "Assets" },
   { id: "constraints", label: "Constraints" },
-  { id: "promises", label: "Activity" },
   { id: "schedule", label: "Schedule" },
   { id: "map", label: "Map" },
   { id: "intelligence", label: "Intelligence" },

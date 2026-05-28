@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { BlockerMap } from "../lib/blocker-state";
@@ -60,6 +61,22 @@ export default function HoldingBackView({
   const terminalTop = terminals[0];
   const maxTerminal = terminals.reduce((m, x) => Math.max(m, x.count), 1);
 
+  // Task-first hierarchy: flatten the company rollups into one card per blocked
+  // task, carrying its holding company + that company's total burn, sorted by
+  // the task's own cost/day so the most expensive blocker leads.
+  const taskCards = useMemo(() => {
+    return groups
+      .flatMap((g) =>
+        g.blockers.map((t) => ({
+          task: t,
+          company: g.rollup.company,
+          companyTotalPerDay: g.rollup.totalPerDay,
+          chain: chainFor(t.activity_id),
+        })),
+      )
+      .sort((a, b) => b.task.cost_per_day - a.task.cost_per_day);
+  }, [groups]);
+
   return (
     <section className="mx-auto max-w-4xl px-8 space-y-4">
       <header>
@@ -113,130 +130,121 @@ export default function HoldingBackView({
         />
       </div>
 
-      {/* Block B — company groups */}
-      {groups.map(({ rollup, blockers }) => (
-        <div
-          key={rollup.company.slug}
-          className="bg-white"
-          style={{ border: `0.5px solid ${BRAND.border}`, borderRadius: 12, padding: "20px 24px" }}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span
-                className="inline-flex items-center justify-center rounded-full font-bold"
-                style={{ width: 28, height: 28, fontSize: 10, backgroundColor: BRAND[rollup.company.colour], color: BRAND.cream }}
+      {/* Block B — task cards (task → company → person → chain) */}
+      {taskCards.map(({ task: t, company, companyTotalPerDay, chain }) => {
+        const d = daysOpen(t);
+        return (
+          <div
+            key={t.activity_id}
+            className="bg-white"
+            style={{ border: `0.5px solid ${BRAND.border}`, borderRadius: 12, padding: "20px 24px" }}
+          >
+            {/* Card header — the task is the primary unit */}
+            <div className="flex items-start justify-between gap-3">
+              <Link
+                href={`/dashboard/tasks/${encodeURIComponent(t.activity_id)}`}
+                className="group min-w-0"
               >
-                {rollup.company.name.slice(0, 2).toUpperCase()}
-              </span>
-              <h2
-                className="font-[family-name:var(--font-fraunces)]"
-                style={{ fontSize: 18, color: BRAND.ink }}
-              >
-                {rollup.company.name}
-              </h2>
-              <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                style={{ backgroundColor: BRAND.cream, color: BRAND.inkMuted, border: `0.5px solid ${BRAND.border}` }}
-              >
-                {rollup.company.role}
-              </span>
+                <span className="font-mono" style={{ fontSize: 11, color: BRAND.inkMuted }}>
+                  {t.activity_id}
+                </span>
+                <h2
+                  className="font-[family-name:var(--font-fraunces)] group-hover:underline"
+                  style={{ fontSize: 18, color: BRAND.ink, lineHeight: 1.15 }}
+                >
+                  {t.name}
+                </h2>
+              </Link>
+              <div className="flex-shrink-0 text-right">
+                <p
+                  className="font-[family-name:var(--font-fraunces)] font-semibold"
+                  style={{ fontSize: 20, lineHeight: 1, color: BRAND.dangerInk }}
+                >
+                  £{Math.round(t.cost_per_day / 1000)}k/day
+                </p>
+                <p style={{ fontSize: 11, color: daysColour(d), marginTop: 4 }}>{d}d open</p>
+              </div>
             </div>
-            <div className="text-right">
+
+            {/* Held by */}
+            <div style={{ marginTop: 16 }}>
               <p
-                className="font-[family-name:var(--font-fraunces)] font-semibold"
-                style={{ fontSize: 20, lineHeight: 1, color: BRAND.dangerInk }}
+                style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: BRAND.inkMuted, fontWeight: 600 }}
               >
-                £{Math.round(rollup.totalPerDay / 1000)}k/day
+                Held by
               </p>
-              <p style={{ fontSize: 11, color: BRAND.inkMuted, marginTop: 2 }}>
-                {blockers.length} blocker{blockers.length === 1 ? "" : "s"}
-              </p>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <span
+                  className="inline-flex items-center justify-center rounded-full font-bold"
+                  style={{ width: 24, height: 24, fontSize: 9, backgroundColor: BRAND[company.colour], color: BRAND.cream }}
+                >
+                  {company.name.slice(0, 2).toUpperCase()}
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 500, color: BRAND.ink }}>{company.name}</span>
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                  style={{ backgroundColor: BRAND.cream, color: BRAND.inkMuted, border: `0.5px solid ${BRAND.border}` }}
+                >
+                  {company.role}
+                </span>
+                <span style={{ fontSize: 11, color: BRAND.inkMuted }}>
+                  · £{Math.round(companyTotalPerDay / 1000)}k/day total burn
+                </span>
+              </div>
             </div>
-          </div>
 
-          <div className="mt-4 space-y-2">
-            {blockers.map((t) => {
-              const d = daysOpen(t);
-              const chain = chainFor(t.activity_id);
-              return (
-                <div key={t.activity_id} style={{ marginBottom: 8 }}>
-                  {/* blocker headline row */}
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2 min-w-0">
-                      <span className="font-mono" style={{ fontSize: 11, color: BRAND.ink }}>
-                        {t.activity_id}
-                      </span>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: BRAND.ink }}>{t.name}</span>
-                      <span
-                        className="rounded-full px-2 py-0.5"
-                        style={{ fontSize: 11, color: daysColour(d), backgroundColor: BRAND.cream }}
-                      >
-                        {d}d open
-                      </span>
-                    </div>
-                    <span className="flex-shrink-0 font-mono" style={{ fontSize: 14, color: BRAND.dangerInk }}>
-                      £{Math.round(t.cost_per_day / 1000)}k/day
-                    </span>
-                  </div>
+            {/* Accountable person */}
+            <div style={{ marginTop: 16 }}>
+              <AccountablePerson
+                chain={chain}
+                companyColourHex={BRAND[company.colour]}
+                onOpen={(person) => setSelectedPerson(person)}
+              />
+            </div>
 
-                  {/* accountable person */}
-                  <div style={{ marginLeft: 16, marginTop: 8 }}>
-                    <AccountablePerson
-                      chain={chain}
-                      companyColourHex={BRAND[rollup.company.colour]}
-                      onOpen={(person) => setSelectedPerson(person)}
-                    />
-
-                    {/* dependency chain */}
-                    {chain ? (
-                      <div
-                        style={{ marginLeft: 16, marginTop: 8, padding: 12, borderLeft: `2px solid ${BRAND.warningInk}` }}
-                      >
-                        <p
-                          style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: BRAND.inkMuted, fontWeight: 600 }}
-                        >
-                          Dependency chain
-                        </p>
-                        <div className="mt-1.5 space-y-1">
-                          {chain.steps.map((s, i) => {
-                            const isLast = i === chain.steps.length - 1;
-                            const dur =
-                              s.days != null ? `${s.days}d` : s.label ? s.label : "";
-                            return (
-                              <div key={i} className="flex items-baseline gap-2" style={{ fontSize: 12, color: BRAND.inkMuted }}>
-                                <span style={{ flex: "1 1 0%", minWidth: 0 }}>
-                                  └─ {s.actor} is waiting on {s.waitingOn}
-                                  {s.what ? ` for ${s.what}` : ""}
-                                  {dur ? ` · ${dur}` : ""}
-                                </span>
-                                {isLast && (
-                                  <span
-                                    className="flex-shrink-0 rounded-full px-2 py-0.5 font-semibold"
-                                    style={{ fontSize: 9, letterSpacing: "0.08em", backgroundColor: BRAND.dangerBg, color: BRAND.dangerInk }}
-                                  >
-                                    ORIGIN
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <p className="mt-2 italic" style={{ fontSize: 12, color: BRAND.dangerInk }}>
-                          The real blocker lives at: {terminalLabel(chain)}
-                        </p>
+            {/* Dependency chain */}
+            {chain ? (
+              <div style={{ marginTop: 12, padding: 12, borderLeft: `2px solid ${BRAND.warningInk}` }}>
+                <p
+                  style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: BRAND.inkMuted, fontWeight: 600 }}
+                >
+                  Dependency chain
+                </p>
+                <div className="mt-1.5 space-y-1">
+                  {chain.steps.map((s, i) => {
+                    const isLast = i === chain.steps.length - 1;
+                    const dur = s.days != null ? `${s.days}d` : s.label ? s.label : "";
+                    return (
+                      <div key={i} className="flex items-baseline gap-2" style={{ fontSize: 12, color: BRAND.inkMuted }}>
+                        <span style={{ flex: "1 1 0%", minWidth: 0 }}>
+                          └─ {s.actor} is waiting on {s.waitingOn}
+                          {s.what ? ` for ${s.what}` : ""}
+                          {dur ? ` · ${dur}` : ""}
+                        </span>
+                        {isLast && (
+                          <span
+                            className="flex-shrink-0 rounded-full px-2 py-0.5 font-semibold"
+                            style={{ fontSize: 9, letterSpacing: "0.08em", backgroundColor: BRAND.dangerBg, color: BRAND.dangerInk }}
+                          >
+                            ORIGIN
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <p style={{ marginLeft: 16, marginTop: 8, fontSize: 12, color: BRAND.inkMuted, fontStyle: "italic" }}>
-                        Chain not yet mapped — pilot week 1 maps the full chain.
-                      </p>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+                <p className="mt-2 italic" style={{ fontSize: 12, color: BRAND.dangerInk }}>
+                  The real blocker lives at: {terminalLabel(chain)}
+                </p>
+              </div>
+            ) : (
+              <p style={{ marginTop: 12, fontSize: 12, color: BRAND.inkMuted, fontStyle: "italic" }}>
+                Chain not yet mapped — pilot week 1 maps the full chain.
+              </p>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {/* Block C — where chains terminate */}
       {terminals.length > 0 && (
