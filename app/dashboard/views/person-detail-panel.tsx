@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { BlockerMap } from "../lib/blocker-state";
 import { BRAND } from "@/lib/brand";
-import { deriveKeptRate, deriveOrgColour, getInitials } from "../utils";
+import { deriveKeptRate, deriveOrgColour, displayName, getInitials } from "../utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -40,30 +40,35 @@ const FAB_EVIDENCE: Evidence = {
     "38% isn't slowness — it's 4 broken commitments and an unopened escalation. This is a deprioritisation pattern, not a capacity problem.",
 };
 
+// Johnny McKenna's record appears as both "Johnny" and "Jonathan" across the
+// roster (jonathan.mckenna@ardmac.com), so both keys map to the same evidence.
+const JOHNNY_EVIDENCE: Evidence = {
+  rows: [
+    {
+      tone: "danger",
+      lead: "5 of 13 commitments blocked upstream",
+      detail: "waiting on Central Design responses, avg 5.9 days vs 24h target",
+    },
+    {
+      tone: "danger",
+      lead: "Central Design accounts for 57% of his kept-rate impact",
+      detail: "not his own delays",
+    },
+    {
+      tone: "warning",
+      lead: "Carrying 2.9× peer workload",
+      detail: "32 open items vs peer average of 11",
+    },
+  ],
+  verdict:
+    "Johnny's 68% is upstream-driven. Take Central Design out of the equation and he's at 91%. He's overloaded, not underperforming.",
+};
+
 const EVIDENCE: Record<string, Evidence> = {
   "lawrence mahon": FAB_EVIDENCE,
   "marco visconti": FAB_EVIDENCE,
-  "johnny mckenna": {
-    rows: [
-      {
-        tone: "danger",
-        lead: "5 of 13 commitments blocked upstream",
-        detail: "waiting on Central Design responses, avg 5.9 days vs 24h target",
-      },
-      {
-        tone: "danger",
-        lead: "Central Design accounts for 57% of his kept-rate impact",
-        detail: "not his own delays",
-      },
-      {
-        tone: "warning",
-        lead: "Carrying 2.9× peer workload",
-        detail: "32 open items vs peer average of 11",
-      },
-    ],
-    verdict:
-      "Johnny's 68% is upstream-driven. Take Central Design out of the equation and he's at 91%. He's overloaded, not underperforming.",
-  },
+  "johnny mckenna": JOHNNY_EVIDENCE,
+  "jonathan mckenna": JOHNNY_EVIDENCE,
   "pawel kowalski": {
     rows: [
       {
@@ -184,7 +189,7 @@ export default function PersonDetailPanel({
 }: Props) {
   const data = useMemo(() => {
     if (!person) return null;
-    const name = (person.name ?? "").toString().trim() || "—";
+    const name = displayName(person);
     const org = (person.organisation ?? "").toString().trim();
     const role = (person.role ?? "").toString().trim();
     const trade = (person.trade ?? "").toString().trim();

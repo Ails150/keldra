@@ -28,6 +28,9 @@ const KEPT_RATE_OVERRIDES: Record<string, number> = {
   "pawel kowalski": 25,
   "lawrence mahon": 38,
   "marco visconti": 38,
+  // Johnny's record is "Jonathan McKenna" in the roster — pin it to the 68%
+  // his evidence drill-down verdict quotes.
+  "jonathan mckenna": 68,
 };
 
 // Deterministic 0-100 from a name. Used for demo kept-rates that stay
@@ -52,6 +55,20 @@ export function formatCurrency(n: number, ccy = "EUR"): string {
   } catch {
     return `€${n.toLocaleString()}`;
   }
+}
+
+// Presentable name for a roster person: the explicit name if present, otherwise
+// derived from the email local-part (jonathan.mckenna@ardmac.com → "Jonathan
+// Mckenna") so people never render as a bare "—".
+export function displayName(person: any): string {
+  const explicit = (person?.name ?? "").toString().trim();
+  if (explicit) return explicit;
+  const local = (person?.email ?? "").toString().trim().split("@")[0];
+  const words = local
+    .split(/[._\-]+/)
+    .filter(Boolean)
+    .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  return words.length ? words.join(" ") : "—";
 }
 
 export function getInitials(name: string): string {

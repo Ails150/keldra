@@ -6,6 +6,7 @@ import type { BlockerMap } from "../lib/blocker-state";
 import {
   deriveKeptRate,
   deriveOrgColour,
+  displayName,
   filterPeopleByRole,
   getInitials,
   rollupByOrg,
@@ -123,7 +124,7 @@ function PeopleTable({
         </thead>
         <tbody className="divide-y divide-paper-line">
           {rows.map((p: any, i: number) => {
-            const name = (p.name ?? "").toString().trim() || "—";
+            const name = displayName(p);
             const org = (p.organisation ?? "").toString().trim() || "—";
             const colour = deriveOrgColour(org);
             const kept = deriveKeptRate(name);
@@ -195,7 +196,7 @@ function ContactInterfaces({
       </h2>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         {mercury.slice(0, 4).map((p: any, i: number) => {
-          const name = (p.name ?? "").toString().trim();
+          const name = displayName(p);
           return (
             <div
               key={`${name}-${i}`}
