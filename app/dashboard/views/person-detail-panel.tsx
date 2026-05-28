@@ -3,9 +3,93 @@
 import { useMemo } from "react";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { BlockerMap } from "../lib/blocker-state";
+import { BRAND } from "@/lib/brand";
 import { deriveKeptRate, deriveOrgColour, getInitials } from "../utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+type EvidenceRow = { tone: "danger" | "warning"; lead: string; detail: string };
+type Evidence = { rows: EvidenceRow[]; verdict: string };
+
+// External steel design-chain (FAB-ADMIN-1120). Surfaces on both the named
+// design lead and Marco Visconti, the clickable accountable for that blocker.
+const FAB_EVIDENCE: Evidence = {
+  rows: [
+    {
+      tone: "danger",
+      lead: "5 escalations, 4 unactioned",
+      detail: "Marco escalated the lighting spec 5 times since 14 Mar; 4 produced no response",
+    },
+    {
+      tone: "danger",
+      lead: "3 commitments broken",
+      detail: '"by Friday" (21 Mar), "next week" (4 Apr), "end of month" (28 Apr) — none met',
+    },
+    {
+      tone: "danger",
+      lead: "PM escalation unopened",
+      detail: "formal note from Johnny McKenna on 8 May has NOT been opened (20 days)",
+    },
+    {
+      tone: "warning",
+      lead: "Blocking 3 downstream tasks",
+      detail: "steel drawings, lighting brackets, external cladding all held",
+    },
+  ],
+  verdict:
+    "38% isn't slowness — it's 4 broken commitments and an unopened escalation. This is a deprioritisation pattern, not a capacity problem.",
+};
+
+const EVIDENCE: Record<string, Evidence> = {
+  "lawrence mahon": FAB_EVIDENCE,
+  "marco visconti": FAB_EVIDENCE,
+  "johnny mckenna": {
+    rows: [
+      {
+        tone: "danger",
+        lead: "5 of 13 commitments blocked upstream",
+        detail: "waiting on Central Design responses, avg 5.9 days vs 24h target",
+      },
+      {
+        tone: "danger",
+        lead: "Central Design accounts for 57% of his kept-rate impact",
+        detail: "not his own delays",
+      },
+      {
+        tone: "warning",
+        lead: "Carrying 2.9× peer workload",
+        detail: "32 open items vs peer average of 11",
+      },
+    ],
+    verdict:
+      "Johnny's 68% is upstream-driven. Take Central Design out of the equation and he's at 91%. He's overloaded, not underperforming.",
+  },
+  "pawel kowalski": {
+    rows: [
+      {
+        tone: "danger",
+        lead: "3 commitments broken",
+        detail: '"Friday", "next week", "2 lads" — all on ELE-COLO-1030 brackets',
+      },
+      {
+        tone: "danger",
+        lead: "Crew diverted to Project Brown",
+        detail: "day 53, brackets arrived but crew moved off DUB-16",
+      },
+      {
+        tone: "danger",
+        lead: "Stopped responding",
+        detail: "no reply to PM contact in 19 days",
+      },
+    ],
+    verdict:
+      "25% reflects choice, not capacity. Cental is prioritising other work. Needs director-to-director escalation.",
+  },
+};
+
+function evidenceFor(name: string): Evidence | null {
+  return EVIDENCE[(name || "").trim().toLowerCase()] ?? null;
+}
 
 function hashStr(s: string): number {
   let h = 0;
@@ -333,6 +417,9 @@ export default function PersonDetailPanel({
             </p>
           </section>
 
+          {/* The evidence — dated receipts behind the number */}
+          <EvidenceSection name={data.name} />
+
           {/* Active work */}
           <section>
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-2">
@@ -415,6 +502,76 @@ export default function PersonDetailPanel({
         </footer>
       </aside>
     </div>
+  );
+}
+
+function EvidenceSection({ name }: { name: string }) {
+  const evidence = evidenceFor(name);
+
+  return (
+    <section>
+      <p
+        style={{
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          color: BRAND.inkMuted,
+          fontWeight: 600,
+        }}
+      >
+        The Evidence · Why This Number
+      </p>
+
+      {evidence ? (
+        <>
+          <div className="mt-3 space-y-2.5">
+            {evidence.rows.map((row, i) => (
+              <div key={i} className="flex items-start gap-2.5">
+                <span
+                  className="mt-1.5 inline-block flex-shrink-0 rounded-full"
+                  style={{
+                    width: 8,
+                    height: 8,
+                    backgroundColor:
+                      row.tone === "warning" ? BRAND.warningInk : BRAND.dangerInk,
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p style={{ fontSize: 13, fontWeight: 500, color: BRAND.ink }}>
+                    {row.lead}
+                  </p>
+                  <p style={{ fontSize: 12, color: BRAND.inkMuted, marginTop: 1, lineHeight: 1.4 }}>
+                    {row.detail}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: BRAND.ink,
+              borderLeft: `2px solid ${BRAND.dangerInk}`,
+              paddingLeft: 10,
+              marginTop: 14,
+              lineHeight: 1.45,
+            }}
+          >
+            {evidence.verdict}
+          </p>
+        </>
+      ) : (
+        <p
+          className="font-[family-name:var(--font-fraunces)] italic"
+          style={{ fontSize: 13, color: BRAND.inkMuted, marginTop: 10, lineHeight: 1.5 }}
+        >
+          Evidence builds as commitments are logged — pilot week 2 surfaces the full
+          pattern per person.
+        </p>
+      )}
+    </section>
   );
 }
 

@@ -22,11 +22,20 @@ export function deriveOrgColour(org: string): string {
   return ORG_COLOURS[h % ORG_COLOURS.length];
 }
 
+// Scripted demo people whose kept-rate must match their evidence drill-down
+// verdict (the drawer's "THE EVIDENCE" section quotes these numbers).
+const KEPT_RATE_OVERRIDES: Record<string, number> = {
+  "pawel kowalski": 25,
+  "lawrence mahon": 38,
+  "marco visconti": 38,
+};
+
 // Deterministic 0-100 from a name. Used for demo kept-rates that stay
 // stable across reloads.
 export function deriveKeptRate(name: string): number {
   const key = (name || "").trim().toLowerCase();
   if (!key) return 80;
+  if (key in KEPT_RATE_OVERRIDES) return KEPT_RATE_OVERRIDES[key];
   let h = 0;
   for (let i = 0; i < key.length; i++) h = (h * 33 + key.charCodeAt(i)) >>> 0;
   // bias toward 55–96 so the demo never shows a 100% or 0%
