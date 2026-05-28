@@ -49,7 +49,7 @@ function ensureProjectShell(name: string): void {
         location: "",
       },
       otherOrgs: [],
-      template: "mercury-red-tag",
+      template: "ardmac-red-tag",
       uploads: { team: [], assets: [], constraints: [], register: null, xer: null },
       invites: [],
       viewingAs: {

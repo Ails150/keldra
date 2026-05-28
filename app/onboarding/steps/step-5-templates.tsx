@@ -22,9 +22,9 @@ import { DUB12_XER } from "../sample-data/dub12-xer";
 
 const TEMPLATES = [
   {
-    id: "mercury-red-tag",
-    name: "Mercury Red Tag v1",
-    description: "Mercury's MEP commissioning pipeline. Asset-level red/yellow/green tagging with ready-criteria gates.",
+    id: "ardmac-red-tag",
+    name: "Ardmac Red Tag v1",
+    description: "Ardmac's MEP commissioning pipeline. Asset-level red/yellow/green tagging with ready-criteria gates.",
     stages: ["Designed", "Delivered", "Installed", "Red-tag candidate", "Red-tagged", "Yellow", "Green"],
     recommended: true,
   },
@@ -312,7 +312,7 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
           name: prev.project.name?.trim() ? prev.project.name : "DUB-16 Cx",
           client: prev.project.client?.trim() ? prev.project.client : "Microsoft",
         },
-        template: prev.template ?? "mercury-red-tag",
+        template: prev.template ?? "ardmac-red-tag",
         uploads: { team, assets, constraints, register, xer },
       }));
     } catch {

@@ -90,7 +90,6 @@ export function isBlankOwner(row: any): boolean {
 // against these — exact substring first, then fuzzy (handles typos like
 // "Mecury" / "Ardmak").
 const CANONICAL_ORGS = [
-  "mercury",
   "ardmac",
   "central",
   "primo",
@@ -121,7 +120,7 @@ export function levenshtein(a: string, b: string): number {
 }
 
 // Map a free-text org name to a canonical short key the role filters can
-// reason about ("ardmac", "mercury", "central", "client", ...).
+// reason about ("ardmac", "cental", "central", "client", ...).
 export function orgKey(name: string): string {
   const n = normaliseOrg(name);
   if (!n) return "";

@@ -108,11 +108,11 @@ const SOURCES: { label: string; dot: string }[] = [
 ];
 
 const OUTPUTS: { label: string; sub: string }[] = [
-  { label: "MD daily digest", sub: "Mercury Engineering" },
+  { label: "MD daily digest", sub: "Ardmac Engineering" },
   { label: "PM live dashboard", sub: "DUB-12 project" },
   { label: "Site lead push alerts", sub: "Tom Walsh" },
   { label: "Client read-only portal", sub: "Hyperscaler X" },
-  { label: "Insurance risk score", sub: "Mercury Indemnity" },
+  { label: "Insurance risk score", sub: "Ardmac Indemnity" },
   { label: "Investor benchmark", sub: "Procurement" },
 ];
 
@@ -251,11 +251,11 @@ function CounterRow({ value, label }: { value: string; label: string }) {
 // ---------- section 2: MD daily digest ----------
 
 const PORTFOLIO_PROJECTS = [
-  { name: "DUB-12 Building 4", exposure: "£98,000/day", desc: "Mercury × Ardmac × MS" },
-  { name: "DUB-10 Building 2", exposure: "£142,000/day", desc: "Mercury × Sisk" },
-  { name: "Cork DC Phase 3", exposure: "£103,000/day", desc: "Mercury × BAM × OCC" },
-  { name: "FRA-04 Commissioning", exposure: "£88,000/day", desc: "Mercury × ENGIE" },
-  { name: "AMS-03 Handover", exposure: "£56,000/day", desc: "Mercury × Heijmans" },
+  { name: "DUB-12 Building 4", exposure: "£98,000/day", desc: "Ardmac × Cental × MS" },
+  { name: "DUB-10 Building 2", exposure: "£142,000/day", desc: "Ardmac × Sisk" },
+  { name: "Cork DC Phase 3", exposure: "£103,000/day", desc: "Ardmac × BAM × OCC" },
+  { name: "FRA-04 Commissioning", exposure: "£88,000/day", desc: "Ardmac × ENGIE" },
+  { name: "AMS-03 Handover", exposure: "£56,000/day", desc: "Ardmac × Heijmans" },
 ];
 
 const PATTERNS = [
@@ -268,7 +268,7 @@ const PATTERNS = [
   {
     title: "MMR earthing scope ambiguity",
     detail:
-      "8 instances across DUB-12 and Cork DC, all Mercury-vs-Ardmac handoff.",
+      "8 instances across DUB-12 and Cork DC, all Cental-vs-Ardmac handoff.",
     rec: "Update Ardmac SOW template.",
   },
   {
@@ -320,11 +320,11 @@ function DailyDigestSection() {
             className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
             style={{ fontSize: 22, lineHeight: 1.2 }}
           >
-            Mercury MD daily digest
+            Ardmac MD daily digest
           </h2>
           <p className="mt-1 text-sm text-ink-mid">
             06:30 AM · delivered to{" "}
-            <span className="font-medium text-ink">md@mercuryeng.com</span>
+            <span className="font-medium text-ink">md@ardmac.com</span>
           </p>
         </div>
         <p
@@ -470,7 +470,7 @@ function ReconciliationSection() {
     {
       label: "Procore RFI #4521 closed",
       text: '"AHU commissioning complete 18 May"',
-      who: "raised by Mercury",
+      who: "raised by Ardmac",
       tone: "bg-orange-100 text-orange-800",
     },
     {
@@ -559,19 +559,19 @@ function ReconciliationSection() {
 function BenchmarkSection() {
   const stats = [
     {
-      label: "Mercury portfolio kept-rate",
+      label: "Ardmac portfolio kept-rate",
       value: "84%",
       industry: "Industry median across 47 contractors on Keldra: 71%",
       tone: "text-green-700",
     },
     {
-      label: "Mercury avg blocker resolution",
+      label: "Ardmac avg blocker resolution",
       value: "4.2 days",
       industry: "Industry: 7.8 days",
       tone: "text-green-700",
     },
     {
-      label: "Mercury audit completeness at handover",
+      label: "Ardmac audit completeness at handover",
       value: "97%",
       industry: "Industry: 64%",
       tone: "text-green-700",
@@ -584,7 +584,7 @@ function BenchmarkSection() {
         className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
         style={{ fontSize: 22, lineHeight: 1.2 }}
       >
-        How Mercury benchmarks against industry
+        How Ardmac benchmarks against industry
       </h2>
       <p className="mt-1 text-sm text-ink-mid">
         The first cross-firm performance dataset in construction — anonymised,
@@ -657,7 +657,7 @@ function NorthStarSection() {
         className="mt-6 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
         style={{ fontSize: 13, lineHeight: 1.55 }}
       >
-        Today: pilot at Mercury Engineering on DUB-12 Building 4. By 2028: the
+        Today: pilot at Ardmac Engineering on DUB-12 Building 4. By 2028: the
         canonical truth layer for construction.
       </p>
     </div>

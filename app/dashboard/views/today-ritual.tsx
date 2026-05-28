@@ -194,7 +194,7 @@ function EveningReview({
             className="font-[family-name:var(--font-fraunces)] italic text-ink-mid"
             style={{ fontSize: 13 }}
           >
-            Mercury moved {closedToday.length} of {starred.length} today,{" "}
+            Ardmac moved {closedToday.length} of {starred.length} today,{" "}
             {GBP.format(totalSavings)} of delay closed.
           </p>
         )}

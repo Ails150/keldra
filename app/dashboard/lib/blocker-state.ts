@@ -359,8 +359,8 @@ export const ACTIONS_BY_STATE: Record<BlockerStateName, ActionDef[]> = {
     { id: "escalate", label: "Escalate to PM", nextState: "escalated" },
   ],
   "pending-acceptance": [
-    { id: "accept", label: "Accept", primary: true, nextState: "accepted" },
-    { id: "decline", label: "Decline — not me", prompts: "reason", nextState: "unowned" },
+    { id: "assign-other", label: "Assign owner", primary: true, prompts: "person", nextState: "accepted" },
+    { id: "escalate", label: "Escalate", nextState: "escalated" },
     { id: "reassign", label: "Reassign", prompts: "person", nextState: "pending-acceptance" },
   ],
   accepted: [

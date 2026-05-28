@@ -39,7 +39,7 @@ export type ParsedRegister = {
 
 // Known orgs we can pull out of an "Action by" string like "JM Cundall".
 const KNOWN_ORGS = [
-  "Mercury",
+  "Cental",
   "Ardmac",
   "Cundall",
   "Evolution",

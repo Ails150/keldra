@@ -73,7 +73,7 @@ export default function Step2Organisation({ formData, setFormData, jumpTo }: Ste
                 org: { ...prev.org, name: e.target.value },
               }))
             }
-            placeholder="e.g. Mercury Engineering"
+            placeholder="e.g. Ardmac"
             className="w-full rounded-xl border border-border-soft bg-paper-card px-4 text-ink placeholder:text-ink-mid/60 outline-none focus:border-accent transition-colors"
             style={{ height: 52, fontSize: 15 }}
           />

@@ -87,7 +87,7 @@ export default function PeopleView({
 function peopleCaption(role: ViewingAs["role"], n: number) {
   switch (role) {
     case "subcontractor":
-      return `${n} from your organisation — plus the Mercury contacts you interface with.`;
+      return `${n} from your organisation — plus the Ardmac contacts you interface with.`;
     case "design":
       return `${n} from Central Design.`;
     default:
@@ -185,17 +185,17 @@ function ContactInterfaces({
   project: WizardData;
   viewingAs: ViewingAs;
 }) {
-  const mercury = (project.uploads.team ?? []).filter(
-    (p: any) => (p.organisation ?? "").toLowerCase().includes("mercury"),
+  const mainContractor = (project.uploads.team ?? []).filter(
+    (p: any) => (p.organisation ?? "").toLowerCase().includes("ardmac"),
   );
-  if (mercury.length === 0) return null;
+  if (mainContractor.length === 0) return null;
   return (
     <div>
       <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-3">
-        Mercury contacts you interface with (read-only)
+        Ardmac contacts you interface with (read-only)
       </h2>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-        {mercury.slice(0, 4).map((p: any, i: number) => {
+        {mainContractor.slice(0, 4).map((p: any, i: number) => {
           const name = displayName(p);
           return (
             <div
@@ -204,7 +204,7 @@ function ContactInterfaces({
             >
               <span
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-paper"
-                style={{ backgroundColor: deriveOrgColour("Mercury") }}
+                style={{ backgroundColor: deriveOrgColour("Ardmac") }}
               >
                 {getInitials(name)}
               </span>
@@ -229,8 +229,8 @@ function ContactInterfaces({
 function ClientRollups({ project }: { project: WizardData }) {
   // Override demo numbers per spec, falling back to derivation for any others.
   const overrides: Record<string, number> = {
-    mercury: 89,
-    ardmac: 65,
+    ardmac: 89,
+    cental: 65,
     central: 84,
     primo: 73,
   };
@@ -242,8 +242,8 @@ function ClientRollups({ project }: { project: WizardData }) {
           overrides[o.org.toLowerCase().split(" ")[0]] ?? o.keptRate,
       }))
     : [
-        { org: "Mercury Engineering", colour: deriveOrgColour("Mercury"), keptRate: 89, peopleCount: 6 },
-        { org: "Ardmac", colour: deriveOrgColour("Ardmac"), keptRate: 65, peopleCount: 3 },
+        { org: "Ardmac", colour: deriveOrgColour("Ardmac"), keptRate: 89, peopleCount: 6 },
+        { org: "Cental", colour: deriveOrgColour("Cental"), keptRate: 65, peopleCount: 3 },
         { org: "Central Design", colour: deriveOrgColour("Central"), keptRate: 84, peopleCount: 2 },
         { org: "Primo Power", colour: deriveOrgColour("Primo"), keptRate: 73, peopleCount: 1 },
       ];

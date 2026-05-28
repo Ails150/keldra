@@ -23,23 +23,23 @@ const INITIAL: WizardData = {
     location: "",
   },
   otherOrgs: [
-    { id: "mer", name: "Mercury Engineering", role: "Subcontractor (MEP)", initials: "MER", colour: "#dc2626", isYou: true },
-    { id: "ard", name: "Ardmac", role: "Subcontractor", initials: "ARD", colour: "#2563eb" },
+    { id: "mer", name: "Ardmac", role: "Main contractor", initials: "ARD", colour: "#dc2626", isYou: true },
+    { id: "ard", name: "Cental", role: "Subcontractor", initials: "CTL", colour: "#2563eb" },
     { id: "cen", name: "Central Design", role: "Design house", initials: "CEN", colour: "#16a34a" },
     { id: "pri", name: "Primo Power", role: "Subcontractor", initials: "PRI", colour: "#ea580c" },
     { id: "cli", name: "Hyperscaler X", role: "Client", initials: "CLI", colour: "#0891b2" },
   ],
-  template: "mercury-red-tag",
+  template: "ardmac-red-tag",
   uploads: { team: null, assets: null, constraints: null, register: null, xer: null },
   invites: [
-    { id: "1", name: "Johnny McKenna", email: "johnny@mercuryeng.com", org: "Mercury", role: "Commissioning lead", initials: "JM", colour: "#dc2626" },
-    { id: "2", name: "Tom Walsh", email: "tom.walsh@mercuryeng.com", org: "Mercury", role: "Site manager", initials: "TW", colour: "#dc2626" },
+    { id: "1", name: "Johnny McKenna", email: "johnny@ardmac.com", org: "Ardmac", role: "Commissioning lead", initials: "JM", colour: "#dc2626" },
+    { id: "2", name: "Tom Walsh", email: "tom.walsh@ardmac.com", org: "Ardmac", role: "Site manager", initials: "TW", colour: "#dc2626" },
     { id: "3", name: "Lawrence Burke", email: "l.burke@ardmac.com", org: "Ardmac", role: "Project lead", initials: "LB", colour: "#2563eb" },
     { id: "4", name: "Conor Murphy", email: "conor@centraldesign.ie", org: "Central", role: "Design lead", initials: "CM", colour: "#16a34a" },
     { id: "5", name: "Sarah Kennedy", email: "sarah.k@hyperscalerx.com", org: "Client", role: "Project sponsor", initials: "SK", colour: "#0891b2" },
   ],
   viewingAs: {
-    orgName: "Mercury Engineering",
+    orgName: "Ardmac",
     orgType: "main-contractor",
     role: "main-contractor",
   },
@@ -81,7 +81,7 @@ export default function OnboardingWizard({ userEmail }: { userEmail: string }) {
   // Keep viewingAs in sync with the org the user entered in step 2.
   useEffect(() => {
     setFormData((prev) => {
-      const desiredName = prev.org.name.trim() || "Mercury Engineering";
+      const desiredName = prev.org.name.trim() || "Ardmac";
       const desiredType = prev.org.type ?? "main-contractor";
       const desiredRole = deriveViewingRole(prev.org.type);
       if (

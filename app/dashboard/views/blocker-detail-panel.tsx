@@ -279,7 +279,9 @@ export default function BlockerDetailPanel({
           {/* Actions */}
           <section>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-mid">
-              Move this forward
+              {blocker.state === "unowned" || blocker.state === "pending-acceptance"
+                ? "Move this forward — assign an owner so this stops drifting"
+                : "Move this forward"}
             </h3>
             {actions.length === 0 ? (
               <p className="text-sm italic text-ink-mid">
@@ -421,20 +423,21 @@ export default function BlockerDetailPanel({
 }
 
 // Pilot generates this live via AI reading the history trail. Hardcoded here,
-// matched to each major constraint's story by id or description keyword (the
-// real card IDs vary by ingest). DUB-16 parties only — no Mercury.
+// matched to each major constraint's story by id or any text field keyword
+// (the real card IDs and which field holds the title vary by ingest).
+// DUB-16 parties only.
 type Synopsis = { narrative: string[]; verdict: string };
 
 const TAILORED: { ids?: string[]; keywords: string[]; synopsis: Synopsis }[] = [
   {
-    keywords: ["door", "ironmonger"],
+    keywords: ["door", "ironmonger", "ironmongery"],
     synopsis: {
       narrative: [
-        "Passed between Ardmac, DEL and RKD — no single owner.",
+        "Disowned across the board: Cental say it's not theirs, DEL say it's not them, engineering say it's not their fault.",
         "Dates keep slipping: 'Ardmac to update', 'no update as Ardmac not on call', 'still waiting to order'.",
       ],
       verdict:
-        "Nobody has accepted ownership. This isn't a technical problem — it's an accountability gap. Needs a named owner today.",
+        "Three parties, zero owners. This isn't a technical problem — it's an accountability gap. Keldra forces the ownership decision; a spreadsheet lets it drift 127 days. Needs a named owner today.",
     },
   },
   {
@@ -496,10 +499,22 @@ const TAILORED: { ids?: string[]; keywords: string[]; synopsis: Synopsis }[] = [
 
 function tailoredSynopsis(b: Blocker): Synopsis | null {
   const id = (b.id ?? "").toLowerCase();
-  const desc = (b.description ?? "").toLowerCase();
+  // Ingested cards hold the title in different fields (description / title /
+  // name / summary) — match against all of them.
+  const any = b as Record<string, unknown>;
+  const text = [
+    b.description,
+    any.title,
+    any.name,
+    any.summary,
+    any.constraint,
+  ]
+    .map((v) => (v == null ? "" : String(v)))
+    .join(" ")
+    .toLowerCase();
   for (const t of TAILORED) {
     if (t.ids?.some((x) => x.toLowerCase() === id)) return t.synopsis;
-    if (t.keywords.some((k) => desc.includes(k))) return t.synopsis;
+    if (t.keywords.some((k) => text.includes(k))) return t.synopsis;
   }
   return null;
 }
@@ -778,13 +793,13 @@ function AiPatternCard() {
         className="mt-2 text-ink leading-relaxed"
         style={{ fontSize: 13 }}
       >
-        This blocker is structurally similar to 4 others Mercury has raised on
+        This blocker is structurally similar to 4 others Ardmac has raised on
         hyperscaler DC projects. Pattern detected: ungrounded MEP elements in
         colo halls.
       </p>
 
       <div className="mt-3 flex flex-wrap items-start gap-x-4 gap-y-3">
-        <MiniStat label="Common owner-unclear" value="Mercury QS vs Ardmac PM" />
+        <MiniStat label="Common owner-unclear" value="Cental vs DEL vs Ardmac — ownership disputed" />
         <MiniStat label="Avg days to resolve" value="11 days" />
         <MiniStat label="Combined cost-of-delay" value="£62,000/day" />
       </div>
@@ -797,7 +812,7 @@ function AiPatternCard() {
         style={{ fontSize: 14, lineHeight: 1.45 }}
       >
         Add MER1 cable tray coordination to Tuesday&apos;s design review.
-        Specifically resolve the Mercury QS vs Ardmac PM handoff for these
+        Specifically resolve the Cental vs DEL vs Ardmac — ownership disputed handoff for these
         assets: MER1-CT-01, MER1-CT-02, MER1-CT-03.
       </p>
 

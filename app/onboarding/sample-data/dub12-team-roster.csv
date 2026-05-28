@@ -1,8 +1,8 @@
 name,email,organisation,role,trade,deputy,phone
-Johnny McKenna,johnny.mckenna@mercuryeng.com,Mercury Engineering,Commissioning lead,M&E,Tom Walsh,+353871234567
-Tom Walsh,tom.walsh@mercuryeng.com,Mercury Engineering,Site supervisor,M&E,Johnny McKenna,+353871234568
-Aoife Sheehan,aoife.sheehan@mercuryeng.com,Mercury Engineering,QA engineer,M&E,Tom Walsh,+353871234569
-Dermot Kelly,dermot.kelly@mercuryeng.com,Mercury Engineering,Electrical lead,Electrical,Tom Walsh,+353871234570
+Johnny McKenna,johnny.mckenna@ardmac.com,Ardmac,Commissioning lead,M&E,Tom Walsh,+353871234567
+Tom Walsh,tom.walsh@ardmac.com,Ardmac,Site supervisor,M&E,Johnny McKenna,+353871234568
+Aoife Sheehan,aoife.sheehan@ardmac.com,Ardmac,QA engineer,M&E,Tom Walsh,+353871234569
+Dermot Kelly,dermot.kelly@ardmac.com,Ardmac,Electrical lead,Electrical,Tom Walsh,+353871234570
 Lawrence Burke,lawrence.burke@ardmac.com,Ardmac,Design lead,Containment,Niamh Boyle,+353871234571
 Niamh Boyle,niamh.boyle@ardmac.com,Ardmac,Site engineer,Containment,Lawrence Burke,+353871234572
 Cormac Doyle,cormac.doyle@ardmac.com,Ardmac,Drywall foreman,Drywall,Lawrence Burke,+353871234573

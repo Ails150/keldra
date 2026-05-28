@@ -1,5 +1,5 @@
 // Real Ardmac DUB-16 P6 baseline (programme revision 21-Apr-26). Activity IDs
-// are verbatim from the programme so Mercury / Ardmac can cross-check against
+// are verbatim from the programme so Ardmac can cross-check against
 // the PDF live in the demo. Today = 27 May 2026.
 
 import { BRAND, type BrandColour } from "@/lib/brand";

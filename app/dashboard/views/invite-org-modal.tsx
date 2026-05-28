@@ -5,8 +5,8 @@ import type { ViewingRole } from "../../onboarding/types";
 import { roleLabel } from "../utils";
 
 const ORG_SUGGESTIONS = [
-  "Mercury Engineering",
   "Ardmac",
+  "Cental",
   "Central Design",
   "Primo Power",
   "Hyperscaler X",

@@ -550,7 +550,7 @@ export default function AssetDetailPanel({
               {[
                 { label: "Internal QA", who: "pending" },
                 { label: "Witness sign-off", who: "Lawrence Burke (Ardmac)" },
-                { label: "Final approval", who: "Johnny McKenna (Mercury)" },
+                { label: "Final approval", who: "Johnny McKenna (Ardmac)" },
               ].map((s) => (
                 <li
                   key={s.label}
