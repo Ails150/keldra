@@ -28,8 +28,10 @@ import InviteOrgModal from "./views/invite-org-modal";
 import BlockerDetailPanel from "./views/blocker-detail-panel";
 import PlannedVsActualView from "./views/planned-vs-actual";
 import HoldingBackView from "./views/holding-back";
+import OverviewView from "./views/overview";
 
 type Tab =
+  | "overview"
   | "today"
   | "variance"
   | "funnel"
@@ -44,6 +46,7 @@ type Tab =
   | "audit";
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: "overview", label: "Overview" },
   { id: "today", label: "Today" },
   { id: "variance", label: "Planned vs Actual" },
   { id: "funnel", label: "Funnel" },
@@ -93,7 +96,7 @@ const DEMO_ROLE_OPTIONS: RoleOption[] = [
 
 export default function DashboardShell({ userEmail }: { userEmail: string }) {
   const [project, setProject] = useState<WizardData | null | undefined>(undefined);
-  const [tab, setTab] = useState<Tab>("today");
+  const [tab, setTab] = useState<Tab>("overview");
   const [viewingAs, setViewingAs] = useState<ViewingAs | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -452,6 +455,14 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
       </header>
 
       <main className="flex-1 py-8">
+        {tab === "overview" && (
+          <OverviewView
+            project={project}
+            viewingAs={active}
+            blockerMap={blockerMap}
+            onOpenBlocker={openBlocker}
+          />
+        )}
         {tab === "today" && (
           <TodayView
             project={project}

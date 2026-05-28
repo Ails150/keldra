@@ -23,6 +23,19 @@ const GBP = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 0,
 });
 
+// Fallback owner picker list — real DUB-16 names, used when the ingested team
+// roster comes back empty so the Assign-owner picker is never blank.
+const DUB16_PEOPLE: { name: string; org: string }[] = [
+  { name: "Johnny McKenna", org: "Ardmac" },
+  { name: "Lawrence Burke", org: "Ardmac" },
+  { name: "Pawel Kowalski", org: "Cental" },
+  { name: "Mark Higgins", org: "Cental" },
+  { name: "Cathal Doyle", org: "Sellafield Design" },
+  { name: "Tom Walsh", org: "Ardmac" },
+  { name: "Killian Duggen", org: "Cental" },
+  { name: "Laurence O'Carroll", org: "Cental" },
+];
+
 const STATE_PILL: Record<
   Blocker["state"],
   { label: string; classes: string }
@@ -119,6 +132,7 @@ export default function BlockerDetailPanel({
     action: ActionDef;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmation, setConfirmation] = useState<string | null>(null);
 
   const pill = STATE_PILL[blocker.state] ?? STATE_PILL.unowned;
   const dInState = daysInState(blocker);
@@ -137,6 +151,10 @@ export default function BlockerDetailPanel({
     try {
       await onAction(action.id, payload);
       setActivePrompt(null);
+      if (payload?.person?.name) {
+        setConfirmation(`Assigned to ${payload.person.name}`);
+        setTimeout(() => setConfirmation(null), 4000);
+      }
     } finally {
       setBusy(false);
     }
@@ -283,6 +301,14 @@ export default function BlockerDetailPanel({
                 ? "Move this forward — assign an owner so this stops drifting"
                 : "Move this forward"}
             </h3>
+            {confirmation && (
+              <p
+                className="mb-2 rounded-lg px-3 py-2 text-sm font-medium"
+                style={{ backgroundColor: BRAND.successBg, color: BRAND.successInk }}
+              >
+                ✓ {confirmation}
+              </p>
+            )}
             {actions.length === 0 ? (
               <p className="text-sm italic text-ink-mid">
                 Nothing left to do — blocker is closed.
@@ -691,10 +717,15 @@ function PromptForm({
   }
 
   if (kind === "person") {
-    const options = (team ?? []).map((p: any) => ({
-      name: (p.name ?? "").toString().trim(),
-      org: (p.organisation ?? "").toString().trim(),
-    })).filter((p) => p.name);
+    const fromTeam = (team ?? [])
+      .map((p: any) => ({
+        name: (p.name ?? "").toString().trim(),
+        org: (p.organisation ?? "").toString().trim(),
+      }))
+      .filter((p) => p.name);
+    // Live ingested data sometimes lands with an empty team — never show an
+    // empty picker in the demo. Fall back to the known DUB-16 names.
+    const options = fromTeam.length > 0 ? fromTeam : DUB16_PEOPLE;
     return (
       <div className="mt-2 space-y-2 rounded-xl border border-paper-line bg-paper-warm/40 p-3">
         <label className="block text-[11px] font-semibold uppercase tracking-wide text-ink-mid">
