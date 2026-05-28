@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { BRAND } from "@/lib/brand";
 import type { ViewingAs } from "../../onboarding/types";
 import {
   type ActionDef,
@@ -236,6 +237,14 @@ export default function BlockerDetailPanel({
             )}
           </section>
 
+          {/* Synopsis — AI reads the history and names the pattern */}
+          <ConstraintSynopsis
+            blocker={blocker}
+            sunk={sunk}
+            daysSinceRaisedValue={dSinceRaised}
+            stateLabel={pill.label}
+          />
+
           {/* Cost of delay */}
           <section className="rounded-2xl border border-red-200 bg-red-50/60 p-4">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-red-700">
@@ -408,6 +417,167 @@ export default function BlockerDetailPanel({
         </footer>
       </aside>
     </div>
+  );
+}
+
+// Pilot generates this live via AI reading the history trail. Hardcoded here,
+// matched to each major constraint's story by id or description keyword (the
+// real card IDs vary by ingest). DUB-16 parties only — no Mercury.
+type Synopsis = { narrative: string[]; verdict: string };
+
+const TAILORED: { ids?: string[]; keywords: string[]; synopsis: Synopsis }[] = [
+  {
+    keywords: ["door", "ironmonger"],
+    synopsis: {
+      narrative: [
+        "Passed between Ardmac, DEL and RKD — no single owner.",
+        "Dates keep slipping: 'Ardmac to update', 'no update as Ardmac not on call', 'still waiting to order'.",
+      ],
+      verdict:
+        "Nobody has accepted ownership. This isn't a technical problem — it's an accountability gap. Needs a named owner today.",
+    },
+  },
+  {
+    keywords: ["fire stop", "firestop", "fire-stop", "fire stopping"],
+    synopsis: {
+      narrative: [
+        "Cross-org certification with no named certifier — Ardmac, Cental and the fire-stop sub each point elsewhere.",
+        "Raised unowned and stayed unowned: 'who certifies cross-org installs?' was never answered.",
+      ],
+      verdict:
+        "No one will sign. Until a single certifier is named, every penetration stays open. Name the signatory today.",
+    },
+  },
+  {
+    keywords: ["generator", "genset", "commissioning sequence"],
+    synopsis: {
+      narrative: [
+        "Commissioning sequence between Cental and the commissioning team is undefined — each assumes the other leads.",
+        "Logged unowned: 'sequence unclear', no method statement issued.",
+      ],
+      verdict:
+        "A sequencing gap, not a plant problem. Agree the commissioning order and a named owner before the genset lands.",
+    },
+  },
+  {
+    keywords: ["fok", "security", "camera", "card reader"],
+    synopsis: {
+      narrative: [
+        "Scope split between Ardmac, DEL and RKD is unresolved — locks, the FoK list and door power all sit in the gap.",
+        "Federated model has stalled near 90% for weeks: 'FoK list issued but not received', 'awaiting RKD review'.",
+      ],
+      verdict:
+        "The model can't close while scope is contested. Lock the DEL ↔ RKD scope boundary this week.",
+    },
+  },
+  {
+    keywords: ["telecom", "fibre", "fiber", "bracketery", "tcp panel", "onnec"],
+    synopsis: {
+      narrative: [
+        "Onnec are ready but idle — Cental's bracketery is the dependency and it's still not installed.",
+        "Same story each week: 'brackets not in', 'crew on another job', 'next week'.",
+      ],
+      verdict:
+        "Onnec can't start until Cental installs. This is a Cental scheduling decision — escalate to free the crew.",
+    },
+  },
+  {
+    keywords: ["integration", "co-ordination", "coordination", "pnl", "upm", "hand-off", "handoff"],
+    synopsis: {
+      narrative: [
+        "Plant delivered 30+ days ago but still uninstalled — coordination between Cental and the install team never closed.",
+        "Sits unowned: 'deliverables on site', 'awaiting install date', no owner assigned.",
+      ],
+      verdict:
+        "Hardware on site, nobody installing. Assign an install owner — this cost is pure idle delay.",
+    },
+  },
+];
+
+function tailoredSynopsis(b: Blocker): Synopsis | null {
+  const id = (b.id ?? "").toLowerCase();
+  const desc = (b.description ?? "").toLowerCase();
+  for (const t of TAILORED) {
+    if (t.ids?.some((x) => x.toLowerCase() === id)) return t.synopsis;
+    if (t.keywords.some((k) => desc.includes(k))) return t.synopsis;
+  }
+  return null;
+}
+
+function ConstraintSynopsis({
+  blocker,
+  sunk,
+  daysSinceRaisedValue,
+  stateLabel,
+}: {
+  blocker: Blocker;
+  sunk: number;
+  daysSinceRaisedValue: number;
+  stateLabel: string;
+}) {
+  const tailored = tailoredSynopsis(blocker);
+  // Line 1 reuses the live sunk + days so it never contradicts the cost block.
+  const line1 = `${daysSinceRaisedValue} ${
+    daysSinceRaisedValue === 1 ? "day" : "days"
+  } at '${stateLabel.toLowerCase()}'. ${GBP.format(sunk)} sunk and counting.`;
+  const lineStyle: React.CSSProperties = {
+    fontSize: 13,
+    color: BRAND.ink,
+    lineHeight: 1.5,
+  };
+
+  return (
+    <section
+      style={{
+        backgroundColor: "#f6f0fc",
+        border: `0.5px solid ${BRAND.border}`,
+        borderRadius: 12,
+        padding: "16px 18px",
+      }}
+    >
+      <p
+        style={{
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          color: BRAND.purple,
+          fontWeight: 600,
+        }}
+      >
+        Synopsis · What&apos;s actually happening
+      </p>
+
+      {tailored ? (
+        <>
+          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+            <p style={lineStyle}>{line1}</p>
+            {tailored.narrative.map((l, i) => (
+              <p key={i} style={lineStyle}>
+                {l}
+              </p>
+            ))}
+          </div>
+          <p
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: BRAND.ink,
+              borderLeft: `2px solid ${BRAND.dangerInk}`,
+              paddingLeft: 10,
+              marginTop: 12,
+              lineHeight: 1.45,
+            }}
+          >
+            {tailored.verdict}
+          </p>
+        </>
+      ) : (
+        <p style={{ ...lineStyle, marginTop: 10 }}>
+          Synopsis generates from the history trail — pilot reads every comment and surfaces
+          the pattern automatically.
+        </p>
+      )}
+    </section>
   );
 }
 
