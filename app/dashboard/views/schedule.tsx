@@ -20,6 +20,32 @@ const DOT: Record<Dot, string> = {
   green: BRAND.successInk,
 };
 
+type Change = { tone: Dot; text: string };
+
+// Pilot computes week-over-week deltas from snapshots — hardcoded for the demo.
+const WEEK_CHANGES: Change[] = [
+  {
+    tone: "red",
+    text: "Forecast BU slipped +4 days — now 20 Dec (was 16 Dec last Friday) — driven by ELE-COLO-1030 still open",
+  },
+  {
+    tone: "red",
+    text: "ELE-COLO-1030 cost raised £15k→£20k/day — now blocking SCCR cabling, second downstream task added",
+  },
+  {
+    tone: "red",
+    text: "Formal escalation to Mark Higgins (Cental) unopened 19 days — no movement",
+  },
+  {
+    tone: "amber",
+    text: "MEC-COLO-1040 entered critical path — water services Status A now gating MMR1 first-fix",
+  },
+  {
+    tone: "red",
+    text: "2 new blockers logged — total now 7 across 4 companies, £73k/day burn (was £68k)",
+  },
+];
+
 type Row = {
   // A real activity-id links through to the task page; a tag renders as a chip
   // (phases / milestones that aren't a single P6 task).
@@ -102,6 +128,8 @@ export default function ScheduleView(_props: Props) {
         </p>
       </header>
 
+      <WeekChangesBand />
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {HORIZONS.map((h) => (
           <HorizonColumn key={h.label} horizon={h} onOpenTask={(id) => router.push(`/dashboard/tasks/${id}`)} />
@@ -112,6 +140,51 @@ export default function ScheduleView(_props: Props) {
         Pilot recomputes these horizons live off the critical path as the programme moves.
       </p>
     </section>
+  );
+}
+
+function WeekChangesBand() {
+  return (
+    <div
+      style={{
+        backgroundColor: "#f6f0fc",
+        border: `0.5px solid ${BRAND.border}`,
+        borderRadius: 12,
+        padding: "16px 20px",
+      }}
+    >
+      <p
+        style={{
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          color: BRAND.purple,
+          fontWeight: 600,
+        }}
+      >
+        What changed this week · 21–28 May
+      </p>
+
+      <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+        {WEEK_CHANGES.map((c, i) => (
+          <div key={i} className="flex items-start" style={{ gap: 10 }}>
+            <span
+              className="inline-block flex-shrink-0 rounded-full"
+              style={{ width: 8, height: 8, backgroundColor: DOT[c.tone], transform: "translateY(5px)" }}
+            />
+            <span style={{ fontSize: 13, lineHeight: 1.45, color: BRAND.ink }}>{c.text}</span>
+          </div>
+        ))}
+      </div>
+
+      <p
+        className="font-[family-name:var(--font-fraunces)] italic"
+        style={{ fontSize: 13, lineHeight: 1.5, color: BRAND.inkMuted, marginTop: 14 }}
+      >
+        Net: programme moved 4 days the wrong way this week. Three of five changes trace to
+        Microsoft sign-offs.
+      </p>
+    </div>
   );
 }
 
