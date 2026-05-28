@@ -29,6 +29,55 @@ const GBP = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 0,
 });
 
+type RootCause = {
+  patternLabel: string;
+  analysis: string;
+  evidence: string[];
+  verdict: string;
+};
+
+const ROOT_CAUSE: Record<string, RootCause> = {
+  "ELE-COLO-1030": {
+    patternLabel: "Deprioritisation — not a supply problem",
+    analysis:
+      "The genuine delay was week one — brackets were late from Cental's manufacturer. Everything since has been Cental deprioritising DUB-16. When the brackets arrived on day 53, Cental moved the crew to Project Brown instead.",
+    evidence: [
+      "Brackets arrived day 53 — crew diverted to Project Brown",
+      'Three commitments made, three broken ("Friday", "next week", "2 lads")',
+      "Formal escalation to Mark Higgins unopened after 19 days",
+      "Now blocking a second task — SCCR cabling — widening downstream impact",
+    ],
+    verdict:
+      "This needs director-to-director escalation, not another chase. Pawel and Mark have stopped responding to PM-level contact.",
+  },
+  "MEC-COLO-1040": {
+    patternLabel: "Stuck in design sign-off — traces to Microsoft",
+    analysis:
+      "Sellafield has the water services package drafted but can't release Status A without Microsoft director sign-off. Eighteen chases, four responses, all deflecting upward. This is not a Sellafield capacity problem — it's a Microsoft decision sitting unmade.",
+    evidence: [
+      "Status A drafted but awaiting Microsoft sign-off — 21 days",
+      "18 chases, 22% response rate, 11-day average reply",
+      "Formal escalation to Cathal Doyle (Director) unopened",
+      "MMR1 first-fix cannot start until this releases",
+    ],
+    verdict:
+      "Escalate to Microsoft directly. Sellafield is waiting on the same sign-off you are.",
+  },
+  "FAB-ADMIN-1120": {
+    patternLabel: "Design chain stalled three links deep",
+    analysis:
+      "Marco can sign the primary supports but not the lighting bracket details — those depend on Lawrence's spec, which depends on Sellafield's service routing, which depends on Microsoft's power loading sign-off. The whole chain is frozen behind one Microsoft decision.",
+    evidence: [
+      "Marco waiting on Lawrence Mahon for lighting spec — 21 days",
+      "Lawrence waiting on Sellafield for service routing — 35 days",
+      "Sellafield waiting on Microsoft for power loading sign-off — 42 days",
+      "Eleven chases, one partial response in eight weeks",
+    ],
+    verdict:
+      "No amount of chasing Marco will move this. The decision lives at Microsoft.",
+  },
+};
+
 function fmt(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
@@ -119,6 +168,8 @@ export default function TaskPage() {
               <p className="mt-1 text-sm text-ink">{task.blocked_reason}</p>
             </div>
           )}
+
+          <RootCausePanel taskId={task.activity_id} entryCount={activity.length} />
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Status" value={statusLabel} />
@@ -253,6 +304,92 @@ export default function TaskPage() {
       )}
       {toast && <Toast message={toast} />}
     </main>
+  );
+}
+
+function RootCausePanel({ taskId, entryCount }: { taskId: string; entryCount: number }) {
+  const rc = ROOT_CAUSE[taskId];
+
+  return (
+    <div
+      style={{
+        backgroundColor: "#f6f0fc",
+        border: `0.5px solid ${BRAND.border}`,
+        borderRadius: 12,
+        padding: "16px 20px",
+      }}
+    >
+      <div className="flex items-center justify-between" style={{ gap: 12 }}>
+        <div className="flex items-center" style={{ gap: 6 }}>
+          <span style={{ color: BRAND.purple, fontSize: 13, lineHeight: 1 }}>✦</span>
+          <span
+            style={{
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              color: BRAND.purple,
+              fontWeight: 600,
+            }}
+          >
+            Root Cause · AI Analysis
+          </span>
+        </div>
+        {rc && (
+          <span style={{ fontSize: 9, fontStyle: "italic", color: BRAND.inkMuted }}>
+            Generated from {entryCount} trail entries
+          </span>
+        )}
+      </div>
+
+      {rc ? (
+        <>
+          <p
+            className="font-[family-name:var(--font-fraunces)]"
+            style={{ fontSize: 16, color: BRAND.ink, marginTop: 12, lineHeight: 1.2 }}
+          >
+            {rc.patternLabel}
+          </p>
+          <p style={{ fontSize: 13, color: BRAND.ink, lineHeight: 1.5, marginTop: 8 }}>
+            {rc.analysis}
+          </p>
+          <ol style={{ marginTop: 12 }}>
+            {rc.evidence.map((point, i) => (
+              <div
+                key={i}
+                className="flex items-baseline"
+                style={{ gap: 8, padding: "3px 0" }}
+              >
+                <span
+                  className="font-mono"
+                  style={{ fontSize: 13, color: BRAND.purple, fontWeight: 600 }}
+                >
+                  {i + 1}.
+                </span>
+                <span style={{ fontSize: 13, color: BRAND.ink, lineHeight: 1.4 }}>{point}</span>
+              </div>
+            ))}
+          </ol>
+          <p
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: BRAND.ink,
+              borderLeft: `2px solid ${BRAND.dangerInk}`,
+              paddingLeft: 10,
+              marginTop: 14,
+              lineHeight: 1.45,
+            }}
+          >
+            {rc.verdict}
+          </p>
+        </>
+      ) : (
+        <p style={{ fontSize: 13, color: BRAND.inkMuted, lineHeight: 1.5, marginTop: 10 }}>
+          Root cause analysis available in pilot — AI reads the full trail and surfaces the
+          pattern.
+        </p>
+      )}
+    </div>
   );
 }
 
