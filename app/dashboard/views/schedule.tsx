@@ -1,67 +1,9 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { BRAND } from "@/lib/brand";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
-import type { Blocker, BlockerMap } from "../lib/blocker-state";
-import type { ParsedXer, XerActivity } from "../../onboarding/lib/xer-parser";
-import { slipDays, xerByCode } from "../../onboarding/lib/xer-parser";
-import AssetDetailPanel from "./asset-detail-panel";
-import {
-  type AssetStatus,
-  daysBetween,
-  filterAssetsByRole,
-  getAssetActualStatus,
-  getAssetPlannedEnd,
-  getLinkedBlockers,
-  groupAssetsByWorkPackage,
-  worstStatus,
-} from "../utils";
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-// Fixed schedule window (1 Mar → 31 Aug 2026) so past-dated work is visible
-// instead of clamping to "today".
-const TIMELINE_START = new Date(2026, 2, 1);
-const TIMELINE_END = new Date(2026, 7, 31);
-const WINDOW_DAYS = Math.round(
-  (TIMELINE_END.getTime() - TIMELINE_START.getTime()) / 86400000,
-);
-
-// % position of a date within the window.
-function offsetPct(d: Date): number {
-  return (
-    ((d.getTime() - TIMELINE_START.getTime()) / 86400000 / WINDOW_DAYS) * 100
-  );
-}
-
-const GBP = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  maximumFractionDigits: 0,
-});
-
-const STATUS_BAR: Record<
-  AssetStatus,
-  { bg: string; ring: string; label: string }
-> = {
-  "on-track": { bg: "bg-green-500", ring: "ring-green-500", label: "On track" },
-  "in-progress": { bg: "bg-accent", ring: "ring-accent", label: "In progress" },
-  "at-risk": { bg: "bg-yellow-500", ring: "ring-yellow-500", label: "At risk" },
-  slipping: { bg: "bg-orange-500", ring: "ring-orange-500", label: "Slipping" },
-  blocked: { bg: "bg-red-500", ring: "ring-red-500", label: "Blocked" },
-  stalled: {
-    bg: "[background:repeating-linear-gradient(45deg,#a1a1aa,#a1a1aa_6px,#fca5a5_6px,#fca5a5_12px)]",
-    ring: "ring-zinc-400",
-    label: "Stalled",
-  },
-};
-
-type Mode = "programme" | "p6-detail";
-
-const MODE_LABELS: Record<Mode, string> = {
-  programme: "Programme",
-  "p6-detail": "P6 detail",
-};
+import type { BlockerMap } from "../lib/blocker-state";
 
 type Props = {
   project: WizardData;
@@ -70,1526 +12,231 @@ type Props = {
   onOpenBlocker: (id: string) => void;
 };
 
-export default function ScheduleView({
-  project,
-  viewingAs,
-  blockerMap,
-  onOpenBlocker,
-}: Props) {
-  const [mode, setMode] = useState<Mode>("programme");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [filterOrg, setFilterOrg] = useState<string>("all");
-  const [filterStage, setFilterStage] = useState<string>("all");
-  const [activeAsset, setActiveAsset] = useState<any | null>(null);
+type Dot = "red" | "amber" | "green";
 
-  const today = useMemo(() => new Date(), []);
+const DOT: Record<Dot, string> = {
+  red: BRAND.dangerInk,
+  amber: BRAND.warningInk,
+  green: BRAND.successInk,
+};
 
-  const assets = useMemo(
-    () =>
-      filterAssetsByRole(
-        project.uploads.assets,
-        viewingAs.role,
-        viewingAs.orgName,
-      ),
-    [project.uploads.assets, viewingAs.role, viewingAs.orgName],
-  );
+type Row = {
+  // A real activity-id links through to the task page; a tag renders as a chip
+  // (phases / milestones that aren't a single P6 task).
+  id?: string;
+  tag?: string;
+  name: string;
+  dot: Dot;
+};
 
-  const xerIdx = useMemo(
-    () => xerByCode(project.uploads.xer),
-    [project.uploads.xer],
-  );
+type Horizon = {
+  label: string;
+  date: string;
+  dot: Dot;
+  verdict: string;
+  rows: Row[];
+  action: string;
+};
 
-  const constraintsByAsset = useMemo(() => {
-    const m = new Map<string, any[]>();
-    for (const c of project.uploads.constraints ?? []) {
-      const ids = (c.linked_assets ?? "")
-        .toString()
-        .split(/[,;|]/)
-        .map((s: string) => s.trim())
-        .filter(Boolean);
-      for (const id of ids) {
-        const arr = m.get(id) ?? [];
-        arr.push(c);
-        m.set(id, arr);
-      }
-    }
-    return m;
-  }, [project.uploads.constraints]);
+// Pilot wires this to live critical-path recompute — hardcoded for the demo,
+// drawn from the existing DUB-16 blockers.
+const HORIZONS: Horizon[] = [
+  {
+    label: "This week",
+    date: "to 02 Jun",
+    dot: "red",
+    verdict: "2 reds must clear or Site Install slips",
+    rows: [
+      { id: "ELE-COLO-1030", name: "Telecoms bracketery — Cental blocked", dot: "red" },
+      { id: "MEC-COLO-1040", name: "Water services COLO 1-4 — Status A held", dot: "red" },
+    ],
+    action: "Director escalation on Cental + Sellafield — PM chases have stalled",
+  },
+  {
+    label: "In 3 weeks",
+    date: "by 18 Jun",
+    dot: "red",
+    verdict: "Steel chain frozen behind Microsoft sign-off",
+    rows: [
+      { tag: "Phase", name: "Site Install prep — sequencing at risk", dot: "amber" },
+      { id: "FAB-ADMIN-1120", name: "External service support steel", dot: "red" },
+    ],
+    action: "Chase Microsoft power-loading sign-off — it releases Lawrence → Marco",
+  },
+  {
+    label: "In 6 weeks",
+    date: "by 09 Jul",
+    dot: "amber",
+    verdict: "Gated on water services Status A clearing in next 3 weeks",
+    rows: [
+      { tag: "Milestone", name: "MMR1 mechanical first-fix (29 Jun)", dot: "amber" },
+    ],
+    action: "First-fix can only start once MEC-COLO-1040 releases — watch the 3-week window",
+  },
+];
 
-  // Per-asset derived data — including a real start→end window and a
-  // date-aware bar status for the Gantt.
-  const enriched = useMemo(
-    () =>
-      assets.map((a: any) => {
-        const planned = getAssetPlannedEnd(a, today);
-        const status = getAssetActualStatus(a, blockerMap);
-        const linked = getLinkedBlockers(a, blockerMap);
-        const sched = deriveSchedule(a, xerIdx, constraintsByAsset, today);
-        return {
-          asset: a,
-          plannedEnd: planned,
-          daysUntil: daysBetween(planned, today),
-          status,
-          linked,
-          start: sched.start,
-          end: sched.end,
-          source: sched.source,
-          barState: deriveBarState(a, sched, linked, today),
-        };
-      }),
-    [assets, blockerMap, today, xerIdx, constraintsByAsset],
-  );
-
-  const orgOptions = useMemo(() => {
-    const set = new Set<string>();
-    enriched.forEach((e) => {
-      const org = (e.asset.owner_org ?? "").toString().trim();
-      if (org) set.add(org);
-    });
-    return Array.from(set).sort();
-  }, [enriched]);
-
-  if (!project.uploads.assets || project.uploads.assets.length === 0) {
-    return <EmptyState />;
-  }
-
-  const projectName =
-    (project.project.name?.trim() || "DUB-12 Building 4").toUpperCase();
+export default function ScheduleView(_props: Props) {
+  const router = useRouter();
 
   return (
-    <section className="mx-auto max-w-6xl px-8 space-y-6">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <p
-            className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-deep"
-            style={{ fontFamily: "var(--font-geist-mono, ui-monospace, monospace)" }}
-          >
-            Programme · {projectName}
-          </p>
-          <h1
-            className="mt-1 font-[family-name:var(--font-fraunces)] font-semibold text-ink"
-            style={{ fontSize: 28, lineHeight: 1.15 }}
-          >
-            Schedule
-          </h1>
-          <p
-            className="mt-1 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
-            style={{ fontSize: 14 }}
-          >
-            What&apos;s planned, what&apos;s slipping, and why
-          </p>
-        </div>
-
-        <div className="flex items-center gap-1 rounded-full border border-paper-line bg-paper-card p-1">
-          {(["programme", "p6-detail"] as Mode[]).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                mode === m ? "bg-ink text-paper" : "text-ink-mid hover:text-ink"
-              }`}
-            >
-              {MODE_LABELS[m]}
-            </button>
-          ))}
-        </div>
+    <section className="mx-auto max-w-6xl px-8 space-y-5">
+      <header>
+        <p
+          className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em]"
+          style={{ color: BRAND.purpleDeep }}
+        >
+          Look-ahead · DUB-16
+        </p>
+        <h1
+          className="mt-1 font-[family-name:var(--font-fraunces)] font-semibold"
+          style={{ fontSize: 28, lineHeight: 1.15, color: BRAND.ink }}
+        >
+          Schedule
+        </h1>
+        <p
+          className="mt-1 font-[family-name:var(--font-fraunces)] italic"
+          style={{ fontSize: 14, color: BRAND.inkMuted }}
+        >
+          Looking ahead — what lands when, and what&apos;s already at risk. Today&apos;s
+          blockers shown against the next 6 weeks.
+        </p>
       </header>
 
-      {mode === "programme" && (
-        <>
-          <RedTagProgramme
-            blockerMap={blockerMap}
-            onOpenBlocker={onOpenBlocker}
-          />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {HORIZONS.map((h) => (
+          <HorizonColumn key={h.label} horizon={h} onOpenTask={(id) => router.push(`/dashboard/tasks/${id}`)} />
+        ))}
+      </div>
 
-          <TimelineHeader today={today} />
-          <ByJobRows
-            enriched={enriched}
-            today={today}
-            expanded={expanded}
-            onToggleExpand={(key) => {
-              setExpanded((prev) => {
-                const next = new Set(prev);
-                if (next.has(key)) next.delete(key);
-                else next.add(key);
-                return next;
-              });
-            }}
-            onOpenBlocker={onOpenBlocker}
-          />
-          <Legend />
-
-          {enriched.some((e) => isModularAsset(e.asset)) && (
-            <div className="pt-2">
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-mid">
-                Modular flow
-              </h2>
-              <ModularFlow
-                enriched={enriched}
-                today={today}
-                onOpenBlocker={onOpenBlocker}
-              />
-            </div>
-          )}
-        </>
-      )}
-
-      {mode === "p6-detail" && (
-        <P6Timeline
-          xer={project.uploads.xer}
-          assets={project.uploads.assets ?? []}
-          onOpenAsset={setActiveAsset}
-        />
-      )}
-
-      <AssetDetailPanel
-        asset={activeAsset}
-        blockerMap={blockerMap}
-        xer={project.uploads.xer}
-        onClose={() => setActiveAsset(null)}
-        onOpenBlocker={(id) => {
-          setActiveAsset(null);
-          onOpenBlocker(id);
-        }}
-      />
-    </section>
-  );
-}
-
-function EmptyState() {
-  return (
-    <section className="mx-auto max-w-3xl px-8 py-16 text-center">
-      <h1
-        className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
-        style={{ fontSize: 28, lineHeight: 1.15 }}
-      >
-        Schedule
-      </h1>
-      <p className="mt-3 text-sm text-ink-mid">
-        No assets uploaded yet —{" "}
-        <a href="/onboarding" className="text-accent hover:text-accent-deep">
-          return to the wizard
-        </a>{" "}
-        to import an asset register.
+      <p style={{ fontSize: 11, color: BRAND.inkMuted, fontStyle: "italic" }}>
+        Pilot recomputes these horizons live off the critical path as the programme moves.
       </p>
     </section>
   );
 }
 
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  options,
+function HorizonColumn({
+  horizon,
+  onOpenTask,
 }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  horizon: Horizon;
+  onOpenTask: (id: string) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 text-xs text-ink-mid">
-      <span className="font-medium uppercase tracking-wide">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="rounded-lg border border-border-soft bg-paper-card px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-// ---------- timeline header ----------
-
-function TimelineHeader({ today }: { today: Date }) {
-  // A tick at the first of each month across the window.
-  const ticks: { pct: number; label: string }[] = [];
-  const cur = new Date(TIMELINE_START);
-  while (cur.getTime() <= TIMELINE_END.getTime()) {
-    ticks.push({
-      pct: offsetPct(cur),
-      label: cur.toLocaleDateString("en-GB", { month: "short" }),
-    });
-    cur.setMonth(cur.getMonth() + 1);
-  }
-  const todayPct = Math.max(0, Math.min(100, offsetPct(today)));
-
-  return (
-    <div className="overflow-hidden rounded-2xl border border-paper-line bg-paper-card">
-      <div className="flex">
-        <div className="w-[240px] flex-shrink-0 border-r border-paper-line bg-paper px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-ink-mid">
-          Work-package / asset
-        </div>
-        <div className="relative flex-1 px-3 py-3">
-          <div className="relative h-10">
-            {ticks.map((t) => (
-              <div
-                key={t.label}
-                className="absolute top-0 flex h-full flex-col items-start gap-1"
-                style={{ left: `${t.pct}%` }}
-              >
-                <span className="block h-2 w-px bg-paper-line" />
-                <span
-                  className="font-mono text-[10px] text-ink-mid"
-                  style={{ transform: "translateX(2px)" }}
-                >
-                  {t.label}
-                </span>
-              </div>
-            ))}
-            <div
-              className="absolute top-0 h-full border-l-2 border-dashed border-accent"
-              style={{ left: `${todayPct}%` }}
-              aria-hidden
-            />
-            <span
-              className="absolute font-mono text-[10px] font-semibold uppercase tracking-wider text-accent-deep"
-              style={{ left: `calc(${todayPct}% + 4px)`, top: 22 }}
-            >
-              Today
-            </span>
-          </div>
-        </div>
+    <div
+      className="flex flex-col"
+      style={{
+        backgroundColor: "#fff",
+        border: `0.5px solid ${BRAND.border}`,
+        borderRadius: 12,
+        padding: "18px 20px",
+      }}
+    >
+      {/* Header */}
+      <div>
+        <p
+          className="font-[family-name:var(--font-fraunces)] font-semibold"
+          style={{ fontSize: 17, lineHeight: 1.15, color: BRAND.ink }}
+        >
+          {horizon.label}
+        </p>
+        <p
+          style={{
+            fontSize: 10,
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+            color: BRAND.inkMuted,
+            marginTop: 2,
+          }}
+        >
+          {horizon.date}
+        </p>
       </div>
-    </div>
-  );
-}
 
-// ---------- by-task ----------
-
-type EnrichedAsset = {
-  asset: any;
-  plannedEnd: Date;
-  daysUntil: number;
-  status: AssetStatus;
-  linked: Blocker[];
-  start: Date;
-  end: Date;
-  source: Sched["source"];
-  barState: BarState;
-};
-
-function matchesStageFilter(s: AssetStatus, f: string): boolean {
-  if (f === "all") return true;
-  if (f === "blocked") return s === "blocked";
-  if (f === "red") return s === "slipping" || s === "blocked";
-  if (f === "yellow") return s === "at-risk";
-  if (f === "green") return s === "on-track";
-  return true;
-}
-
-function ByTaskRows({
-  enriched,
-  today,
-  filterOrg,
-  filterStage,
-  onOpenBlocker,
-}: {
-  enriched: EnrichedAsset[];
-  today: Date;
-  filterOrg: string;
-  filterStage: string;
-  onOpenBlocker: (id: string) => void;
-}) {
-  const rows = useMemo(
-    () =>
-      enriched
-        .filter((e) => {
-          if (filterOrg !== "all") {
-            const org = (e.asset.owner_org ?? "").toString().trim();
-            if (org !== filterOrg) return false;
-          }
-          return matchesStageFilter(e.status, filterStage);
-        })
-        .sort((a, b) => a.start.getTime() - b.start.getTime()),
-    [enriched, filterOrg, filterStage],
-  );
-
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-2xl border border-dashed border-paper-line bg-paper-card p-10 text-center text-sm text-ink-mid">
-        No assets match the current filters.
+      {/* Verdict */}
+      <div className="flex items-center" style={{ gap: 8, marginTop: 12 }}>
+        <span
+          className="inline-block flex-shrink-0 rounded-full"
+          style={{ width: 9, height: 9, backgroundColor: DOT[horizon.dot] }}
+        />
+        <p style={{ fontSize: 13, fontWeight: 600, color: BRAND.ink }}>{horizon.verdict}</p>
       </div>
-    );
-  }
 
-  return (
-    <div className="overflow-hidden rounded-2xl border border-paper-line bg-paper-card">
-      <ul className="divide-y divide-paper-line">
-        {rows.map((e) => (
-          <Row
-            key={e.asset.asset_id ?? Math.random()}
-            label={
-              <div className="min-w-0">
-                <p className="font-mono text-[11px] text-ink-mid">
-                  {e.asset.asset_id ?? "—"}
-                </p>
-                <p className="truncate text-xs font-medium text-ink">
-                  {e.asset.asset_type ?? "—"}
-                </p>
-              </div>
-            }
-            today={today}
-            start={e.start}
-            end={e.end}
-            barState={e.barState}
-            stageText={(e.asset.current_stage ?? "").toString() || "—"}
-            linked={e.linked}
-            costPerDay={e.linked[0]?.cost_per_day}
-            activityId={e.source === "p6" ? (e.asset.activity_id ?? null) : null}
-            assetTitle={`${e.asset.asset_id ?? "—"} · ${e.asset.asset_type ?? ""}`.trim()}
-            onOpenBlocker={onOpenBlocker}
-            onClickBar={() => {
-              if (e.linked.length > 0) onOpenBlocker(e.linked[0].id);
-              else
-                alert(
-                  "Asset detail view — pilot week 5 deliverable.",
-                );
-            }}
-          />
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-// ---------- by-job ----------
-
-type GroupRow = {
-  key: string;
-  items: EnrichedAsset[];
-  start: Date;
-  end: Date;
-  barState: BarState;
-};
-
-function ByJobRows({
-  enriched,
-  today,
-  expanded,
-  onToggleExpand,
-  onOpenBlocker,
-}: {
-  enriched: EnrichedAsset[];
-  today: Date;
-  expanded: Set<string>;
-  onToggleExpand: (key: string) => void;
-  onOpenBlocker: (id: string) => void;
-}) {
-  const groups = useMemo<GroupRow[]>(() => {
-    const grouped = groupAssetsByWorkPackage(enriched.map((e) => e.asset));
-    const out: GroupRow[] = [];
-    for (const [key, assets] of grouped.entries()) {
-      const items = assets
-        .map((a) => enriched.find((e) => e.asset === a))
-        .filter((e): e is EnrichedAsset => Boolean(e));
-      if (items.length === 0) continue;
-      out.push({
-        key,
-        items,
-        start: new Date(Math.min(...items.map((i) => i.start.getTime()))),
-        end: new Date(Math.max(...items.map((i) => i.end.getTime()))),
-        barState: worstBarState(items.map((i) => i.barState)),
-      });
-    }
-    return out.sort((a, b) => a.start.getTime() - b.start.getTime());
-  }, [enriched]);
-
-  if (groups.length === 0) {
-    return (
-      <div className="rounded-2xl border border-dashed border-paper-line bg-paper-card p-10 text-center text-sm text-ink-mid">
-        No assets visible from this seat.
-      </div>
-    );
-  }
-
-  return (
-    <div className="overflow-hidden rounded-2xl border border-paper-line bg-paper-card">
-      <ul className="divide-y divide-paper-line">
-        {groups.map((g) => {
-          const isOpen = expanded.has(g.key);
-          const blockedCount = g.items.filter(
-            (i) => i.barState === "blocked",
-          ).length;
+      {/* Rows */}
+      <ul className="flex-1" style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+        {horizon.rows.map((r, i) => {
+          const clickable = !!r.id;
           return (
-            <li key={g.key}>
-              <Row
-                today={today}
-                label={
-                  <button
-                    type="button"
-                    onClick={() => onToggleExpand(g.key)}
-                    className="flex items-start gap-2 text-left"
-                  >
-                    <span className="mt-0.5 text-ink-mid text-xs">
-                      {isOpen ? "▾" : "▸"}
+            <li key={i}>
+              <button
+                type="button"
+                disabled={!clickable}
+                onClick={() => r.id && onOpenTask(r.id)}
+                className={clickable ? "w-full text-left transition-colors active:opacity-80" : "w-full text-left"}
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 8,
+                  backgroundColor: BRAND.cream,
+                  border: `0.5px solid ${BRAND.border}`,
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  cursor: clickable ? "pointer" : "default",
+                }}
+              >
+                <span
+                  className="inline-block flex-shrink-0 rounded-full"
+                  style={{ width: 7, height: 7, backgroundColor: DOT[r.dot], transform: "translateY(3px)" }}
+                />
+                <span className="min-w-0">
+                  {r.id ? (
+                    <span className="font-mono" style={{ fontSize: 10, color: BRAND.purpleDeep }}>
+                      {r.id}
                     </span>
-                    <span className="min-w-0">
-                      <p className="truncate text-xs font-semibold text-ink">
-                        {g.key}
-                      </p>
-                      <p className="font-mono text-[10px] text-ink-mid">
-                        {g.items.length}{" "}
-                        {g.items.length === 1 ? "asset" : "assets"}
-                        {blockedCount > 0 && ` · ${blockedCount} blocked`}
-                      </p>
+                  ) : (
+                    <span
+                      className="rounded-full"
+                      style={{
+                        fontSize: 9,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        fontWeight: 600,
+                        color: BRAND.inkMuted,
+                        backgroundColor: "#fff",
+                        border: `0.5px solid ${BRAND.border}`,
+                        padding: "1px 6px",
+                      }}
+                    >
+                      {r.tag}
                     </span>
-                  </button>
-                }
-                start={g.start}
-                end={g.end}
-                barState={g.barState}
-                stageText={`${g.items.length} assets`}
-                linked={[]}
-                assetTitle={g.key}
-                onOpenBlocker={onOpenBlocker}
-                onClickBar={() => onToggleExpand(g.key)}
-              />
-              {isOpen && (
-                <ul className="divide-y divide-paper-line bg-paper-warm/30">
-                  {g.items
-                    .slice()
-                    .sort((a, b) => a.start.getTime() - b.start.getTime())
-                    .map((e) => (
-                      <Row
-                        key={e.asset.asset_id ?? Math.random()}
-                        today={today}
-                        label={
-                          <div className="min-w-0 pl-5">
-                            <p className="font-mono text-[10px] text-ink-mid">
-                              {e.asset.asset_id ?? "—"}
-                            </p>
-                            <p className="truncate text-xs text-ink">
-                              {e.asset.asset_type ?? "—"}
-                            </p>
-                          </div>
-                        }
-                        start={e.start}
-                        end={e.end}
-                        barState={e.barState}
-                        stageText={
-                          (e.asset.current_stage ?? "").toString() || "—"
-                        }
-                        linked={e.linked}
-                        costPerDay={e.linked[0]?.cost_per_day}
-                        activityId={
-                          e.source === "p6" ? (e.asset.activity_id ?? null) : null
-                        }
-                        assetTitle={`${e.asset.asset_id ?? "—"} · ${e.asset.asset_type ?? ""}`.trim()}
-                        onOpenBlocker={onOpenBlocker}
-                        onClickBar={() => {
-                          if (e.linked.length > 0)
-                            onOpenBlocker(e.linked[0].id);
-                          else
-                            alert(
-                              "Asset detail view — pilot week 5 deliverable.",
-                            );
-                        }}
-                      />
-                    ))}
-                </ul>
-              )}
+                  )}
+                  <span className="block" style={{ fontSize: 12.5, color: BRAND.ink, marginTop: 2 }}>
+                    {r.name}
+                  </span>
+                </span>
+              </button>
             </li>
           );
         })}
       </ul>
-    </div>
-  );
-}
 
-// ---------- shared row + bar ----------
-
-const DAY = 86400000;
-
-// Date-aware bar status (drives colour). Precedence per the schedule spec.
-type BarState =
-  | "blocked"
-  | "overdue"
-  | "at-risk"
-  | "in-progress"
-  | "complete"
-  | "not-started";
-
-const BAR: Record<BarState, { bg: string; ring: string; label: string }> = {
-  blocked: { bg: "bg-red-500", ring: "ring-red-500", label: "Blocked" },
-  overdue: {
-    bg: "[background:repeating-linear-gradient(45deg,#ef4444,#ef4444_6px,#fecaca_6px,#fecaca_12px)]",
-    ring: "ring-red-500",
-    label: "Overdue",
-  },
-  "at-risk": { bg: "bg-amber-500", ring: "ring-amber-500", label: "At risk" },
-  "in-progress": { bg: "bg-accent", ring: "ring-accent", label: "In progress" },
-  complete: { bg: "bg-green-500", ring: "ring-green-500", label: "Complete" },
-  "not-started": { bg: "bg-zinc-400", ring: "ring-zinc-400", label: "Not started" },
-};
-
-const BAR_RANK: Record<BarState, number> = {
-  blocked: 6,
-  overdue: 5,
-  "at-risk": 4,
-  "in-progress": 3,
-  "not-started": 2,
-  complete: 1,
-};
-
-function worstBarState(states: BarState[]): BarState {
-  if (states.length === 0) return "not-started";
-  return states.reduce((a, b) => (BAR_RANK[b] > BAR_RANK[a] ? b : a));
-}
-
-function parseDateSafe(v: unknown): Date | null {
-  const s = (v ?? "").toString().trim();
-  if (!s) return null;
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-type Sched = {
-  start: Date;
-  end: Date;
-  source: "p6" | "constraints" | "events" | "fallback";
-};
-
-// Derives a real start→end window for an asset, in order of accuracy:
-// 1) linked P6 activity dates, 2) linked constraint raised→deadline span,
-// 3) latest stage-transition date + 14d, 4) today → today+30d fallback.
-function deriveSchedule(
-  asset: any,
-  xerIdx: Map<string, XerActivity>,
-  consByAsset: Map<string, any[]>,
-  today: Date,
-): Sched {
-  const code = (asset.activity_id ?? "").toString().trim();
-  if (code) {
-    const act = xerIdx.get(code);
-    if (act) {
-      const s = parseDateSafe(act.target_start);
-      const e = parseDateSafe(act.target_end);
-      if (s && e) return { start: s, end: e, source: "p6" };
-    }
-  }
-
-  const id = (asset.asset_id ?? "").toString().trim();
-  const cons = consByAsset.get(id) ?? [];
-  if (cons.length) {
-    const starts = cons
-      .map((c) => parseDateSafe(c.raised_date))
-      .filter((d): d is Date => !!d);
-    const ends = cons
-      .map((c) => parseDateSafe(c.deadline))
-      .filter((d): d is Date => !!d);
-    if (starts.length && ends.length) {
-      const start = new Date(Math.min(...starts.map((d) => d.getTime())));
-      const end = new Date(Math.max(...ends.map((d) => d.getTime())));
-      if (end.getTime() > start.getTime())
-        return { start, end, source: "constraints" };
-    }
-  }
-
-  const tags = [
-    asset.green_date,
-    asset.yellow_tag_date,
-    asset.red_tag_date,
-    asset.installed_date,
-    asset.delivered_date,
-  ]
-    .map(parseDateSafe)
-    .filter((d): d is Date => !!d);
-  if (tags.length) {
-    const start = new Date(Math.max(...tags.map((d) => d.getTime())));
-    return { start, end: new Date(start.getTime() + 14 * DAY), source: "events" };
-  }
-
-  return { start: today, end: new Date(today.getTime() + 30 * DAY), source: "fallback" };
-}
-
-function assetHasStages(asset: any): boolean {
-  return [
-    "green_date",
-    "yellow_tag_date",
-    "red_tag_date",
-    "installed_date",
-    "delivered_date",
-  ].some((k) => (asset[k] ?? "").toString().trim());
-}
-
-function deriveBarState(
-  asset: any,
-  sched: Sched,
-  linkedOpen: Blocker[],
-  today: Date,
-): BarState {
-  const stage = (asset.current_stage ?? "").toString().toLowerCase();
-  const isComplete =
-    stage.includes("green") ||
-    stage.includes("handover") ||
-    stage.includes("commission") ||
-    stage.includes("complete");
-  const t = today.getTime();
-  const endT = sched.end.getTime();
-  const blocked = linkedOpen.length > 0;
-
-  if (endT > t && blocked) return "blocked";
-  if (endT < t && !isComplete) return "overdue";
-  if (endT >= t && endT <= t + 7 * DAY && !isComplete) return "at-risk";
-  if (assetHasStages(asset) && !isComplete) return "in-progress";
-  if (isComplete) return "complete";
-  if (sched.start.getTime() > t) return "not-started";
-  return "in-progress";
-}
-
-function truncate14(s: string): string {
-  return s.length > 14 ? s.slice(0, 13) + "…" : s;
-}
-
-function fmtBarDate(d: Date): string {
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
-}
-
-function Row({
-  label,
-  today,
-  start,
-  end,
-  barState,
-  stageText,
-  linked,
-  costPerDay,
-  activityId,
-  assetTitle,
-  onClickBar,
-  onOpenBlocker,
-}: {
-  label: React.ReactNode;
-  today: Date;
-  start: Date;
-  end: Date;
-  barState: BarState;
-  stageText: string;
-  linked: Blocker[];
-  costPerDay?: number;
-  activityId?: string | null;
-  assetTitle: string;
-  onClickBar: () => void;
-  onOpenBlocker: (id: string) => void;
-}) {
-  // Position across the fixed window; deadline maths stays relative to today.
-  const left = Math.max(0, Math.min(98, offsetPct(start)));
-  const right = Math.max(0, Math.min(100, offsetPct(end)));
-  const width = Math.max(2, Math.min(100 - left, right - left));
-  const todayPct = Math.max(0, Math.min(100, offsetPct(today)));
-
-  const daysToDeadline = daysBetween(end, today);
-  // Only "overdue" bars get the badge — never complete/green items.
-  const overdueBadge = barState === "overdue";
-  const slippedDays = daysToDeadline < 0 ? -daysToDeadline : 0;
-  const bar = BAR[barState];
-  const primaryBlocker = linked[0];
-  const showWhy =
-    (barState === "blocked" || barState === "overdue") && !!primaryBlocker;
-
-  const tooltip = [
-    assetTitle,
-    `${fmtBarDate(start)} → ${fmtBarDate(end)}`,
-    daysToDeadline < 0
-      ? `Overdue ${slippedDays}d`
-      : `${daysToDeadline}d until deadline`,
-    linked.length > 0
-      ? `${linked.length} open blocker${linked.length === 1 ? "" : "s"}`
-      : null,
-    costPerDay ? `${GBP.format(costPerDay)}/day cost-of-delay` : null,
-    activityId ? `P6 ${activityId}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-  return (
-    <div className="group flex items-stretch transition-colors hover:bg-paper-warm/60">
-      <div className="w-[240px] flex-shrink-0 border-r border-paper-line bg-paper px-4 py-3">
-        {label}
-      </div>
-      <div className="relative flex-1 px-3 py-3">
-        <div className="relative h-6">
-          <div
-            className="absolute top-0 h-full border-l-2 border-dashed border-accent/40"
-            style={{ left: `${todayPct}%` }}
-            aria-hidden
-          />
-          <button
-            type="button"
-            onClick={onClickBar}
-            title={tooltip}
-            className={`absolute top-0 flex h-6 cursor-pointer items-center overflow-hidden rounded-md px-2 text-[11px] font-medium text-white transition-shadow hover:ring-2 hover:ring-offset-1 ${bar.bg} ${bar.ring}`}
-            style={{ left: `${left}%`, width: `${width}%` }}
-          >
-            <span className="truncate">{truncate14(stageText)}</span>
-          </button>
-
-          {overdueBadge && (
-            <span
-              className="absolute top-0 -translate-y-0.5 rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-semibold text-red-700"
-              style={{ left: `calc(${left}% + ${width}% + 6px)` }}
-            >
-              Overdue {slippedDays}d
-            </span>
-          )}
-        </div>
-
-        {showWhy && (
-          <button
-            type="button"
-            onClick={() => onOpenBlocker(primaryBlocker.id)}
-            className="mt-2 flex w-full items-center gap-2 rounded-lg border border-red-200 bg-red-50/70 px-3 py-1.5 text-left text-[11px] transition-colors hover:bg-red-100"
-          >
-            <span className="font-semibold text-red-700">Why:</span>
-            <span className="flex-1 truncate text-ink">
-              {primaryBlocker.description}
-              {primaryBlocker.waiting_on_person && (
-                <span className="text-ink-mid">
-                  {" "}
-                  · Waiting on {primaryBlocker.waiting_on_person}
-                </span>
-              )}
-            </span>
-            <span className="font-mono text-[10px] font-semibold text-red-700">
-              {GBP.format(primaryBlocker.cost_per_day)}/day
-            </span>
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ---------- legend ----------
-
-function Legend() {
-  const items: { key: BarState; copy: string }[] = [
-    { key: "complete", copy: "Complete" },
-    { key: "in-progress", copy: "In progress" },
-    { key: "at-risk", copy: "At risk (≤7 days)" },
-    { key: "overdue", copy: "Overdue" },
-    { key: "blocked", copy: "Blocked (open blocker)" },
-    { key: "not-started", copy: "Not started" },
-  ];
-  return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-ink-mid">
-      {items.map((i) => (
-        <span key={i.key} className="inline-flex items-center gap-1.5">
-          <span className={`inline-block h-3 w-5 rounded-sm ${BAR[i.key].bg}`} />
-          {i.copy}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-// ---------- Red-Tag Programme (Job 7) ----------
-
-type WeekPlan = { code: string; ending: string; plan: number; actual: number };
-
-// Johnny's actual whiteboard: planned vs achieved red-tags per week. Two weeks
-// of over-delivery (W30/W31), then structural slippage from W33.
-const RED_TAG_WEEKS: WeekPlan[] = [
-  { code: "W30", ending: "2026-07-17", plan: 15, actual: 29 },
-  { code: "W31", ending: "2026-07-24", plan: 12, actual: 25 },
-  { code: "W32", ending: "2026-07-31", plan: 16, actual: 14 },
-  { code: "W33", ending: "2026-08-07", plan: 18, actual: 4 },
-  { code: "W34", ending: "2026-08-14", plan: 32, actual: 14 },
-  { code: "W35", ending: "2026-08-21", plan: 32, actual: 25 },
-  { code: "W36", ending: "2026-08-28", plan: 43, actual: 20 },
-  { code: "W37", ending: "2026-09-04", plan: 3, actual: 0 },
-  { code: "W38", ending: "2026-09-11", plan: 4, actual: 0 },
-  { code: "W39", ending: "2026-09-18", plan: 2, actual: 0 },
-];
-
-// Severe-week slippage drivers — the phrases come from Johnny's register.
-const SLIP_DRIVERS = [
-  { count: 8, label: "Robust Verification", key: "robust verification" },
-  { count: 6, label: "Asbestos Check", key: "asbestos" },
-  { count: 4, label: "Residual Verification PM", key: "residual verification" },
-];
-
-function fmtWeekEnding(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function RedTagProgramme({
-  blockerMap,
-  onOpenBlocker,
-}: {
-  blockerMap: BlockerMap | null;
-  onOpenBlocker: (id: string) => void;
-}) {
-  const today = new Date();
-
-  // Link each driver phrase to its matching constraint in the data.
-  const drivers = useMemo(() => {
-    const open = blockerMap
-      ? Object.values(blockerMap).filter((b) => b.state !== "closed")
-      : [];
-    return SLIP_DRIVERS.map((d) => ({
-      ...d,
-      blockerId:
-        open.find((b) => (b.description ?? "").toLowerCase().includes(d.key))
-          ?.id ?? null,
-    }));
-  }, [blockerMap]);
-
-  const weeks = RED_TAG_WEEKS.map((w) => {
-    const ratio = w.plan > 0 ? w.actual / w.plan : 1;
-    // green: met/beat plan · amber: 60–99% · red: <60%
-    const tone: "green" | "amber" | "red" =
-      ratio >= 1 ? "green" : ratio >= 0.6 ? "amber" : "red";
-    const isPast = new Date(w.ending).getTime() <= today.getTime();
-    return { ...w, ratio, tone, isPast, severe: tone === "red" && w.plan >= 10 };
-  });
-
-  const maxPlan = Math.max(
-    ...RED_TAG_WEEKS.map((w) => Math.max(w.plan, w.actual)),
-  );
-
-  const barTone: Record<string, string> = {
-    green: "bg-green-500",
-    amber: "bg-amber-500",
-    red: "bg-red-500",
-  };
-
-  return (
-    <div className="rounded-2xl border border-paper-line bg-paper-card p-5">
-      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-deep">
-        Red-Tag Programme
-      </p>
-      <h2
-        className="mt-1 font-[family-name:var(--font-fraunces)] font-semibold text-ink"
-        style={{ fontSize: 22, lineHeight: 1.15 }}
-      >
-        Weekly plan vs forecast actual
-      </h2>
-      <p
-        className="mt-1 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
-        style={{ fontSize: 14 }}
-      >
-        Johnny&apos;s whiteboard, rendered as software with the why attached.
-      </p>
-
-      <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
-        {weeks.map((w) => (
-          <div
-            key={w.code}
-            className="flex w-44 flex-shrink-0 flex-col rounded-xl border border-paper-line bg-paper p-3"
-          >
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">
-              {w.code}
-            </p>
-            <p className="text-xs font-medium text-ink">
-              Week ending {fmtWeekEnding(w.ending)}
-            </p>
-
-            <div className="mt-3 flex items-end gap-3" style={{ height: 96 }}>
-              <ProgrammeBar
-                label="Plan"
-                value={w.plan}
-                max={maxPlan}
-                barCls="bg-paper-line"
-                valueCls="text-ink-mid"
-              />
-              <ProgrammeBar
-                label={w.isPast ? "Actual" : "Forecast"}
-                value={w.actual}
-                max={maxPlan}
-                barCls={barTone[w.tone]}
-                valueCls="text-ink"
-              />
-            </div>
-
-            {w.severe && (
-              <div className="mt-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">
-                  Drivers of slippage
-                </p>
-                <ul className="mt-1 space-y-1">
-                  {drivers.map((d) => (
-                    <li key={d.label}>
-                      <button
-                        type="button"
-                        disabled={!d.blockerId}
-                        onClick={() => d.blockerId && onOpenBlocker(d.blockerId)}
-                        className="w-full truncate rounded-md bg-red-50 px-2 py-1 text-left text-[11px] text-red-700 transition-colors enabled:hover:bg-red-100 disabled:opacity-70"
-                      >
-                        {d.count} on {d.label}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <p className="mt-3 text-sm text-ink">
-        Across the next 10 weeks:{" "}
-        <span className="font-semibold">planned 177</span>, forecast 134, gap 43
-        (~24% slippage).
-      </p>
-    </div>
-  );
-}
-
-function ProgrammeBar({
-  label,
-  value,
-  max,
-  barCls,
-  valueCls,
-}: {
-  label: string;
-  value: number;
-  max: number;
-  barCls: string;
-  valueCls: string;
-}) {
-  const h = max > 0 ? Math.round((value / max) * 72) : 0;
-  return (
-    <div className="flex flex-1 flex-col items-center justify-end">
-      <span className={`text-xs font-semibold ${valueCls}`}>{value}</span>
-      <div
-        className={`mt-1 w-6 rounded-t ${barCls}`}
-        style={{ height: Math.max(2, h) }}
-      />
-      <span className="mt-1 text-[9px] uppercase tracking-wide text-ink-mid">
-        {label}
-      </span>
-    </div>
-  );
-}
-
-// ---------- by-week ----------
-
-function ByWeekView({
-  enriched,
-  today,
-}: {
-  enriched: EnrichedAsset[];
-  today: Date;
-}) {
-  const weeks = useMemo(() => {
-    const buckets = new Map<number, EnrichedAsset[]>();
-    for (const e of enriched) {
-      const wk = Math.max(0, Math.floor(e.daysUntil / 7));
-      const arr = buckets.get(wk) ?? [];
-      arr.push(e);
-      buckets.set(wk, arr);
-    }
-    return Array.from(buckets.entries())
-      .sort((a, b) => a[0] - b[0])
-      .map(([wk, items]) => ({
-        wk,
-        ending: new Date(today.getTime() + (wk + 1) * 7 * 86400000),
-        items,
-        status: worstStatus(items.map((i) => i.status)),
-      }));
-  }, [enriched, today]);
-
-  if (weeks.length === 0) {
-    return (
-      <div className="rounded-2xl border border-dashed border-paper-line bg-paper-card p-10 text-center text-sm text-ink-mid">
-        No scheduled work in view.
-      </div>
-    );
-  }
-
-  return (
-    <div className="overflow-hidden rounded-2xl border border-paper-line bg-paper-card">
-      <ul className="divide-y divide-paper-line">
-        {weeks.map((w) => (
-          <li key={w.wk} className="flex items-center gap-4 px-4 py-3">
-            <span className="w-28 flex-shrink-0 text-xs font-medium text-ink">
-              Wk of{" "}
-              {w.ending.toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-              })}
-            </span>
-            <span
-              className={`inline-block h-3 w-5 rounded-sm ${STATUS_BAR[w.status].bg}`}
-            />
-            <span className="flex-1 text-sm text-ink-mid">
-              {w.items.length} {w.items.length === 1 ? "asset" : "assets"}{" "}
-              planned · worst status {STATUS_BAR[w.status].label}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-// ---------- modular flow (Job 8) ----------
-
-const MODULAR_COLUMNS = [
-  { id: "designed", title: "Designed", sub: "Factory drawings" },
-  { id: "in-factory", title: "In factory", sub: "Manufacturing / FAT" },
-  { id: "delivered", title: "Delivered", sub: "On site" },
-  { id: "installed", title: "Installed", sub: "Physically positioned" },
-  { id: "commissioned", title: "Commissioned", sub: "Live" },
-] as const;
-
-const MODULAR_SLAS = [
-  "Designed → In factory: 10 days target",
-  "FAT → Delivered: 14 days target",
-  "Delivered → Installed: 21 days target",
-  "Installed → Commissioned: 14 days target",
-];
-
-function isModularAsset(a: any): boolean {
-  const system = (a.system ?? "").toString().toLowerCase();
-  const type = (a.asset_type ?? "").toString().toLowerCase();
-  return (
-    system === "power" &&
-    (type.includes("distribution panel") || type.includes("ups module"))
-  );
-}
-
-function modularColumn(stage: string): string {
-  const s = (stage ?? "").toLowerCase();
-  if (s.includes("design")) return "designed";
-  if (s.includes("factory") || s.includes("fat") || s.includes("manufact"))
-    return "in-factory";
-  if (s.includes("not installed") || s.includes("delivered"))
-    return "delivered";
-  if (s.includes("green") || s.includes("commission") || s.includes("handover"))
-    return "commissioned";
-  return "installed";
-}
-
-function stageEntry(a: any, today: Date): Date | null {
-  const cands = [a.green_date, a.yellow_tag_date, a.red_tag_date]
-    .map((d: any) => (d ? new Date(d) : null))
-    .filter(
-      (d): d is Date =>
-        !!d && !Number.isNaN(d.getTime()) && d.getTime() <= today.getTime(),
-    );
-  if (cands.length === 0) return null;
-  return new Date(Math.max(...cands.map((d) => d.getTime())));
-}
-
-function ModularFlow({
-  enriched,
-  today,
-  onOpenBlocker,
-}: {
-  enriched: EnrichedAsset[];
-  today: Date;
-  onOpenBlocker: (id: string) => void;
-}) {
-  const items = enriched
-    .filter((e) => isModularAsset(e.asset))
-    .map((e) => {
-      const entry = stageEntry(e.asset, today);
-      const days = entry ? daysBetween(today, entry) : 0;
-      return {
-        e,
-        col: modularColumn(e.asset.current_stage ?? ""),
-        days,
-        stalled: days > 14,
-        linkedCost: e.linked.reduce((s, b) => s + b.cost_per_day, 0),
-        primary: e.linked[0],
-      };
-    });
-
-  if (items.length === 0) {
-    return (
-      <div className="rounded-2xl border border-dashed border-paper-line bg-paper-card p-10 text-center text-sm text-ink-mid">
-        No modular assets (Power distribution panels / UPS modules) in view.
-      </div>
-    );
-  }
-
-  const stalledItems = items.filter((i) => i.stalled);
-  const seen = new Set<string>();
-  let stallCost = 0;
-  for (const i of stalledItems) {
-    for (const b of i.e.linked) {
-      if (!seen.has(b.id)) {
-        seen.add(b.id);
-        stallCost += b.cost_per_day;
-      }
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <ModularStat label="In flight" value={`${items.length} assets`} />
-        <ModularStat
-          label="Stalled (>14 days)"
-          value={`${stalledItems.length} assets`}
-          tone={stalledItems.length > 0 ? "bad" : undefined}
-        />
-        <ModularStat
-          label="Estimated cost of stall"
-          value={`${GBP.format(stallCost)}/day`}
-          tone={stallCost > 0 ? "bad" : undefined}
-        />
-      </div>
-
-      <div className="overflow-x-auto">
-        <div className="flex min-w-[760px] items-stretch gap-2">
-          {MODULAR_COLUMNS.map((col, idx) => {
-            const colItems = items.filter((i) => i.col === col.id);
-            return (
-              <Fragment key={col.id}>
-                <div className="flex-1 rounded-2xl border border-paper-line bg-paper-card p-3">
-                  <p className="text-xs font-semibold text-ink">{col.title}</p>
-                  <p className="text-[10px] text-ink-mid">{col.sub}</p>
-                  <div className="mt-3 space-y-2">
-                    {colItems.length === 0 ? (
-                      <p className="rounded-lg border border-dashed border-paper-line py-4 text-center text-[10px] text-ink-mid">
-                        —
-                      </p>
-                    ) : (
-                      colItems.map((i) => (
-                        <button
-                          key={i.e.asset.asset_id}
-                          type="button"
-                          onClick={() => i.primary && onOpenBlocker(i.primary.id)}
-                          className={`block w-full rounded-lg border p-2 text-left transition-colors ${
-                            i.stalled
-                              ? "border-red-400 bg-red-50/60"
-                              : "border-paper-line bg-paper hover:bg-paper-warm"
-                          }`}
-                        >
-                          <p className="font-mono text-[10px] text-ink">
-                            {i.e.asset.asset_id}
-                          </p>
-                          <p className="text-[10px] text-ink-mid">
-                            {i.days}d in stage
-                          </p>
-                          {i.stalled && i.linkedCost > 0 && (
-                            <p className="text-[10px] font-semibold text-red-700">
-                              {GBP.format(i.linkedCost)}/day
-                            </p>
-                          )}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-                {idx < MODULAR_COLUMNS.length - 1 && (
-                  <div className="flex w-24 flex-shrink-0 items-center justify-center px-1 text-center">
-                    <span className="text-[9px] leading-tight text-ink-mid">
-                      {MODULAR_SLAS[idx]}
-                    </span>
-                  </div>
-                )}
-              </Fragment>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="rounded-2xl border-2 border-accent/40 bg-[color:var(--accent)]/[0.03] p-4">
-        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-accent-deep">
-          Why this matters for modular construction
-        </p>
-        <p className="mt-1.5 text-sm leading-relaxed text-ink">
-          Modular factories deliver in batches. If 30% of a batch stalls between
-          FAT and SAT, the next factory load can&apos;t ship. Longford&apos;s
-          operating model depends on this flow staying tight.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function ModularStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "bad";
-}) {
-  return (
-    <div className="rounded-2xl border border-paper-line bg-paper-card p-4">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">
-        {label}
-      </p>
-      <p
-        className={`mt-1 font-[family-name:var(--font-fraunces)] font-semibold ${
-          tone === "bad" ? "text-red-700" : "text-ink"
-        }`}
-        style={{ fontSize: 24, lineHeight: 1 }}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-// ---------- P6 timeline (Job 9.D) ----------
-
-function fmtP6(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function p6BarColour(a: XerActivity, todayIso: string): string {
-  if (a.status === "COMPLETE") return "bg-green-500";
-  if (a.status === "IN_PROGRESS")
-    return a.target_end && a.target_end < todayIso
-      ? "bg-amber-500"
-      : "bg-blue-500";
-  if (a.target_start && a.target_start < todayIso) return "bg-red-500";
-  return "bg-zinc-400";
-}
-
-function P6Timeline({
-  xer,
-  assets,
-  onOpenAsset,
-}: {
-  xer: ParsedXer | null;
-  assets: any[];
-  onOpenAsset: (asset: any) => void;
-}) {
-  const [activeActivity, setActiveActivity] = useState<XerActivity | null>(null);
-
-  const codeToAsset = useMemo(() => {
-    const m = new Map<string, any>();
-    for (const a of assets) {
-      const code = (a.activity_id ?? "").toString().trim();
-      if (code) m.set(code, a);
-    }
-    return m;
-  }, [assets]);
-
-  const todayIso = new Date().toISOString().slice(0, 10);
-
-  const domain = useMemo(() => {
-    if (!xer) return null;
-    let min = Infinity;
-    let max = -Infinity;
-    for (const a of xer.activities) {
-      const s = a.target_start ? new Date(a.target_start).getTime() : NaN;
-      const e = a.target_end ? new Date(a.target_end).getTime() : NaN;
-      if (!Number.isNaN(s)) min = Math.min(min, s);
-      if (!Number.isNaN(e)) max = Math.max(max, e);
-    }
-    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min)
-      return null;
-    return { min, max, span: max - min };
-  }, [xer]);
-
-  const groups = useMemo(() => {
-    if (!xer) return [];
-    const nameById = new Map(xer.wbs.map((w) => [w.id, w.name]));
-    const byWbs = new Map<string, XerActivity[]>();
-    for (const a of xer.activities) {
-      const key = a.wbs_id ?? "—";
-      const arr = byWbs.get(key);
-      if (arr) arr.push(a);
-      else byWbs.set(key, [a]);
-    }
-    return Array.from(byWbs.entries())
-      .map(([id, items]) => ({
-        id,
-        name: nameById.get(id) ?? "Unassigned",
-        items: items
-          .slice()
-          .sort((x, y) =>
-            (x.target_start ?? "").localeCompare(y.target_start ?? ""),
-          ),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [xer]);
-
-  if (!xer) {
-    return (
-      <div className="rounded-2xl border border-dashed border-paper-line bg-paper-card p-10 text-center">
-        <p className="text-sm text-ink">
-          Drop a P6 XER export on Step 5 of the wizard to see your live schedule
-          here.
-        </p>
+      {/* Action footer */}
+      <div style={{ marginTop: 12, paddingTop: 12, borderTop: `0.5px solid ${BRAND.border}` }}>
         <p
-          className="mt-2 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
-          style={{ fontSize: 13 }}
+          style={{
+            fontSize: 10,
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+            color: BRAND.purple,
+            fontWeight: 600,
+          }}
         >
-          Pilot week 4: direct Primavera Cloud API integration.
+          → What to do
+        </p>
+        <p style={{ fontSize: 12, color: BRAND.ink, marginTop: 4, lineHeight: 1.45 }}>
+          {horizon.action}
         </p>
       </div>
-    );
-  }
-
-  const pos = (iso: string | null): number => {
-    if (!iso || !domain) return 0;
-    const t = new Date(iso).getTime();
-    if (Number.isNaN(t)) return 0;
-    return ((t - domain.min) / domain.span) * 100;
-  };
-  const todayPct = Math.max(0, Math.min(100, pos(todayIso)));
-
-  return (
-    <div className="space-y-4">
-      <div className="overflow-hidden rounded-2xl border border-paper-line bg-paper-card">
-        <div className="flex">
-          <div className="w-[260px] flex-shrink-0 border-r border-paper-line bg-paper px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-ink-mid">
-            WBS / activity
-          </div>
-          <div className="flex flex-1 items-center justify-between px-3 py-2 font-mono text-[10px] text-ink-mid">
-            <span>{domain ? fmtP6(new Date(domain.min).toISOString()) : ""}</span>
-            <span className="text-accent-deep">Today</span>
-            <span>{domain ? fmtP6(new Date(domain.max).toISOString()) : ""}</span>
-          </div>
-        </div>
-
-        {groups.map((g) => (
-          <div key={g.id}>
-            <div className="flex items-center gap-2 border-t border-paper-line bg-paper-warm/40 px-4 py-1.5">
-              <span className="text-[11px] font-semibold text-ink">{g.name}</span>
-              <span className="font-mono text-[10px] text-ink-mid">
-                {g.items.length}
-              </span>
-            </div>
-            {g.items.map((a) => {
-              const mapped = codeToAsset.get(a.task_code);
-              const left = Math.max(0, Math.min(100, pos(a.target_start)));
-              const right = Math.max(0, Math.min(100, pos(a.target_end)));
-              const width = Math.max(1.5, right - left);
-              const slip = slipDays(a);
-              const tooltip = `${a.task_code} · ${a.task_name}\n${fmtP6(a.target_start)} → ${fmtP6(a.target_end)} · ${a.complete_pct}%${slip > 0 ? ` · slipped ${slip}d` : ""}${a.is_critical ? " · CRITICAL" : ""}${mapped ? `\nAsset: ${mapped.asset_id}` : ""}`;
-              return (
-                <div
-                  key={a.task_id}
-                  className="flex items-stretch border-t border-paper-line hover:bg-paper-warm/40"
-                >
-                  <div className="w-[260px] flex-shrink-0 border-r border-paper-line bg-paper px-4 py-2">
-                    <div className="flex items-center gap-1.5">
-                      {a.is_critical && (
-                        <span className="inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-600" />
-                      )}
-                      <span className="font-mono text-[10px] text-ink-mid">
-                        {a.task_code}
-                      </span>
-                      {mapped && (
-                        <span className="font-mono text-[9px] text-accent-deep">
-                          ↔ {mapped.asset_id}
-                        </span>
-                      )}
-                    </div>
-                    <p className="truncate text-xs text-ink">{a.task_name}</p>
-                  </div>
-                  <div className="relative flex-1 px-3 py-2">
-                    <div className="relative h-5">
-                      <div
-                        className="absolute top-0 h-full border-l border-dashed border-accent/40"
-                        style={{ left: `${todayPct}%` }}
-                        aria-hidden
-                      />
-                      <button
-                        type="button"
-                        title={tooltip}
-                        onClick={() =>
-                          mapped ? onOpenAsset(mapped) : setActiveActivity(a)
-                        }
-                        className={`absolute top-0 h-5 cursor-pointer rounded transition-shadow hover:ring-2 hover:ring-offset-1 ${p6BarColour(a, todayIso)} ${a.is_critical ? "border-2 border-red-600" : ""}`}
-                        style={{ left: `${left}%`, width: `${width}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-ink-mid">
-        {[
-          ["bg-green-500", "Complete"],
-          ["bg-blue-500", "In progress"],
-          ["bg-amber-500", "Slipping"],
-          ["bg-red-500", "Overdue (not started)"],
-          ["bg-zinc-400", "Planned"],
-        ].map(([cls, label]) => (
-          <span key={label} className="inline-flex items-center gap-1.5">
-            <span className={`inline-block h-3 w-5 rounded-sm ${cls}`} />
-            {label}
-          </span>
-        ))}
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-3 w-5 rounded-sm border-2 border-red-600" />
-          Critical path
-        </span>
-      </div>
-
-      {activeActivity && (
-        <div className="rounded-2xl border border-accent/30 bg-[color:var(--accent)]/[0.04] p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="font-mono text-sm font-semibold text-ink">
-                {activeActivity.task_code}
-              </p>
-              <p className="text-xs text-ink-mid">{activeActivity.task_name}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setActiveActivity(null)}
-              className="rounded-full p-1 text-ink-mid transition-colors hover:bg-paper-warm hover:text-ink"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-ink">
-            <p>
-              <span className="text-ink-mid">Planned start:</span>{" "}
-              {fmtP6(activeActivity.target_start)}
-            </p>
-            <p>
-              <span className="text-ink-mid">Planned end:</span>{" "}
-              {fmtP6(activeActivity.target_end)}
-            </p>
-            <p>
-              <span className="text-ink-mid">Status:</span>{" "}
-              {activeActivity.status.replace(/_/g, " ").toLowerCase()}
-            </p>
-            <p>
-              <span className="text-ink-mid">Complete:</span>{" "}
-              {activeActivity.complete_pct}%
-            </p>
-            {slipDays(activeActivity) > 0 && (
-              <p className="col-span-2 font-semibold text-red-700">
-                Slipped {slipDays(activeActivity)} days vs baseline
-              </p>
-            )}
-          </div>
-          <p className="mt-2 text-[11px] italic text-ink-mid">
-            No Keldra asset mapped to this activity yet.
-          </p>
-        </div>
-      )}
     </div>
   );
 }

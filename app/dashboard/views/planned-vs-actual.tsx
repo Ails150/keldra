@@ -204,9 +204,12 @@ export default function PlannedVsActualView() {
           eyebrow="Variance"
           big={summary.variance === null ? "—" : `${summary.variance}%`}
           bigColour={varianceColour}
-          sub="Today's delivery vs plan"
+          sub="Behind plan today"
         />
       </div>
+
+      {/* Impact timeline — connects the variance to the BU date */}
+      <ImpactTimeline variance={summary.variance} />
 
       {/* Block B — filter chips */}
       <div className="flex flex-wrap items-center" style={{ gap: 8, marginTop: 16 }}>
@@ -375,6 +378,139 @@ function Divider() {
       className="mx-5 self-stretch"
       style={{ width: "0.5px", backgroundColor: BRAND.cream, opacity: 0.2 }}
     />
+  );
+}
+
+// Pilot wires real velocity math — the slip, forecast date and per-day
+// multiplier are hardcoded for the demo.
+const IMPACT_TODAY = new Date(2026, 4, 28); // 28 May
+const IMPACT_PLANNED_BU = new Date(2026, 11, 2); // 02 Dec
+const IMPACT_FORECAST_BU = new Date(2026, 11, 20); // 20 Dec
+const IMPACT_SLIP_DAYS = 18;
+const IMPACT_DAY_MULTIPLIER = 0.3;
+
+function ImpactTimeline({ variance }: { variance: number | null }) {
+  const span = IMPACT_FORECAST_BU.getTime() - IMPACT_TODAY.getTime();
+  const plannedPct =
+    ((IMPACT_PLANNED_BU.getTime() - IMPACT_TODAY.getTime()) / span) * 100;
+  const v = variance ?? 24;
+
+  return (
+    <div style={{ border: `0.5px solid ${BRAND.border}`, borderRadius: 12, padding: "18px 24px" }}>
+      <p
+        style={{
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          color: BRAND.purple,
+          fontWeight: 600,
+        }}
+      >
+        What today&apos;s shortfall does to the date
+      </p>
+
+      {/* End-point labels */}
+      <div className="relative" style={{ marginTop: 18, height: 16 }}>
+        <span style={{ position: "absolute", left: 0, fontSize: 11, color: BRAND.inkMuted }}>
+          Today · 28 May
+        </span>
+        <span
+          style={{
+            position: "absolute",
+            right: 0,
+            fontSize: 11,
+            fontWeight: 600,
+            color: BRAND.dangerInk,
+          }}
+        >
+          Forecast BU · 20 Dec · +{IMPACT_SLIP_DAYS} days
+        </span>
+      </div>
+
+      {/* Track: green to planned BU, red slip beyond it */}
+      <div className="relative" style={{ height: 12, marginTop: 6 }}>
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: 999,
+            backgroundColor: BRAND.cream,
+            border: `0.5px solid ${BRAND.border}`,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: `${plannedPct}%`,
+            borderRadius: "999px 0 0 999px",
+            backgroundColor: BRAND.successInk,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            left: `${plannedPct}%`,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            borderRadius: "0 999px 999px 0",
+            backgroundColor: BRAND.dangerInk,
+          }}
+        />
+        {/* Planned BU marker — green tick */}
+        <div
+          style={{
+            position: "absolute",
+            left: `${plannedPct}%`,
+            top: -3,
+            bottom: -3,
+            width: 2,
+            backgroundColor: BRAND.successInk,
+            transform: "translateX(-1px)",
+          }}
+        />
+        {/* Forecast BU marker — red dot at the right edge */}
+        <div
+          style={{
+            position: "absolute",
+            right: 0,
+            top: "50%",
+            width: 12,
+            height: 12,
+            borderRadius: 999,
+            backgroundColor: BRAND.dangerInk,
+            border: `2px solid ${BRAND.cream}`,
+            transform: "translate(50%, -50%)",
+          }}
+        />
+      </div>
+
+      {/* Planned BU caption under its marker */}
+      <div className="relative" style={{ height: 16, marginTop: 6 }}>
+        <span
+          style={{
+            position: "absolute",
+            left: `${plannedPct}%`,
+            transform: "translateX(-50%)",
+            fontSize: 11,
+            fontWeight: 600,
+            color: BRAND.successInk,
+            whiteSpace: "nowrap",
+          }}
+        >
+          ✓ Planned BU · 02 Dec
+        </span>
+      </div>
+
+      <p style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: BRAND.ink }}>
+        At <span style={{ fontWeight: 600 }}>{v}% behind plan</span> sustained, DUB-16
+        forecasts <span style={{ fontWeight: 600, color: BRAND.dangerInk }}>+{IMPACT_SLIP_DAYS} working days</span>.
+        Each day at this manpower level adds ~{IMPACT_DAY_MULTIPLIER} days to the programme.
+      </p>
+    </div>
   );
 }
 
