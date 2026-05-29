@@ -7,6 +7,8 @@ export const BRAND = {
   inkMuted: "#5a4a72",
   cream: "#faf7fc",
   paperLine: "#e8dcf0",
+  paperWhite: "#ffffff",
+  paperWarm: "#f5eef9", // matches --paper-warm
 
   purple: "#8a3dd6",
   purpleDeep: "#5e25a3",
@@ -18,12 +20,14 @@ export const BRAND = {
   cxPreEnergy: "#c9a6ec",
 
   border: "#e8dcf0",
+  borderStrong: "#dbcce8", // matches --border-soft
   successInk: "#3b6d11",
   successBg: "#eaf3de",
   warningInk: "#854f0b",
   warningBg: "#faeeda",
   dangerInk: "#a32d2d",
   dangerBg: "#fcebeb",
+  dangerSoft: "#fcecec", // danger-tinted surface for the gate spine
 
   // Company hues, per the P6 seed.
   coral: "#e2654b",

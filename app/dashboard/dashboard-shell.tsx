@@ -29,8 +29,10 @@ import BlockerDetailPanel from "./views/blocker-detail-panel";
 import PlannedVsActualView from "./views/planned-vs-actual";
 import HoldingBackView from "./views/holding-back";
 import OverviewView from "./views/overview";
+import GatesView from "./views/gates";
 
 type Tab =
+  | "gates"
   | "overview"
   | "today"
   | "variance"
@@ -45,17 +47,17 @@ type Tab =
   | "intelligence"
   | "audit";
 
+// Visible nav tabs. variance/funnel/map are intentionally omitted here — their
+// views still render (see the tab blocks below) and can be reached via Smart
+// Alert routing; they're just off the nav for the director-facing demo.
 const TABS: { id: Tab; label: string }[] = [
-  { id: "overview", label: "Overview" },
+  { id: "gates", label: "Gates" },
   { id: "today", label: "Today" },
-  { id: "variance", label: "Planned vs Actual" },
-  { id: "funnel", label: "Funnel" },
+  { id: "overview", label: "Overview" },
   { id: "people", label: "People" },
   { id: "holding-back", label: "Holding back" },
   { id: "assets", label: "Assets" },
   { id: "constraints", label: "Constraints" },
-  { id: "schedule", label: "Schedule" },
-  { id: "map", label: "Map" },
   { id: "intelligence", label: "Intelligence" },
   { id: "audit", label: "Audit" },
 ];
@@ -96,7 +98,7 @@ const DEMO_ROLE_OPTIONS: RoleOption[] = [
 
 export default function DashboardShell({ userEmail }: { userEmail: string }) {
   const [project, setProject] = useState<WizardData | null | undefined>(undefined);
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>("gates");
   const [viewingAs, setViewingAs] = useState<ViewingAs | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -104,6 +106,7 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
   const [activeBlockerId, setActiveBlockerId] = useState<string | null>(null);
   const [assetFilter, setAssetFilter] = useState<string[] | null>(null);
   const [mapZone, setMapZone] = useState<string | null>(null);
+  const [selectedGate, setSelectedGate] = useState<string>("C");
 
   useEffect(() => {
     const stored = readStoredProject();
@@ -170,6 +173,13 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
     setActiveBlockerId(id);
   }, []);
   const closeBlocker = useCallback(() => setActiveBlockerId(null), []);
+
+  // Selection mechanism for the gate ladder: jump to the Gates tab with a
+  // specific gate pre-selected. Today's gate banner calls this with "C".
+  const openGate = useCallback((gateId: string) => {
+    setSelectedGate(gateId);
+    setTab("gates");
+  }, []);
 
   const runBlockerAction = useCallback(
     async (id: string, actionId: string, payload?: ActionPayload) => {
@@ -455,6 +465,9 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
       </header>
 
       <main className="flex-1 py-8">
+        {tab === "gates" && (
+          <GatesView selectedGate={selectedGate} onSelectGate={setSelectedGate} />
+        )}
         {tab === "overview" && (
           <OverviewView
             project={project}
@@ -463,15 +476,7 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
             onOpenBlocker={openBlocker}
           />
         )}
-        {tab === "today" && (
-          <TodayView
-            project={project}
-            viewingAs={active}
-            blockerMap={blockerMap}
-            onOpenBlocker={openBlocker}
-            onAlertAction={handleAlertAction}
-          />
-        )}
+        {tab === "today" && <TodayView onOpenGate={openGate} />}
         {tab === "variance" && <PlannedVsActualView />}
         {tab === "funnel" && (
           <FunnelView
