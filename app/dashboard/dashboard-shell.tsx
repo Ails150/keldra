@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { WizardData, ViewingRole, ViewingAs } from "../onboarding/types";
 import SignOutButton from "../sign-out-button";
-import { deriveOrgColour, getInitials, readStoredProject, roleLabel } from "./utils";
+import { deriveOrgColour, getInitials, roleLabel } from "./utils";
+import { seedDemoStore, DEMO_VIEWING_AS } from "./lib/demo-seed";
 import {
   type ActionPayload,
   type BlockerMap,
@@ -108,18 +109,23 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
   const [mapZone, setMapZone] = useState<string | null>(null);
   const [selectedGate, setSelectedGate] = useState<string>("C");
 
+  // generic-demo lock: always seed synthetic data and ignore any cached real
+  // ingest or stored viewing-as. The demo can only ever show the synthetic org.
   useEffect(() => {
-    const stored = readStoredProject();
-    setProject(stored);
-    if (stored) {
-      setViewingAs(
-        stored.viewingAs ?? {
-          orgName: "Main Contractor",
-          orgType: "main-contractor",
-          role: "main-contractor",
-        },
-      );
-    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const proj = await seedDemoStore();
+        if (cancelled) return;
+        setProject(proj);
+        setViewingAs(DEMO_VIEWING_AS);
+      } catch {
+        if (!cancelled) setProject(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Hydrate blocker state once the project is known.
@@ -327,12 +333,6 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <a
-              href="/dashboard/ingest"
-              className="hidden font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-accent-deep transition-colors hover:text-accent md:inline"
-            >
-              Re-ingest data ↑
-            </a>
             <a
               href="/field"
               target="_blank"
