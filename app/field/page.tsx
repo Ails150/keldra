@@ -67,7 +67,7 @@ export default function FieldHome() {
     <div className="space-y-6">
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-accent-deep">
-          DUB-16 · {FIELD_PERSONA.companyName}
+          MER · {FIELD_PERSONA.companyName}
         </p>
         <h1
           className="mt-1 font-[family-name:var(--font-fraunces)] font-semibold text-ink"
@@ -149,7 +149,7 @@ export default function FieldHome() {
                 )}
               </p>
               <p className="mt-2 text-sm text-ink">
-                Chases from Johnny McKenna — reply here, in Keldra.
+                Chases from Commissioning Lead — reply here, in Keldra.
               </p>
               {mounted && formalUnopened && (
                 <p className="mt-1.5 text-xs font-semibold text-red-700">

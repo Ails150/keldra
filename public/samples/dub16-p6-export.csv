@@ -1,13 +1,13 @@
 Activity ID,Activity Name,Start,Finish,WBS,Resources,Original Duration,Total Float
-ELE-MER-1010,Install Earth Bar MER1,13-May-26,14-May-26,Electrical Fit Out MER1,Ardmac,2,0
-ELE-COLO-1030,Telecoms Bracketery and Containment,13-Mar-26,20-Apr-26,COLO 1-4 Electrical,T Bourke,28,0
-ELE-ADMIN-1020,Install high level Bracketery and Containment AD1-4,01-Apr-26,01-May-26,Elec AD01-04,Ardmac,22,0
-MEC-COLO-1040,Water services and connections COLO 1-4,21-Apr-26,28-Apr-26,Mechanical Modules 1-4,Ardmac,6,0
-FAB-ADMIN-1120,External Service Support Steel,16-Mar-26,24-Apr-26,Facility Modules,Ardmac,29,0
-CX-1180,DUB16-ADMIN-XFM01 FWT,13-May-26,14-May-26,Off Site Commissioning / FWT,Ardmac,2,0
-ELE-COLO-1010,COLO DC 1-4 LV 1st fix containment,16-Feb-26,01-Apr-26,COLO 1-4 LV,Ardmac,32,12
-ARC-COLO-1060,HAC system install Modules 1-4,26-Mar-26,30-Apr-26,COLO 1-4 Fit-Out,Dornans,25,8
-ARC-COLO-1080,Firestopping penetrations Modules 1-4,29-May-26,03-Jun-26,COLO 1-4 Fit-Out,Auto Fire,4,15
-FAB-MER-1110,MER2 Floor and Roof,06-Feb-26,20-Feb-26,DUB16 MER2 Fab,Ardmac,10,40
-SEC-COLO-1000,FOK for each door type,17-Apr-26,22-Apr-26,Security COLO & ADMIN,Ardmac,4,0
-CX-1440,DUB16-COLO1-MER1-MSB01 FWT,02-Jun-26,03-Jun-26,Off Site Commissioning / FWT,Ardmac,2,5
+ELE-MER-1010,Install Earth Bar MER1,13-May-26,14-May-26,Electrical Fit Out MER1,Main Contractor,2,0
+ELE-COLO-1030,Telecoms Bracketery and Containment,13-Mar-26,20-Apr-26,COLO 1-4 Electrical,Mech Sub,28,0
+ELE-ADMIN-1020,Install high level Bracketery and Containment AD1-4,01-Apr-26,01-May-26,Elec AD01-04,Main Contractor,22,0
+MEC-COLO-1040,Water services and ctelecoms-subtions COLO 1-4,21-Apr-26,28-Apr-26,Mechanical Modules 1-4,Main Contractor,6,0
+FAB-ADMIN-1120,External Service Support Steel,16-Mar-26,24-Apr-26,Facility Modules,Main Contractor,29,0
+CX-1180,MER-ADMIN-XFM01 FWT,13-May-26,14-May-26,Off Site Commissioning / FWT,Main Contractor,2,0
+ELE-COLO-1010,COLO DC 1-4 LV 1st fix containment,16-Feb-26,01-Apr-26,COLO 1-4 LV,Main Contractor,32,12
+ARC-COLO-1060,HAC system install Modules 1-4,26-Mar-26,30-Apr-26,COLO 1-4 Fit-Out,Fit-Out Sub,25,8
+ARC-COLO-1080,Firestopping penetrations Modules 1-4,29-May-26,03-Jun-26,COLO 1-4 Fit-Out,Fire Sub,4,15
+FAB-MER-1110,MER2 Floor and Roof,06-Feb-26,20-Feb-26,MER MER2 Fab,Main Contractor,10,40
+SEC-COLO-1000,FOK for each door type,17-Apr-26,22-Apr-26,Security COLO & ADMIN,Main Contractor,4,0
+CX-1440,MER-COLO1-MER1-MSB01 FWT,02-Jun-26,03-Jun-26,Off Site Commissioning / FWT,Main Contractor,2,5

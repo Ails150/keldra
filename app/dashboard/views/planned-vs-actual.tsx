@@ -104,7 +104,7 @@ export default function PlannedVsActualView() {
   }, []);
 
   // Programme says this should be underway by now and it isn't finished. The
-  // DUB-16 seed is behind, so most planned-active tasks are overdue — which is
+  // MER seed is behind, so most planned-active tasks are overdue — which is
   // exactly the variance this view exists to show.
   const plannedActive = useMemo(() => {
     const today = midnight(new Date());
@@ -178,7 +178,7 @@ export default function PlannedVsActualView() {
           className="mt-1 font-[family-name:var(--font-fraunces)] italic"
           style={{ fontSize: 14, color: BRAND.inkMuted }}
         >
-          DUB-16 · {dateLabel || "…"} · Programme rev{" "}
+          MER · {dateLabel || "…"} · Programme rev{" "}
           {revLabel(baseline.project.baseline_revision_date)}
         </p>
       </header>
@@ -208,7 +208,7 @@ export default function PlannedVsActualView() {
         />
       </div>
 
-      {/* Impact timeline — connects the variance to the BU date */}
+      {/* Impact timeline — ctelecoms-subts the variance to the BU date */}
       <ImpactTimeline variance={summary.variance} />
 
       {/* Block B — filter chips */}
@@ -506,7 +506,7 @@ function ImpactTimeline({ variance }: { variance: number | null }) {
       </div>
 
       <p style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: BRAND.ink }}>
-        At <span style={{ fontWeight: 600 }}>{v}% behind plan</span> sustained, DUB-16
+        At <span style={{ fontWeight: 600 }}>{v}% behind plan</span> sustained, MER
         forecasts <span style={{ fontWeight: 600, color: BRAND.dangerInk }}>+{IMPACT_SLIP_DAYS} working days</span>.
         Each day at this manpower level adds ~{IMPACT_DAY_MULTIPLIER} days to the programme.
       </p>

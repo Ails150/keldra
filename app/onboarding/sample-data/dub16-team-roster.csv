@@ -1,9 +1,9 @@
 name,email,organisation,role,trade,deputy,phone
-Tom Walsh,tom.walsh@ardmac.com,Ardmac,Main contractor lead,M&E,Johnny McKenna,+353871234560
-Johnny McKenna,johnny.mckenna@ardmac.com,Ardmac,Construction Manager,M&E,Lawrence Burke,+353871234561
-Lawrence Burke,lawrence.burke@ardmac.com,Ardmac,Design coordination,Design,Johnny McKenna,+353871234562
-Killian Duggen FPK,killian.duggen@fpk.ie,Cental,ATS commissioning,Power,Laurence O'Carroll,+353871234563
-Laurence O'Carroll,laurence.ocarroll@cental.ie,Cental,TCP panels,Controls,Killian Duggen FPK,+353871234564
-Philly Johnston Automatic,philly.johnston@autofire.ie,Auto Fire,Fire alarm panels,Fire,Tom Walsh,+353871234565
-Standard Controls,controls@standardcontrols.ie,Cental,BMS / DOO,Controls,Laurence O'Carroll,+353871234566
-David O'Brien,david.obrien@microsoft.com,Microsoft,Client witness,Client,Tom Walsh,+353871234567
+Site Manager,site.manager@contractor.example,Main Contractor,Main contractor lead,M&E,Commissioning Lead,+353871234560
+Commissioning Lead,commissioning.lead@contractor.example,Main Contractor,Construction Manager,M&E,Design Coordinator,+353871234561
+Design Coordinator,design.coord@contractor.example,Main Contractor,Design coordination,Design,Commissioning Lead,+353871234562
+Cx Engineer,cx.eng@cx-sub.example,MEP Sub,ATS commissioning,Power,Controls Engineer,+353871234563
+Controls Engineer,controls.eng@mep-sub.example,MEP Sub,TCP panels,Controls,Cx Engineer,+353871234564
+Fire Engineer,fire.eng@fire-sub.example,Fire Sub,Fire alarm panels,Fire,Site Manager,+353871234565
+Controls Sub,bms@controls-sub.example,MEP Sub,BMS / DOO,Controls,Controls Engineer,+353871234566
+Client Witness,client.witness@client.example,Hyperscale Client,Client witness,Client,Site Manager,+353871234567

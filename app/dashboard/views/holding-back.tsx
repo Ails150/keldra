@@ -84,7 +84,7 @@ export default function HoldingBackView({
           className="font-[family-name:var(--font-fraunces)] font-semibold"
           style={{ fontSize: 28, lineHeight: 1.1, color: BRAND.ink }}
         >
-          Who&apos;s holding DUB-16 back
+          Who&apos;s holding MER back
         </h1>
         <p
           className="mt-1 font-[family-name:var(--font-fraunces)] italic"

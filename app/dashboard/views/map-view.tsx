@@ -19,7 +19,7 @@ const GBP = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 0,
 });
 
-// Stylised top-down layout of DUB-16. Each zone is a critical room (or, for the
+// Stylised top-down layout of MER. Each zone is a critical room (or, for the
 // BU rooms, a group) read straight from the baseline; dots are baseline tasks
 // whose affects_room points here.
 type Zone = {
@@ -109,7 +109,7 @@ export default function MapView({
             className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
             style={{ fontSize: 28, lineHeight: 1.15 }}
           >
-            DUB-16 · Site map
+            MER · Site map
           </h1>
           <p
             className="mt-1 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
@@ -141,7 +141,7 @@ export default function MapView({
           className="w-full"
           style={{ height: 640 }}
           role="img"
-          aria-label="DUB-16 site map"
+          aria-label="MER site map"
         >
           {zoneData.map(({ zone, tasks, count, cost, inScope }) => {
             const tint = zoneTint(count);
@@ -264,7 +264,7 @@ export default function MapView({
       </div>
 
       <p className="text-center text-xs text-ink-mid">
-        Click any room or task · live from the DUB-16 baseline · site install
+        Click any room or task · live from the MER baseline · site install
         starts 17 Aug 26, so every dot is still off-site
       </p>
     </section>

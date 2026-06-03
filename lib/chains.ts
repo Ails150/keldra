@@ -1,7 +1,7 @@
-// Dependency chains for DUB-16 active blockers. Each chain walks from the
+// Dependency chains for MER active blockers. Each chain walks from the
 // accountable person down through who *they* are waiting on, to the terminal
 // origin. The point of the "Holding back" view: most chains don't stop at the
-// sub on site — they trace back to Microsoft sign-off. Seeded for the demo;
+// sub on site — they trace back to Hyperscale Client sign-off. Seeded for the demo;
 // pilot week 1 maps these live.
 
 export type ChainStep = {
@@ -26,60 +26,60 @@ export type Chain = {
 export const CHAINS: Chain[] = [
   {
     activity_id: "ELE-COLO-1030",
-    accountable: { name: "Pawel Kowalski", org: "Cental", role: "Site Lead" },
+    accountable: { name: "Site Lead", org: "MEP Sub", role: "Site Lead" },
     steps: [
-      { actor: "Pawel Kowalski (Cental Site Lead)", waitingOn: "Mark Higgins (Cental Operations)", what: "sign-off on bracket spec", days: 19 },
-      { actor: "Mark Higgins (Cental Operations)", waitingOn: "Sellafield Design", what: "clarification on bracket dimensions", days: 30 },
-      { actor: "Sellafield Design", waitingOn: "Microsoft", what: "sign-off on revised design", days: 45 },
+      { actor: "Site Lead (MEP Sub Site Lead)", waitingOn: "Operations Manager (MEP Sub Operations)", what: "sign-off on bracket spec", days: 19 },
+      { actor: "Operations Manager (MEP Sub Operations)", waitingOn: "Design House", what: "clarification on bracket dimensions", days: 30 },
+      { actor: "Design House", waitingOn: "Hyperscale Client", what: "sign-off on revised design", days: 45 },
     ],
-    terminal: "Microsoft",
-    terminalPerson: "Andrew Farrell",
+    terminal: "Hyperscale Client",
+    terminalPerson: "Client Sign-off",
   },
   {
     activity_id: "ELE-ADMIN-1020",
-    accountable: { name: "Pawel Kowalski", org: "Cental", role: "Site Lead" },
+    accountable: { name: "Site Lead", org: "MEP Sub", role: "Site Lead" },
     steps: [
-      { actor: "Pawel Kowalski (Cental Site Lead)", waitingOn: "Mark Higgins (Cental Operations)", what: "re-quote", days: 12 },
-      { actor: "Mark Higgins (Cental Operations)", waitingOn: "Microsoft procurement", what: "PO release", days: 28 },
+      { actor: "Site Lead (MEP Sub Site Lead)", waitingOn: "Operations Manager (MEP Sub Operations)", what: "re-quote", days: 12 },
+      { actor: "Operations Manager (MEP Sub Operations)", waitingOn: "Hyperscale Client procurement", what: "PO release", days: 28 },
     ],
-    terminal: "Microsoft",
-    terminalPerson: "Andrew Farrell",
+    terminal: "Hyperscale Client",
+    terminalPerson: "Client Sign-off",
   },
   {
     activity_id: "MEC-COLO-1040",
-    accountable: { name: "Cathal Doyle", org: "Sellafield Design", role: "Design Director" },
+    accountable: { name: "Design Director", org: "Design House", role: "Design Director" },
     steps: [
-      { actor: "Cathal Doyle (Sellafield Design Director)", waitingOn: "Microsoft", what: "sign-off on Status A", days: 21 },
+      { actor: "Design Director (Design House Director)", waitingOn: "Hyperscale Client", what: "sign-off on Status A", days: 21 },
     ],
-    terminal: "Microsoft",
-    terminalPerson: "Andrew Farrell",
+    terminal: "Hyperscale Client",
+    terminalPerson: "Client Sign-off",
   },
   {
     activity_id: "SEC-COLO-1000",
-    accountable: { name: "Maeve O'Connor", org: "Sellafield Design", role: "Design Engineer" },
+    accountable: { name: "Design Engineer", org: "Design House", role: "Design Engineer" },
     steps: [
-      { actor: "Maeve O'Connor (Sellafield Design)", waitingOn: "RKD Architects", what: "door type approval", days: 18 },
-      { actor: "RKD Architects", waitingOn: "Microsoft", what: "revised security spec", days: 28 },
+      { actor: "Design Engineer (Design House)", waitingOn: "the Architects", what: "door type approval", days: 18 },
+      { actor: "the Architects", waitingOn: "Hyperscale Client", what: "revised security spec", days: 28 },
     ],
-    terminal: "Microsoft",
-    terminalPerson: "Andrew Farrell",
+    terminal: "Hyperscale Client",
+    terminalPerson: "Client Sign-off",
   },
   {
     activity_id: "FAB-ADMIN-1120",
-    accountable: { name: "Marco Visconti", org: "Lawrence → Marco", role: "Drawings Lead" },
+    accountable: { name: "Drawings Lead", org: "Drawings Office", role: "Drawings Lead" },
     steps: [
-      { actor: "Marco Visconti (Drawings Lead)", waitingOn: "Lawrence Mahon (Design Lead)", what: "lighting spec", days: 21 },
-      { actor: "Lawrence Mahon (Design Lead)", waitingOn: "Sellafield Design", what: "service routing clarification", days: 35 },
-      { actor: "Sellafield Design", waitingOn: "Microsoft", what: "power loading sign-off", days: 42 },
+      { actor: "Drawings Lead (Drawings Lead)", waitingOn: "Design Lead (Design Lead)", what: "lighting spec", days: 21 },
+      { actor: "Design Lead (Design Lead)", waitingOn: "Design House", what: "service routing clarification", days: 35 },
+      { actor: "Design House", waitingOn: "Hyperscale Client", what: "power loading sign-off", days: 42 },
     ],
-    terminal: "Microsoft",
-    terminalPerson: "Andrew Farrell",
+    terminal: "Hyperscale Client",
+    terminalPerson: "Client Sign-off",
   },
   {
     activity_id: "PRO-1110",
-    accountable: { name: "Padraig Connors", org: "Finnings", role: "Procurement Lead" },
+    accountable: { name: "Procurement Lead", org: "Sprinkler Sub", role: "Procurement Lead" },
     steps: [
-      { actor: "Padraig Connors (Finnings Procurement)", waitingOn: "the manufacturer (supplier)", what: "genset production slot", label: "14-week lead time" },
+      { actor: "Procurement Lead (Sprinkler Sub Procurement)", waitingOn: "the manufacturer (supplier)", what: "genset production slot", label: "14-week lead time" },
       { actor: "Supplier", waitingOn: "parts shortage resolution", label: "external" },
     ],
     terminal: "Supplier shortage",
@@ -87,9 +87,9 @@ export const CHAINS: Chain[] = [
   },
   {
     activity_id: "FAB-2000",
-    accountable: { name: "Padraig Connors", org: "Finnings", role: "Procurement Lead" },
+    accountable: { name: "Procurement Lead", org: "Sprinkler Sub", role: "Procurement Lead" },
     steps: [
-      { actor: "Padraig Connors (Finnings Procurement)", waitingOn: "the supplier", what: "delivery confirmation", days: 8 },
+      { actor: "Procurement Lead (Sprinkler Sub Procurement)", waitingOn: "the supplier", what: "delivery confirmation", days: 8 },
       { actor: "Supplier", waitingOn: "parts shortage resolution", label: "external" },
     ],
     terminal: "Supplier shortage",

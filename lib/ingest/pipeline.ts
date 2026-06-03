@@ -38,10 +38,10 @@ function ensureProjectShell(name: string): void {
     if (window.localStorage.getItem("keldra_demo_project")) return;
     const shell = {
       phase: null,
-      org: { name: "Ardmac", type: "main-contractor", colour: "#8a3dd6" },
+      org: { name: "Main Contractor", type: "main-contractor", colour: "#8a3dd6" },
       project: {
         name,
-        client: "Microsoft",
+        client: "Hyperscale Client",
         sector: "",
         startDate: "",
         handoverDate: "",
@@ -49,11 +49,11 @@ function ensureProjectShell(name: string): void {
         location: "",
       },
       otherOrgs: [],
-      template: "ardmac-red-tag",
+      template: "main-contractor-red-tag",
       uploads: { team: [], assets: [], constraints: [], register: null, xer: null },
       invites: [],
       viewingAs: {
-        orgName: "Ardmac",
+        orgName: "Main Contractor",
         orgType: "main-contractor",
         role: "main-contractor",
       },
@@ -172,7 +172,7 @@ function merge(payloads: NormalisedPayload[]): {
     for (const t of p.tasks ?? []) {
       const company = t.responsible_company_name
         ? ensureCompany(t.responsible_company_name)
-        : "ardmac";
+        : "main-contractor";
       const room = detectRoomCode(t.wbs_path) ?? detectRoomCode(t.name);
       if (room) ensureRoom(room);
       tasks.push({
@@ -200,7 +200,7 @@ function merge(payloads: NormalisedPayload[]): {
         activity_id: `BLK-${String(++blkSeq).padStart(3, "0")}`,
         name: b.title,
         wbs_path: "Blocker register",
-        responsible_company: company ?? "ardmac",
+        responsible_company: company ?? "main-contractor",
         planned_start: "",
         planned_end: "",
         planned_manpower: 0,

@@ -11,9 +11,9 @@ type Decision = { id: string; action: string; cost: number };
 type Later = { id: string; note: string; cost: string };
 
 const NOW: Decision[] = [
-  { id: "ELE-COLO-1030", action: "Escalate Cental — director-to-director call on telecoms bracketery", cost: 20 },
+  { id: "ELE-COLO-1030", action: "Escalate MEP Sub — director-to-director call on telecoms bracketery", cost: 20 },
   { id: "ELE-MER-1010", action: "Assign a crew — your own unstaffed MER1 earth bar", cost: 18 },
-  { id: "MEC-COLO-1040", action: "Push Microsoft for Status A sign-off on water services", cost: 15 },
+  { id: "MEC-COLO-1040", action: "Push Hyperscale Client for Status A sign-off on water services", cost: 15 },
 ];
 
 const LATER: Later[] = [
@@ -70,7 +70,7 @@ export default function TodayView({
         </h1>
       </div>
 
-      {/* Gate connection banner — the spine. Click → Gate C. */}
+      {/* Gate ctelecoms-subtion banner — the spine. Click → Gate C. */}
       <button
         type="button"
         onClick={() => onOpenGate("C")}

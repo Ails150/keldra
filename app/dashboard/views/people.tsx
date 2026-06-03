@@ -87,9 +87,9 @@ export default function PeopleView({
 function peopleCaption(role: ViewingAs["role"], n: number) {
   switch (role) {
     case "subcontractor":
-      return `${n} from your organisation — plus the Ardmac contacts you interface with.`;
+      return `${n} from your organisation — plus the Main Contractor contacts you interface with.`;
     case "design":
-      return `${n} from Central Design.`;
+      return `${n} from Design Studio.`;
     default:
       return `${n} across all organisations on this project.`;
   }
@@ -186,13 +186,13 @@ function ContactInterfaces({
   viewingAs: ViewingAs;
 }) {
   const mainContractor = (project.uploads.team ?? []).filter(
-    (p: any) => (p.organisation ?? "").toLowerCase().includes("ardmac"),
+    (p: any) => (p.organisation ?? "").toLowerCase().includes("main-contractor"),
   );
   if (mainContractor.length === 0) return null;
   return (
     <div>
       <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-3">
-        Ardmac contacts you interface with (read-only)
+        Main Contractor contacts you interface with (read-only)
       </h2>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         {mainContractor.slice(0, 4).map((p: any, i: number) => {
@@ -204,7 +204,7 @@ function ContactInterfaces({
             >
               <span
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-paper"
-                style={{ backgroundColor: deriveOrgColour("Ardmac") }}
+                style={{ backgroundColor: deriveOrgColour("Main Contractor") }}
               >
                 {getInitials(name)}
               </span>
@@ -229,10 +229,10 @@ function ContactInterfaces({
 function ClientRollups({ project }: { project: WizardData }) {
   // Override demo numbers per spec, falling back to derivation for any others.
   const overrides: Record<string, number> = {
-    ardmac: 89,
-    cental: 65,
-    central: 84,
-    primo: 73,
+    main: 89,
+    mep: 65,
+    design: 84,
+    power: 73,
   };
   const orgs = rollupByOrg(project.uploads.team);
   const enriched = orgs.length
@@ -242,10 +242,10 @@ function ClientRollups({ project }: { project: WizardData }) {
           overrides[o.org.toLowerCase().split(" ")[0]] ?? o.keptRate,
       }))
     : [
-        { org: "Ardmac", colour: deriveOrgColour("Ardmac"), keptRate: 89, peopleCount: 6 },
-        { org: "Cental", colour: deriveOrgColour("Cental"), keptRate: 65, peopleCount: 3 },
-        { org: "Central Design", colour: deriveOrgColour("Central"), keptRate: 84, peopleCount: 2 },
-        { org: "Primo Power", colour: deriveOrgColour("Primo"), keptRate: 73, peopleCount: 1 },
+        { org: "Main Contractor", colour: deriveOrgColour("Main Contractor"), keptRate: 89, peopleCount: 6 },
+        { org: "MEP Sub", colour: deriveOrgColour("MEP Sub"), keptRate: 65, peopleCount: 3 },
+        { org: "Design Studio", colour: deriveOrgColour("Design Studio"), keptRate: 84, peopleCount: 2 },
+        { org: "Power Sub", colour: deriveOrgColour("Power Sub"), keptRate: 73, peopleCount: 1 },
       ];
 
   return (

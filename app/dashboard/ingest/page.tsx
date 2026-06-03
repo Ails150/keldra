@@ -248,10 +248,10 @@ export default function IngestPage() {
           <label className="flex items-center gap-2 text-sm text-ink">
             Replace data for project:
             <select
-              defaultValue="DUB-16"
+              defaultValue="MER"
               className="rounded-lg border border-border-soft bg-paper-card px-2.5 py-1.5 text-sm text-ink outline-none focus:border-accent"
             >
-              <option>DUB-16</option>
+              <option>MER</option>
             </select>
           </label>
           <p className="mt-1 text-[11px] text-ink-mid">

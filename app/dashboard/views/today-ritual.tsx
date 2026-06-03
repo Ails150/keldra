@@ -194,7 +194,7 @@ function EveningReview({
             className="font-[family-name:var(--font-fraunces)] italic text-ink-mid"
             style={{ fontSize: 13 }}
           >
-            Ardmac moved {closedToday.length} of {starred.length} today,{" "}
+            Main Contractor moved {closedToday.length} of {starred.length} today,{" "}
             {GBP.format(totalSavings)} of delay closed.
           </p>
         )}

@@ -11,20 +11,20 @@ import {
   type ParsedRegister,
 } from "../lib/register-parser";
 import {
-  DUB16_ASSETS_CSV,
-  DUB16_CONSTRAINTS_CSV,
-  DUB16_TEAM_CSV,
+  MER_ASSETS_CSV,
+  MER_CONSTRAINTS_CSV,
+  MER_TEAM_CSV,
 } from "../sample-data/dub16";
 import { parseXer, type ParsedXer } from "../lib/xer-parser";
-import { DUB12_XER } from "../sample-data/dub12-xer";
+import { BLD_XER } from "../sample-data/dub12-xer";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const TEMPLATES = [
   {
-    id: "ardmac-red-tag",
-    name: "Ardmac Red Tag v1",
-    description: "Ardmac's MEP commissioning pipeline. Asset-level red/yellow/green tagging with ready-criteria gates.",
+    id: "main-contractor-red-tag",
+    name: "Main Contractor Red Tag v1",
+    description: "Main Contractor's MEP commissioning pipeline. Asset-level red/yellow/green tagging with ready-criteria gates.",
     stages: ["Designed", "Delivered", "Installed", "Red-tag candidate", "Red-tagged", "Yellow", "Green"],
     recommended: true,
   },
@@ -38,8 +38,8 @@ const TEMPLATES = [
   {
     id: "modular-plant-room",
     name: "Modular Plant Room v1",
-    description: "For skid-delivered MEP. Factory test → site connect → commissioning → handover.",
-    stages: ["Designed", "Factory tested", "Delivered", "Sited", "Connected", "Commissioned", "Handed over"],
+    description: "For skid-delivered MEP. Factory test → site ctelecoms-subt → commissioning → handover.",
+    stages: ["Designed", "Factory tested", "Delivered", "Sited", "Ctelecoms-subted", "Commissioned", "Handed over"],
     recommended: false,
   },
   {
@@ -288,35 +288,35 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
     }).data as any[];
   }
 
-  // Auto-fills all four uploads with the DUB-12 sample so the demo can run
+  // Auto-fills all four uploads with the BLD sample so the demo can run
   // without manually dropping files. Builds a register from the constraint log
   // so the 4th card lands in its done-state too.
   async function loadDub16Sample() {
     setParsing(true);
     setParseError(null);
     try {
-      const team = parseCsv(DUB16_TEAM_CSV);
-      const assets = parseCsv(DUB16_ASSETS_CSV);
-      const constraints = parseCsv(DUB16_CONSTRAINTS_CSV);
+      const team = parseCsv(MER_TEAM_CSV);
+      const assets = parseCsv(MER_ASSETS_CSV);
+      const constraints = parseCsv(MER_CONSTRAINTS_CSV);
       const register = await buildRegisterFromConstraintRows(
         "dub16-constraint-log.csv",
         constraints,
       );
       const xer = await parseXer(
-        new File([DUB12_XER], "DUB-12_Building_4.xer"),
+        new File([BLD_XER], "BLD_Building_4.xer"),
       );
       setFormData((prev) => ({
         ...prev,
         project: {
           ...prev.project,
-          name: prev.project.name?.trim() ? prev.project.name : "DUB-16 Cx",
-          client: prev.project.client?.trim() ? prev.project.client : "Microsoft",
+          name: prev.project.name?.trim() ? prev.project.name : "MER Cx",
+          client: prev.project.client?.trim() ? prev.project.client : "Hyperscale Client",
         },
-        template: prev.template ?? "ardmac-red-tag",
+        template: prev.template ?? "main-contractor-red-tag",
         uploads: { team, assets, constraints, register, xer },
       }));
     } catch {
-      setParseError("Could not load the DUB-16 sample data.");
+      setParseError("Could not load the MER sample data.");
     } finally {
       setParsing(false);
     }
@@ -417,7 +417,7 @@ export default function Step5Templates({ formData, setFormData }: StepProps) {
             className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/5 px-3 py-1.5 text-xs font-medium text-accent-deep transition-colors hover:bg-accent/10 disabled:opacity-50"
           >
             <span aria-hidden>⚡</span>
-            Load DUB-16 sample
+            Load MER sample
           </button>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">

@@ -2,7 +2,7 @@
 
 // The foreman Field Mode acts as for the demo. The director board is configured
 // top-down; Field Mode is the bottom-up data-entry end — and the seeded persona
-// is Pawel (Cental site lead), so his blockers and the chases Johnny has sent
+// is Site Lead (MEP Sub site lead), so his blockers and the chases Commissioning Lead has sent
 // him line up with the activity trail the dashboard already shows.
 
 import {
@@ -15,14 +15,14 @@ import {
 } from "@/lib/activity";
 
 export const FIELD_PERSONA = {
-  firstName: "Pawel",
-  fullName: "Pawel — Cental",
-  companySlug: "cental",
-  companyName: "Cental",
+  firstName: "Site Lead",
+  fullName: "Site Lead — MEP Sub",
+  companySlug: "mep-sub",
+  companyName: "MEP Sub",
   role: "Site Lead",
 } as const;
 
-// Pawel as an activity actor — name matches the trail seed so replies he logs
+// Site Lead as an activity actor — name matches the trail seed so replies he logs
 // render consistently alongside the existing entries.
 export const PERSONA_ACTOR = {
   name: FIELD_PERSONA.fullName,
@@ -31,9 +31,9 @@ export const PERSONA_ACTOR = {
 };
 
 // The PM on the other end of every chase.
-export const PM = { name: "Johnny McKenna", company_slug: "ardmac" };
+export const PM = { name: "Commissioning Lead", company_slug: "main-contractor" };
 
-// Blockers Pawel is accountable for — baseline tasks Cental is holding up.
+// Blockers Site Lead is accountable for — baseline tasks MEP Sub is holding up.
 export function personaBlockers(): BaselineTask[] {
   return loadBaseline()
     .tasks.filter(
@@ -42,7 +42,7 @@ export function personaBlockers(): BaselineTask[] {
     .sort((a, b) => b.cost_per_day - a.cost_per_day);
 }
 
-// Every task Pawel touches — used to populate the "which task?" dropdown.
+// Every task Site Lead touches — used to populate the "which task?" dropdown.
 export function personaTasks(): BaselineTask[] {
   return loadBaseline().tasks.filter(
     (t) =>
@@ -53,7 +53,7 @@ export function personaTasks(): BaselineTask[] {
 
 export type Inbox = { regular: Activity[]; formal: Activity | null };
 
-// Chases the PM has sent to Cental, split into the formal escalation (rendered
+// Chases the PM has sent to MEP Sub, split into the formal escalation (rendered
 // as its own urgent card) and the regular run of chases. Already newest-first.
 export function inboxMessages(): Inbox {
   const all = listActivityForCompany(FIELD_PERSONA.companySlug).filter(

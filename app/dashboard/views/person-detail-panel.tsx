@@ -12,13 +12,13 @@ type EvidenceRow = { tone: "danger" | "warning"; lead: string; detail: string };
 type Evidence = { rows: EvidenceRow[]; verdict: string };
 
 // External steel design-chain (FAB-ADMIN-1120). Surfaces on both the named
-// design lead and Marco Visconti, the clickable accountable for that blocker.
+// design lead and Drawings Lead, the clickable accountable for that blocker.
 const FAB_EVIDENCE: Evidence = {
   rows: [
     {
       tone: "danger",
       lead: "5 escalations, 4 unactioned",
-      detail: "Marco escalated the lighting spec 5 times since 14 Mar; 4 produced no response",
+      detail: "Drawings Lead escalated the lighting spec 5 times since 14 Mar; 4 produced no response",
     },
     {
       tone: "danger",
@@ -28,7 +28,7 @@ const FAB_EVIDENCE: Evidence = {
     {
       tone: "danger",
       lead: "PM escalation unopened",
-      detail: "formal note from Johnny McKenna on 8 May has NOT been opened (20 days)",
+      detail: "formal note from Commissioning Lead on 8 May has NOT been opened (20 days)",
     },
     {
       tone: "warning",
@@ -40,18 +40,17 @@ const FAB_EVIDENCE: Evidence = {
     "38% isn't slowness — it's 4 broken commitments and an unopened escalation. This is a deprioritisation pattern, not a capacity problem.",
 };
 
-// Johnny McKenna's record appears as both "Johnny" and "Jonathan" across the
-// roster (jonathan.mckenna@ardmac.com), so both keys map to the same evidence.
-const JOHNNY_EVIDENCE: Evidence = {
+// The Commissioning Lead's roster record (commissioning.lead@contractor.example).
+const LEAD_EVIDENCE: Evidence = {
   rows: [
     {
       tone: "danger",
       lead: "5 of 13 commitments blocked upstream",
-      detail: "waiting on Central Design responses, avg 5.9 days vs 24h target",
+      detail: "waiting on Design Studio responses, avg 5.9 days vs 24h target",
     },
     {
       tone: "danger",
-      lead: "Central Design accounts for 57% of his kept-rate impact",
+      lead: "Design Studio accounts for 57% of his kept-rate impact",
       detail: "not his own delays",
     },
     {
@@ -61,15 +60,14 @@ const JOHNNY_EVIDENCE: Evidence = {
     },
   ],
   verdict:
-    "Johnny's 68% is upstream-driven. Take Central Design out of the equation and he's at 91%. He's overloaded, not underperforming.",
+    "Commissioning Lead's 68% is upstream-driven. Take Design Studio out of the equation and he's at 91%. He's overloaded, not underperforming.",
 };
 
 const EVIDENCE: Record<string, Evidence> = {
-  "lawrence mahon": FAB_EVIDENCE,
-  "marco visconti": FAB_EVIDENCE,
-  "johnny mckenna": JOHNNY_EVIDENCE,
-  "jonathan mckenna": JOHNNY_EVIDENCE,
-  "pawel kowalski": {
+  "design lead": FAB_EVIDENCE,
+  "drawings lead": FAB_EVIDENCE,
+  "commissioning lead": LEAD_EVIDENCE,
+  "site lead": {
     rows: [
       {
         tone: "danger",
@@ -79,7 +77,7 @@ const EVIDENCE: Record<string, Evidence> = {
       {
         tone: "danger",
         lead: "Crew diverted to Project Brown",
-        detail: "day 53, brackets arrived but crew moved off DUB-16",
+        detail: "day 53, brackets arrived but crew moved off MER",
       },
       {
         tone: "danger",
@@ -88,7 +86,7 @@ const EVIDENCE: Record<string, Evidence> = {
       },
     ],
     verdict:
-      "25% reflects choice, not capacity. Cental is prioritising other work. Needs director-to-director escalation.",
+      "25% reflects choice, not capacity. MEP Sub is prioritising other work. Needs director-to-director escalation.",
   },
 };
 
@@ -373,12 +371,12 @@ export default function PersonDetailPanel({
                     <DiagnosticCard
                       dot="red"
                       eyebrow="Waiting on"
-                      bold="Central Design team"
-                      detail={`${data.card1.blockedCount} of ${data.name}'s ${data.card1.openCount} open commitments are blocked waiting on Central Design responses. Average wait: ${data.card1.avgWaitDays} days (target: 24 hours). Central Design's response time accounts for ${data.card1.pctImpact}% of ${data.name}'s kept-rate impact.`}
-                      buttonLabel="Escalate to Central Design ↗"
+                      bold="Design Studio team"
+                      detail={`${data.card1.blockedCount} of ${data.name}'s ${data.card1.openCount} open commitments are blocked waiting on Design Studio responses. Average wait: ${data.card1.avgWaitDays} days (target: 24 hours). Design Studio's response time accounts for ${data.card1.pctImpact}% of ${data.name}'s kept-rate impact.`}
+                      buttonLabel="Escalate to Design Studio ↗"
                       onClick={() =>
                         alert(
-                          `Escalation to Central Design — wired into the routing layer pilot week 2.`,
+                          `Escalation to Design Studio — wired into the routing layer pilot week 2.`,
                         )
                       }
                     />
@@ -400,7 +398,7 @@ export default function PersonDetailPanel({
                       dot="orange"
                       eyebrow="Pattern"
                       bold="Recurring late deliverable type"
-                      detail={`${data.name} late on ${data.card3.lateCount} ${data.card3.deliverable} this quarter. Pattern: dependency on Central Design response time exceeds ${data.card3.lateCount}× target. Consider structural fix.`}
+                      detail={`${data.name} late on ${data.card3.lateCount} ${data.card3.deliverable} this quarter. Pattern: dependency on Design Studio response time exceeds ${data.card3.lateCount}× target. Consider structural fix.`}
                       buttonLabel="View pattern detail ↗"
                       onClick={() =>
                         alert("Pattern detail — pilot week 6 AI deliverable.")

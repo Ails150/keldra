@@ -5,10 +5,10 @@ import type { ViewingRole } from "../../onboarding/types";
 import { roleLabel } from "../utils";
 
 const ORG_SUGGESTIONS = [
-  "Ardmac",
-  "Cental",
-  "Central Design",
-  "Primo Power",
+  "Main Contractor",
+  "MEP Sub",
+  "Design Studio",
+  "Power Sub",
   "Hyperscaler X",
   "Other",
 ];
@@ -114,7 +114,7 @@ export default function InviteOrgModal({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Lawrence Burke"
+              placeholder="e.g. Design Coordinator"
               className="w-full rounded-xl border border-border-soft bg-paper-card px-3 py-2.5 text-sm text-ink outline-none focus:border-accent"
             />
           </div>

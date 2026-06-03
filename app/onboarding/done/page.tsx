@@ -39,7 +39,7 @@ export default function OnboardingDone() {
             style={{ fontSize: 17, lineHeight: 1.55 }}
           >
             Your project is set up.{" "}
-            <span className="font-medium text-paper">Ardmac Red Tag</span>{" "}
+            <span className="font-medium text-paper">Main Contractor Red Tag</span>{" "}
             template applied to{" "}
             <span className="font-medium text-paper">247 assets</span>.{" "}
             <span className="font-medium text-paper">12 invites</span> sent.

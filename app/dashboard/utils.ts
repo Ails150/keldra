@@ -25,12 +25,12 @@ export function deriveOrgColour(org: string): string {
 // Scripted demo people whose kept-rate must match their evidence drill-down
 // verdict (the drawer's "THE EVIDENCE" section quotes these numbers).
 const KEPT_RATE_OVERRIDES: Record<string, number> = {
-  "pawel kowalski": 25,
-  "lawrence mahon": 38,
-  "marco visconti": 38,
-  // Johnny's record is "Jonathan McKenna" in the roster — pin it to the 68%
-  // his evidence drill-down verdict quotes.
-  "jonathan mckenna": 68,
+  "site lead": 25,
+  "design lead": 38,
+  "drawings lead": 38,
+  // The Commissioning Lead's roster record — pin it to the 68% his evidence
+  // drill-down verdict quotes.
+  "commissioning lead": 68,
 };
 
 // Deterministic 0-100 from a name. Used for demo kept-rates that stay
@@ -58,8 +58,8 @@ export function formatCurrency(n: number, ccy = "EUR"): string {
 }
 
 // Presentable name for a roster person: the explicit name if present, otherwise
-// derived from the email local-part (jonathan.mckenna@ardmac.com → "Jonathan
-// Mckenna") so people never render as a bare "—".
+// derived from the email local-part (commissioning.lead@contractor.example →
+// "Commissioning Lead") so people never render as a bare "—".
 export function displayName(person: any): string {
   const explicit = (person?.name ?? "").toString().trim();
   if (explicit) return explicit;
@@ -90,14 +90,18 @@ export function isBlankOwner(row: any): boolean {
 // against these — exact substring first, then fuzzy (handles typos like
 // "Mecury" / "Ardmak").
 const CANONICAL_ORGS = [
-  "ardmac",
-  "central",
-  "primo",
-  "hyperscaler",
-  "microsoft",
-  "cundall",
-  "evolution",
-  "del",
+  "main contractor",
+  "mep sub",
+  "mech sub",
+  "telecoms sub",
+  "fit-out sub",
+  "sprinkler sub",
+  "fire sub",
+  "controls sub",
+  "power sub",
+  "mep consultant",
+  "specialist sub",
+  "portal",
 ];
 
 // Standard Levenshtein edit distance.
@@ -120,12 +124,14 @@ export function levenshtein(a: string, b: string): number {
 }
 
 // Map a free-text org name to a canonical short key the role filters can
-// reason about ("ardmac", "cental", "central", "client", ...).
+// reason about ("main contractor", "mep sub", "design", "client", ...).
 export function orgKey(name: string): string {
   const n = normaliseOrg(name);
   if (!n) return "";
   // Preserve the existing client alias (the role switcher uses "Hyperscaler X").
   if (n.includes("hyperscaler") || n.includes("client")) return "client";
+  // Any design org (Design House / Design Studio / Drawings Office) → "design".
+  if (n.includes("design") || n.includes("drawings")) return "design";
   // Exact substring against canonical orgs.
   for (const c of CANONICAL_ORGS) {
     if (n.includes(c)) return c;
@@ -170,7 +176,7 @@ export function filterPeopleByRole(
     case "subcontractor":
       return team.filter((r) => orgKey(r.organisation) === key);
     case "design":
-      return team.filter((r) => orgKey(r.organisation) === "central");
+      return team.filter((r) => orgKey(r.organisation) === "design");
     case "client":
       // Client never sees individual people — caller should render org rollups instead.
       return [];
@@ -191,8 +197,8 @@ export function filterAssetsByRole(
       return assets.filter((r) => {
         if (orgKey(r.owner_org) === key) return true;
         const stage = (r.current_stage ?? "").toString().toLowerCase();
-        // Containment / drywall stages keep Ardmac in the loop.
-        if (key === "ardmac" && (stage.includes("contain") || stage.includes("drywall")))
+        // Containment / drywall stages keep the main contractor in the loop.
+        if (key === "main contractor" && (stage.includes("contain") || stage.includes("drywall")))
           return true;
         return false;
       });
@@ -235,7 +241,7 @@ export function filterConstraintsByRole(
       return constraints.filter((c) => {
         const desc = (c.description ?? "").toString().toLowerCase();
         const owner = orgKey(c.owner_org);
-        return owner === "central" || desc.includes("design") || desc.includes("rfi");
+        return owner === "design" || desc.includes("design") || desc.includes("rfi");
       });
     case "client":
       return constraints.filter((c) => {

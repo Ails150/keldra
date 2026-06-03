@@ -19,7 +19,7 @@ const BUILD_TYPES = [
   {
     id: "modular",
     label: "Modular",
-    desc: "Prefabricated skids/plant rooms delivered and connected.",
+    desc: "Prefabricated skids/plant rooms delivered and ctelecoms-subted.",
   },
   {
     id: "hybrid",
@@ -65,7 +65,7 @@ export default function Step3Project({ formData, setFormData }: StepProps) {
             type="text"
             value={formData.project.name}
             onChange={(e) => updateProject("name", e.target.value)}
-            placeholder="e.g. DUB16 CX"
+            placeholder="e.g. MER CX"
             className="w-full rounded-xl border border-border-soft bg-paper-card px-4 text-ink outline-none focus:border-accent transition-colors"
             style={{ height: 52, fontSize: 15 }}
           />

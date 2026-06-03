@@ -23,17 +23,17 @@ const GBP = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 0,
 });
 
-// Fallback owner picker list — real DUB-16 names, used when the ingested team
+// Fallback owner picker list — real MER names, used when the ingested team
 // roster comes back empty so the Assign-owner picker is never blank.
-const DUB16_PEOPLE: { name: string; org: string }[] = [
-  { name: "Johnny McKenna", org: "Ardmac" },
-  { name: "Lawrence Burke", org: "Ardmac" },
-  { name: "Pawel Kowalski", org: "Cental" },
-  { name: "Mark Higgins", org: "Cental" },
-  { name: "Cathal Doyle", org: "Sellafield Design" },
-  { name: "Tom Walsh", org: "Ardmac" },
-  { name: "Killian Duggen", org: "Cental" },
-  { name: "Laurence O'Carroll", org: "Cental" },
+const MER_PEOPLE: { name: string; org: string }[] = [
+  { name: "Commissioning Lead", org: "Main Contractor" },
+  { name: "Design Coordinator", org: "Main Contractor" },
+  { name: "Site Lead", org: "MEP Sub" },
+  { name: "Operations Manager", org: "MEP Sub" },
+  { name: "Design Director", org: "Design House" },
+  { name: "Site Manager", org: "Main Contractor" },
+  { name: "Cx Engineer", org: "MEP Sub" },
+  { name: "Controls Engineer", org: "MEP Sub" },
 ];
 
 const STATE_PILL: Record<
@@ -451,7 +451,7 @@ export default function BlockerDetailPanel({
 // Pilot generates this live via AI reading the history trail. Hardcoded here,
 // matched to each major constraint's story by id or any text field keyword
 // (the real card IDs and which field holds the title vary by ingest).
-// DUB-16 parties only.
+// MER parties only.
 type Synopsis = { narrative: string[]; verdict: string };
 
 const TAILORED: { ids?: string[]; keywords: string[]; synopsis: Synopsis }[] = [
@@ -459,8 +459,8 @@ const TAILORED: { ids?: string[]; keywords: string[]; synopsis: Synopsis }[] = [
     keywords: ["door", "ironmonger", "ironmongery"],
     synopsis: {
       narrative: [
-        "Disowned across the board: Cental say it's not theirs, DEL say it's not them, engineering say it's not their fault.",
-        "Dates keep slipping: 'Ardmac to update', 'no update as Ardmac not on call', 'still waiting to order'.",
+        "Disowned across the board: MEP Sub say it's not theirs, Portal say it's not them, engineering say it's not their fault.",
+        "Dates keep slipping: 'Main Contractor to update', 'no update as Main Contractor not on call', 'still waiting to order'.",
       ],
       verdict:
         "Three parties, zero owners. This isn't a technical problem — it's an accountability gap. Keldra forces the ownership decision; a spreadsheet lets it drift 127 days. Needs a named owner today.",
@@ -470,7 +470,7 @@ const TAILORED: { ids?: string[]; keywords: string[]; synopsis: Synopsis }[] = [
     keywords: ["fire stop", "firestop", "fire-stop", "fire stopping"],
     synopsis: {
       narrative: [
-        "Cross-org certification with no named certifier — Ardmac, Cental and the fire-stop sub each point elsewhere.",
+        "Cross-org certification with no named certifier — Main Contractor, MEP Sub and the fire-stop sub each point elsewhere.",
         "Raised unowned and stayed unowned: 'who certifies cross-org installs?' was never answered.",
       ],
       verdict:
@@ -481,7 +481,7 @@ const TAILORED: { ids?: string[]; keywords: string[]; synopsis: Synopsis }[] = [
     keywords: ["generator", "genset", "commissioning sequence"],
     synopsis: {
       narrative: [
-        "Commissioning sequence between Cental and the commissioning team is undefined — each assumes the other leads.",
+        "Commissioning sequence between MEP Sub and the commissioning team is undefined — each assumes the other leads.",
         "Logged unowned: 'sequence unclear', no method statement issued.",
       ],
       verdict:
@@ -492,29 +492,29 @@ const TAILORED: { ids?: string[]; keywords: string[]; synopsis: Synopsis }[] = [
     keywords: ["fok", "security", "camera", "card reader"],
     synopsis: {
       narrative: [
-        "Scope split between Ardmac, DEL and RKD is unresolved — locks, the FoK list and door power all sit in the gap.",
+        "Scope split between Main Contractor, Portal and RKD is unresolved — locks, the FoK list and door power all sit in the gap.",
         "Federated model has stalled near 90% for weeks: 'FoK list issued but not received', 'awaiting RKD review'.",
       ],
       verdict:
-        "The model can't close while scope is contested. Lock the DEL ↔ RKD scope boundary this week.",
+        "The model can't close while scope is contested. Lock the Portal ↔ RKD scope boundary this week.",
     },
   },
   {
-    keywords: ["telecom", "fibre", "fiber", "bracketery", "tcp panel", "onnec"],
+    keywords: ["telecom", "fibre", "fiber", "bracketery", "tcp panel", "telecoms-sub"],
     synopsis: {
       narrative: [
-        "Onnec are ready but idle — Cental's bracketery is the dependency and it's still not installed.",
+        "Telecoms Sub are ready but idle — MEP Sub's bracketery is the dependency and it's still not installed.",
         "Same story each week: 'brackets not in', 'crew on another job', 'next week'.",
       ],
       verdict:
-        "Onnec can't start until Cental installs. This is a Cental scheduling decision — escalate to free the crew.",
+        "Telecoms Sub can't start until MEP Sub installs. This is a MEP Sub scheduling decision — escalate to free the crew.",
     },
   },
   {
     keywords: ["integration", "co-ordination", "coordination", "pnl", "upm", "hand-off", "handoff"],
     synopsis: {
       narrative: [
-        "Plant delivered 30+ days ago but still uninstalled — coordination between Cental and the install team never closed.",
+        "Plant delivered 30+ days ago but still uninstalled — coordination between MEP Sub and the install team never closed.",
         "Sits unowned: 'deliverables on site', 'awaiting install date', no owner assigned.",
       ],
       verdict:
@@ -724,8 +724,8 @@ function PromptForm({
       }))
       .filter((p) => p.name);
     // Live ingested data sometimes lands with an empty team — never show an
-    // empty picker in the demo. Fall back to the known DUB-16 names.
-    const options = fromTeam.length > 0 ? fromTeam : DUB16_PEOPLE;
+    // empty picker in the demo. Fall back to the known MER names.
+    const options = fromTeam.length > 0 ? fromTeam : MER_PEOPLE;
     return (
       <div className="mt-2 space-y-2 rounded-xl border border-paper-line bg-paper-warm/40 p-3">
         <label className="block text-[11px] font-semibold uppercase tracking-wide text-ink-mid">
@@ -824,13 +824,13 @@ function AiPatternCard() {
         className="mt-2 text-ink leading-relaxed"
         style={{ fontSize: 13 }}
       >
-        This blocker is structurally similar to 4 others Ardmac has raised on
+        This blocker is structurally similar to 4 others Main Contractor has raised on
         hyperscaler DC projects. Pattern detected: ungrounded MEP elements in
         colo halls.
       </p>
 
       <div className="mt-3 flex flex-wrap items-start gap-x-4 gap-y-3">
-        <MiniStat label="Common owner-unclear" value="Cental vs DEL vs Ardmac — ownership disputed" />
+        <MiniStat label="Common owner-unclear" value="MEP Sub vs Portal vs Main Contractor — ownership disputed" />
         <MiniStat label="Avg days to resolve" value="11 days" />
         <MiniStat label="Combined cost-of-delay" value="£62,000/day" />
       </div>
@@ -843,7 +843,7 @@ function AiPatternCard() {
         style={{ fontSize: 14, lineHeight: 1.45 }}
       >
         Add MER1 cable tray coordination to Tuesday&apos;s design review.
-        Specifically resolve the Cental vs DEL vs Ardmac — ownership disputed handoff for these
+        Specifically resolve the MEP Sub vs Portal vs Main Contractor — ownership disputed handoff for these
         assets: MER1-CT-01, MER1-CT-02, MER1-CT-03.
       </p>
 

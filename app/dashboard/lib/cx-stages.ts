@@ -1,4 +1,4 @@
-// Johnny's actual DUB-16 commissioning flow, used as the canonical asset stage
+// Commissioning Lead's actual MER commissioning flow, used as the canonical asset stage
 // set across the product.
 //
 // FWT (factory) → RT (Red Tag) → Off YT/GT (offline) → On YT/GT (online).
@@ -108,7 +108,7 @@ export function stageMeta(raw: unknown): StageMeta {
 }
 
 // ---------- P6 site-map Cx stages ----------
-// The real DUB-16 commissioning flow as it reads on the programme. Site module
+// The real MER commissioning flow as it reads on the programme. Site module
 // install does not begin until 17 Aug 26, so today every in-flight task is
 // off-site (L1/L2-L3); the later stages stay empty by design — that emptiness
 // is the point. "Owner unclear" is Keldra's wedge: work nobody on site owns.
@@ -156,7 +156,7 @@ export function mapStageMeta(key: MapStageKey): MapStage {
 
 // Companies that hold work without owning the next physical move on site —
 // when one of these is blocking, accountability is genuinely unclear.
-const OFF_SITE_HOLDERS = new Set(["sellafield-design", "lawrence-marco", "ssci-team"]);
+const OFF_SITE_HOLDERS = new Set(["design-house", "drawings-office", "client-network"]);
 
 // Derive a Cx map stage from a baseline task. We only have status + holder, and
 // the whole project is pre-install today, so dots land on the early stages or

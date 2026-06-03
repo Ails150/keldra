@@ -92,7 +92,7 @@ Return JSON in this exact shape:
       "type": "PATTERN" | "TREND" | "ALERT" | "RECOMMENDATION" | "CRITICAL_PATH_RISK",
       "title": "Short, specific title (max 8 words)",
       "body": "1-2 sentence explanation citing specific people, asset IDs, days, or £ figures from the data above",
-      "action_label": "What button to show (max 4 words, e.g. 'View Lawrence's chain')",
+      "action_label": "What button to show (max 4 words, e.g. 'View Design Lead's chain')",
       "action_target": "blocker:<id>" | "person:<name>" | "asset:<asset_id>" | "filter:unowned" | "tab:schedule" | "tab:constraints"
     }
   ]

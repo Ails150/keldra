@@ -8,21 +8,21 @@ import HoldingBackView from "../views/holding-back";
 // dashboard shell as the "Holding back" tab (with the live project context).
 const FALLBACK: WizardData = {
   phase: null,
-  org: { name: "Ardmac", type: "main-contractor", colour: "#8a3dd6" },
+  org: { name: "Main Contractor", type: "main-contractor", colour: "#8a3dd6" },
   project: {
-    name: "DUB-16 Cx",
-    client: "Microsoft",
+    name: "MER Cx",
+    client: "Hyperscale Client",
     sector: "Data Centre",
     startDate: "",
     handoverDate: "2026-12-02",
     buildType: null,
-    location: "Grangecastle",
+    location: "Site",
   },
   otherOrgs: [],
   template: null,
   uploads: { team: [], assets: [], constraints: [], register: null, xer: null },
   invites: [],
-  viewingAs: { orgName: "Ardmac", orgType: "main-contractor", role: "main-contractor" },
+  viewingAs: { orgName: "Main Contractor", orgType: "main-contractor", role: "main-contractor" },
 };
 
 export default function HoldingBackPage() {

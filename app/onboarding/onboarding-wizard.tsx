@@ -14,8 +14,8 @@ const INITIAL: WizardData = {
   phase: null,
   org: { name: "", type: null, colour: "#8a3dd6" },
   project: {
-    name: "DUB-16 Cx",
-    client: "Microsoft",
+    name: "MER Cx",
+    client: "Hyperscale Client",
     sector: "",
     startDate: "",
     handoverDate: "",
@@ -23,23 +23,23 @@ const INITIAL: WizardData = {
     location: "",
   },
   otherOrgs: [
-    { id: "mer", name: "Ardmac", role: "Main contractor", initials: "ARD", colour: "#dc2626", isYou: true },
-    { id: "ard", name: "Cental", role: "Subcontractor", initials: "CTL", colour: "#2563eb" },
-    { id: "cen", name: "Central Design", role: "Design house", initials: "CEN", colour: "#16a34a" },
-    { id: "pri", name: "Primo Power", role: "Subcontractor", initials: "PRI", colour: "#ea580c" },
+    { id: "mer", name: "Main Contractor", role: "Main contractor", initials: "ARD", colour: "#dc2626", isYou: true },
+    { id: "ard", name: "MEP Sub", role: "Subcontractor", initials: "CTL", colour: "#2563eb" },
+    { id: "cen", name: "Design Studio", role: "Design house", initials: "CEN", colour: "#16a34a" },
+    { id: "pri", name: "Power Sub", role: "Subcontractor", initials: "PRI", colour: "#ea580c" },
     { id: "cli", name: "Hyperscaler X", role: "Client", initials: "CLI", colour: "#0891b2" },
   ],
-  template: "ardmac-red-tag",
+  template: "main-contractor-red-tag",
   uploads: { team: null, assets: null, constraints: null, register: null, xer: null },
   invites: [
-    { id: "1", name: "Johnny McKenna", email: "johnny@ardmac.com", org: "Ardmac", role: "Commissioning lead", initials: "JM", colour: "#dc2626" },
-    { id: "2", name: "Tom Walsh", email: "tom.walsh@ardmac.com", org: "Ardmac", role: "Site manager", initials: "TW", colour: "#dc2626" },
-    { id: "3", name: "Lawrence Burke", email: "l.burke@ardmac.com", org: "Ardmac", role: "Project lead", initials: "LB", colour: "#2563eb" },
-    { id: "4", name: "Conor Murphy", email: "conor@centraldesign.ie", org: "Central", role: "Design lead", initials: "CM", colour: "#16a34a" },
-    { id: "5", name: "Sarah Kennedy", email: "sarah.k@hyperscalerx.com", org: "Client", role: "Project sponsor", initials: "SK", colour: "#0891b2" },
+    { id: "1", name: "Commissioning Lead", email: "commissioning.lead@contractor.example", org: "Main Contractor", role: "Commissioning lead", initials: "JM", colour: "#dc2626" },
+    { id: "2", name: "Site Manager", email: "site.manager@contractor.example", org: "Main Contractor", role: "Site manager", initials: "TW", colour: "#dc2626" },
+    { id: "3", name: "Design Coordinator", email: "design.coord@contractor.example", org: "Main Contractor", role: "Project lead", initials: "LB", colour: "#2563eb" },
+    { id: "4", name: "Design Engineer", email: "design.eng@design-studio.example", org: "Design Studio", role: "Design lead", initials: "CM", colour: "#16a34a" },
+    { id: "5", name: "Power Cx Engineer", email: "sponsor@hyperscalerx.com", org: "Client", role: "Project sponsor", initials: "SK", colour: "#0891b2" },
   ],
   viewingAs: {
-    orgName: "Ardmac",
+    orgName: "Main Contractor",
     orgType: "main-contractor",
     role: "main-contractor",
   },
@@ -81,7 +81,7 @@ export default function OnboardingWizard({ userEmail }: { userEmail: string }) {
   // Keep viewingAs in sync with the org the user entered in step 2.
   useEffect(() => {
     setFormData((prev) => {
-      const desiredName = prev.org.name.trim() || "Ardmac";
+      const desiredName = prev.org.name.trim() || "Main Contractor";
       const desiredType = prev.org.type ?? "main-contractor";
       const desiredRole = deriveViewingRole(prev.org.type);
       if (

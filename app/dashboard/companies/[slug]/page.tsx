@@ -220,7 +220,7 @@ export default function CompanyPage() {
             className="font-[family-name:var(--font-fraunces)] italic"
             style={{ fontSize: 11, color: BRAND.inkMuted }}
           >
-            Computed from activity trail across DUB-16
+            Computed from activity trail across MER
           </p>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -459,7 +459,7 @@ export default function CompanyPage() {
             className="text-center italic"
             style={{ fontSize: 11, color: BRAND.inkMuted, marginTop: 12 }}
           >
-            Same data Ardmac sees · shared with {company.name} as part of integrated programme
+            Same data Main Contractor sees · shared with {company.name} as part of integrated programme
             governance
           </p>
         </>

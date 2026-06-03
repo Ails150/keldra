@@ -29,9 +29,9 @@ const FORECAST = [
 
 // Ranked by cost/day, descending.
 const DECISIONS = [
-  { id: "ELE-COLO-1030", cost: 20, action: "Escalate Cental — director-to-director" },
+  { id: "ELE-COLO-1030", cost: 20, action: "Escalate MEP Sub — director-to-director" },
   { id: "ELE-MER-1010", cost: 18, action: "Assign a crew — your own unstaffed task" },
-  { id: "MEC-COLO-1040", cost: 15, action: "Push Microsoft for Status A sign-off" },
+  { id: "MEC-COLO-1040", cost: 15, action: "Push Hyperscale Client for Status A sign-off" },
 ];
 
 const eyebrow: React.CSSProperties = {
@@ -58,8 +58,8 @@ export default function OverviewView(_props: Props) {
           className="font-[family-name:var(--font-fraunces)]"
           style={{ fontSize: 22, lineHeight: 1.35, color: BRAND.ink, marginTop: 10 }}
         >
-          DUB-16 is <Hot>18 days behind</Hot>, <Hot>£4.2m exposed</Hot>, and{" "}
-          <Hot>5 of 7 blockers</Hot> trace to Microsoft. <Hot>3 decisions</Hot> need you
+          MER is <Hot>18 days behind</Hot>, <Hot>£4.2m exposed</Hot>, and{" "}
+          <Hot>5 of 7 blockers</Hot> trace to Hyperscale Client. <Hot>3 decisions</Hot> need you
           today.
         </h1>
       </div>

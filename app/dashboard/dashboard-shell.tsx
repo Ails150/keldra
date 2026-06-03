@@ -71,16 +71,16 @@ type RoleOption = {
 
 const DEMO_ROLE_OPTIONS: RoleOption[] = [
   {
-    orgName: "Ardmac",
+    orgName: "Main Contractor",
     orgType: "main-contractor",
     role: "main-contractor",
     caption: "Sees everything across the project",
   },
   {
-    orgName: "Cental",
+    orgName: "MEP Sub",
     orgType: "subcontractor",
     role: "subcontractor",
-    caption: "Only Cental-owned items + interfaces with Ardmac",
+    caption: "Only MEP Sub-owned items + interfaces with Main Contractor",
   },
   {
     orgName: "Hyperscaler X",
@@ -89,7 +89,7 @@ const DEMO_ROLE_OPTIONS: RoleOption[] = [
     caption: "Org-level rollups and sign-off queue only",
   },
   {
-    orgName: "Central Design",
+    orgName: "Design Studio",
     orgType: "design",
     role: "design",
     caption: "Design-driven constraints and RFIs only",
@@ -114,7 +114,7 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
     if (stored) {
       setViewingAs(
         stored.viewingAs ?? {
-          orgName: "Ardmac",
+          orgName: "Main Contractor",
           orgType: "main-contractor",
           role: "main-contractor",
         },
@@ -255,8 +255,8 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
   );
 
   // Role options for the switcher — always offer the four demo personas, but
-  // if the originating org isn't Ardmac, surface it as a fifth option so
-  // Johnny can also flip back into his real org's view.
+  // if the originating org isn't Main Contractor, surface it as a fifth option so
+  // Commissioning Lead can also flip back into his real org's view.
   const roleOptions = useMemo<RoleOption[]>(() => {
     const base = DEMO_ROLE_OPTIONS;
     if (!project) return base;

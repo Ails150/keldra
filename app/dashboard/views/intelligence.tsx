@@ -108,11 +108,11 @@ const SOURCES: { label: string; dot: string }[] = [
 ];
 
 const OUTPUTS: { label: string; sub: string }[] = [
-  { label: "MD daily digest", sub: "Ardmac Engineering" },
-  { label: "PM live dashboard", sub: "DUB-12 project" },
-  { label: "Site lead push alerts", sub: "Tom Walsh" },
+  { label: "MD daily digest", sub: "Main Contractor Engineering" },
+  { label: "PM live dashboard", sub: "BLD project" },
+  { label: "Site lead push alerts", sub: "Site Manager" },
   { label: "Client read-only portal", sub: "Hyperscaler X" },
-  { label: "Insurance risk score", sub: "Ardmac Indemnity" },
+  { label: "Insurance risk score", sub: "Main Contractor Indemnity" },
   { label: "Investor benchmark", sub: "Procurement" },
 ];
 
@@ -251,29 +251,29 @@ function CounterRow({ value, label }: { value: string; label: string }) {
 // ---------- section 2: MD daily digest ----------
 
 const PORTFOLIO_PROJECTS = [
-  { name: "DUB-12 Building 4", exposure: "£98,000/day", desc: "Ardmac × Cental × MS" },
-  { name: "DUB-10 Building 2", exposure: "£142,000/day", desc: "Ardmac × Sisk" },
-  { name: "Cork DC Phase 3", exposure: "£103,000/day", desc: "Ardmac × BAM × OCC" },
-  { name: "FRA-04 Commissioning", exposure: "£88,000/day", desc: "Ardmac × ENGIE" },
-  { name: "AMS-03 Handover", exposure: "£56,000/day", desc: "Ardmac × Heijmans" },
+  { name: "BLD Building 4", exposure: "£98,000/day", desc: "Main Contractor × MEP Sub × MS" },
+  { name: "DUB-10 Building 2", exposure: "£142,000/day", desc: "Main Contractor × Sisk" },
+  { name: "Cork DC Phase 3", exposure: "£103,000/day", desc: "Main Contractor × BAM × OCC" },
+  { name: "FRA-04 Commissioning", exposure: "£88,000/day", desc: "Main Contractor × ENGIE" },
+  { name: "AMS-03 Handover", exposure: "£56,000/day", desc: "Main Contractor × Heijmans" },
 ];
 
 const PATTERNS = [
   {
     title: "Cable tray clashes with structural beam",
     detail:
-      "14 instances across 4 projects, 9 traced to Central Design response time > 5 days.",
+      "14 instances across 4 projects, 9 traced to Design Studio response time > 5 days.",
     rec: "Weekly coordination with structural lead.",
   },
   {
     title: "MMR earthing scope ambiguity",
     detail:
-      "8 instances across DUB-12 and Cork DC, all Cental-vs-Ardmac handoff.",
-    rec: "Update Ardmac SOW template.",
+      "8 instances across BLD and Cork DC, all MEP Sub-vs-Main Contractor handoff.",
+    rec: "Update Main Contractor SOW template.",
   },
   {
     title: "UPS commissioning delay",
-    detail: "6 instances, primary cause Primo Power lead time.",
+    detail: "6 instances, primary cause Power Sub lead time.",
     rec: "16-week PO requirement.",
   },
 ];
@@ -282,7 +282,7 @@ const INTERVENTIONS = [
   {
     severity: "high",
     text:
-      "If Lawrence Burke's kept-rate doesn't improve by Friday, DUB-12 hits 2-week slip (£175,000 LD exposure).",
+      "If Design Coordinator's kept-rate doesn't improve by Friday, BLD hits 2-week slip (£175,000 LD exposure).",
     action: "PM 1:1 by Wednesday.",
   },
   {
@@ -294,8 +294,8 @@ const INTERVENTIONS = [
   {
     severity: "medium",
     text:
-      "Central Design avg response time trending up to 6.4 days on DUB-12 — projected impact: 3 deliverables slipping by 22 May.",
-    action: "Escalate to Central PM.",
+      "Design Studio avg response time trending up to 6.4 days on BLD — projected impact: 3 deliverables slipping by 22 May.",
+    action: "Escalate to Design Studio PM.",
   },
   {
     severity: "medium",
@@ -306,7 +306,7 @@ const INTERVENTIONS = [
   {
     severity: "low",
     text:
-      "Primo Power kept-rate down 6% over 14 days across portfolio — supplier review trigger.",
+      "Power Sub kept-rate down 6% over 14 days across portfolio — supplier review trigger.",
     action: "Procurement sync Friday.",
   },
 ];
@@ -320,11 +320,11 @@ function DailyDigestSection() {
             className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
             style={{ fontSize: 22, lineHeight: 1.2 }}
           >
-            Ardmac MD daily digest
+            Main Contractor MD daily digest
           </h2>
           <p className="mt-1 text-sm text-ink-mid">
             06:30 AM · delivered to{" "}
-            <span className="font-medium text-ink">md@ardmac.com</span>
+            <span className="font-medium text-ink">md@contractor.example</span>
           </p>
         </div>
         <p
@@ -470,19 +470,19 @@ function ReconciliationSection() {
     {
       label: "Procore RFI #4521 closed",
       text: '"AHU commissioning complete 18 May"',
-      who: "raised by Ardmac",
+      who: "raised by Main Contractor",
       tone: "bg-orange-100 text-orange-800",
     },
     {
       label: "Aconex document signed",
       text: '"Witness sign-off 20 May"',
-      who: "Ardmac",
+      who: "Main Contractor",
       tone: "bg-teal-100 text-teal-800",
     },
     {
       label: "Keldra audit chain",
       text: '"Stage transition red→green 19 May 14:22"',
-      who: "Tom Walsh",
+      who: "Site Manager",
       tone: "bg-accent/10 text-accent-deep",
     },
   ];
@@ -559,19 +559,19 @@ function ReconciliationSection() {
 function BenchmarkSection() {
   const stats = [
     {
-      label: "Ardmac portfolio kept-rate",
+      label: "Main Contractor portfolio kept-rate",
       value: "84%",
       industry: "Industry median across 47 contractors on Keldra: 71%",
       tone: "text-green-700",
     },
     {
-      label: "Ardmac avg blocker resolution",
+      label: "Main Contractor avg blocker resolution",
       value: "4.2 days",
       industry: "Industry: 7.8 days",
       tone: "text-green-700",
     },
     {
-      label: "Ardmac audit completeness at handover",
+      label: "Main Contractor audit completeness at handover",
       value: "97%",
       industry: "Industry: 64%",
       tone: "text-green-700",
@@ -584,7 +584,7 @@ function BenchmarkSection() {
         className="font-[family-name:var(--font-fraunces)] font-semibold text-ink"
         style={{ fontSize: 22, lineHeight: 1.2 }}
       >
-        How Ardmac benchmarks against industry
+        How Main Contractor benchmarks against industry
       </h2>
       <p className="mt-1 text-sm text-ink-mid">
         The first cross-firm performance dataset in construction — anonymised,
@@ -657,7 +657,7 @@ function NorthStarSection() {
         className="mt-6 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
         style={{ fontSize: 13, lineHeight: 1.55 }}
       >
-        Today: pilot at Ardmac Engineering on DUB-12 Building 4. By 2028: the
+        Today: pilot at Main Contractor Engineering on BLD Building 4. By 2028: the
         canonical truth layer for construction.
       </p>
     </div>

@@ -549,8 +549,8 @@ export default function AssetDetailPanel({
             <ol className="space-y-2">
               {[
                 { label: "Internal QA", who: "pending" },
-                { label: "Witness sign-off", who: "Lawrence Burke (Ardmac)" },
-                { label: "Final approval", who: "Johnny McKenna (Ardmac)" },
+                { label: "Witness sign-off", who: "Design Coordinator (Main Contractor)" },
+                { label: "Final approval", who: "Commissioning Lead (Main Contractor)" },
               ].map((s) => (
                 <li
                   key={s.label}

@@ -40,9 +40,9 @@ const STAGES: Stage[] = [
     n: 34,
     legacy: "Red Tag (legacy) = L1/L2 Off-Site",
     stuck: [
-      { count: 6, reason: "Awaiting Status A submittal from Ardmac" },
-      { count: 5, reason: "Cental bracketery dependency" },
-      { count: 4, reason: "Design clarification open with Sellafield" },
+      { count: 6, reason: "Awaiting Status A submittal from Main Contractor" },
+      { count: 5, reason: "MEP Sub bracketery dependency" },
+      { count: 4, reason: "Design clarification open with Design House" },
     ],
   },
   {
@@ -61,7 +61,7 @@ const STAGES: Stage[] = [
     legacy: null,
     stuck: [
       { count: 2, reason: "Cross-system integration test pending" },
-      { count: 1, reason: "Sign-off chain unclear (Onnec / Evolution)" },
+      { count: 1, reason: "Sign-off chain unclear (Telecoms Sub / Specialist Sub)" },
     ],
   },
   { label: "On Site", n: 0, legacy: "Site module installation starts 17 Aug 26", stuck: [] },
@@ -121,7 +121,7 @@ export default function FunnelView({
           className="mt-1.5 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
           style={{ fontSize: 16 }}
         >
-          Microsoft / Ardmac Cx flow against the DUB-16 P6 programme.
+          Hyperscale Client / Main Contractor Cx flow against the MER P6 programme.
         </p>
       </header>
 
@@ -134,7 +134,7 @@ export default function FunnelView({
           <Stat label="Planned RT" value="60" />
           <Stat label="Walked RT" value="41" caption="-19, 32% miss" />
           <Stat label="Documentation uploaded" value="25" caption="-16, 38% drop" />
-          <Stat label="Achieved RT (Nexus)" value="13" caption="-12, 48% drop" danger />
+          <Stat label="Achieved RT (AE Portal)" value="13" caption="-12, 48% drop" danger />
         </div>
       </div>
 

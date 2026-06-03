@@ -1,5 +1,5 @@
-// Parses an action register / meeting-minutes spreadsheet (Johnny McKenna's
-// DUB-12 security meeting format and friends) into structured constraints.
+// Parses an action register / meeting-minutes spreadsheet (Commissioning Lead's
+// BLD security meeting format and friends) into structured constraints.
 //
 // The Comments column is the gold: each dated line ("DD/MM/YYYY - text") becomes
 // a hash-chained event so the project's real history lands in the audit chain.
@@ -20,8 +20,8 @@ export type ParsedConstraint = {
   date_raised: string; // ISO (or "" if unparseable)
   raised_by: string; // initials or name
   priority: "Critical" | "High" | "Medium" | "Low";
-  action_by: string; // e.g. "JM Cundall"
-  action_by_org: string; // extracted org, e.g. "Cundall"
+  action_by: string; // e.g. "JM MEP Consultant"
+  action_by_org: string; // extracted org, e.g. "MEP Consultant"
   agreed_action_date: string | null;
   status: "OPEN" | "CLOSED" | "AWAITING_INPUT";
   date_closed: string | null;
@@ -37,16 +37,16 @@ export type ParsedRegister = {
   constraints: ParsedConstraint[];
 };
 
-// Known orgs we can pull out of an "Action by" string like "JM Cundall".
+// Known orgs we can pull out of an "Action by" string like "JM MEP Consultant".
 const KNOWN_ORGS = [
-  "Cental",
-  "Ardmac",
-  "Cundall",
-  "Evolution",
-  "DEL",
-  "Microsoft",
-  "Primo",
-  "Central",
+  "MEP Sub",
+  "Main Contractor",
+  "MEP Consultant",
+  "Specialist Sub",
+  "Portal",
+  "Hyperscale Client",
+  "Power Sub",
+  "Design Studio",
 ];
 
 // ---------- sha-256 (Web Crypto, with a deterministic SSR/test fallback) ----------
@@ -138,7 +138,7 @@ function mapStatus(raw: unknown): ParsedConstraint["status"] {
   return "OPEN";
 }
 
-// "JM Cundall" -> "Cundall"; "FL DEL" -> "DEL". Matches a known org anywhere in
+// "JM MEP Consultant" -> "MEP Consultant"; "FL Portal" -> "Portal". Matches a known org anywhere in
 // the string (case-insensitive); otherwise falls back to the last word.
 function extractOrg(actionBy: string): string {
   const text = (actionBy ?? "").trim();
@@ -350,7 +350,7 @@ export async function parseActionRegister(file: File): Promise<ParsedRegister> {
 }
 
 // Builds a lightweight ParsedRegister from an already-parsed constraint-log
-// (id / description / raised_date / ... rows). Used by the "Load DUB-12 sample"
+// (id / description / raised_date / ... rows). Used by the "Load BLD sample"
 // button so the 4th upload card has a populated done-state without a real
 // spreadsheet. Each constraint contributes one hash-chained "raised" event.
 export async function buildRegisterFromConstraintRows(

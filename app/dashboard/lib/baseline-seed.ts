@@ -1,5 +1,5 @@
-// Real Ardmac DUB-16 P6 baseline (programme revision 21-Apr-26). Activity IDs
-// are verbatim from the programme so Ardmac can cross-check against
+// Real Main Contractor MER P6 baseline (programme revision 21-Apr-26). Activity IDs
+// are verbatim from the programme so Main Contractor can cross-check against
 // the PDF live in the demo. Today = 27 May 2026.
 
 import { BRAND, type BrandColour } from "@/lib/brand";
@@ -8,7 +8,7 @@ export type Role =
   | "Main contractor"
   | "Subcontractor"
   | "Design"
-  | "MS Programming";
+  | "Client Programming";
 
 export type Company = {
   slug: string;
@@ -19,16 +19,16 @@ export type Company = {
 };
 
 export const COMPANIES: Company[] = [
-  { slug: "cental", name: "Cental", role: "Subcontractor", colour: "coral", punchLine: "Brackets blocking fibre runs." },
-  { slug: "sellafield-design", name: "Sellafield Design", role: "Design", colour: "blue", punchLine: "MMR1 design pending — 4 weeks open." },
-  { slug: "lawrence-marco", name: "Lawrence → Marco", role: "Design", colour: "amber", punchLine: "External lights spec unsigned — Marco can't cut drawings." },
-  { slug: "auto-fire", name: "Auto Fire", role: "Subcontractor", colour: "pink" },
-  { slug: "t-bourke", name: "T Bourke", role: "Subcontractor", colour: "teal", punchLine: "Mechanical sub — CRAH connections, COLO 1-4." },
-  { slug: "onnec", name: "Onnec", role: "Subcontractor", colour: "indigo", punchLine: "Telecoms sub — fibre crew standing idle on Cental's brackets." },
-  { slug: "ardmac", name: "Ardmac", role: "Main contractor", colour: "purple" },
-  { slug: "dornans", name: "Dornans", role: "Subcontractor", colour: "green" },
-  { slug: "finnings", name: "Finnings", role: "Subcontractor", colour: "slate", punchLine: "Sprinkler diesel pump generators — affects FER BU room." },
-  { slug: "ssci-team", name: "SSCI Team", role: "MS Programming", colour: "navy", punchLine: "Corpnet delivery locked to 30 Nov. Slips, BU slips." },
+  { slug: "mep-sub", name: "MEP Sub", role: "Subcontractor", colour: "coral", punchLine: "Brackets blocking fibre runs." },
+  { slug: "design-house", name: "Design House", role: "Design", colour: "blue", punchLine: "MMR1 design pending — 4 weeks open." },
+  { slug: "drawings-office", name: "Drawings Office", role: "Design", colour: "amber", punchLine: "External lights spec unsigned — Drawings Lead can't cut drawings." },
+  { slug: "fire-sub", name: "Fire Sub", role: "Subcontractor", colour: "pink" },
+  { slug: "mech-sub", name: "Mech Sub", role: "Subcontractor", colour: "teal", punchLine: "Mechanical sub — CRAH ctelecoms-subtions, COLO 1-4." },
+  { slug: "telecoms-sub", name: "Telecoms Sub", role: "Subcontractor", colour: "indigo", punchLine: "Telecoms sub — fibre crew standing idle on MEP Sub's brackets." },
+  { slug: "main-contractor", name: "Main Contractor", role: "Main contractor", colour: "purple" },
+  { slug: "fitout-sub", name: "Fit-Out Sub", role: "Subcontractor", colour: "green" },
+  { slug: "sprinkler-sub", name: "Sprinkler Sub", role: "Subcontractor", colour: "slate", punchLine: "Sprinkler diesel pump generators — affects FER BU room." },
+  { slug: "client-network", name: "Client Network Team", role: "Client Programming", colour: "navy", punchLine: "ClientNet delivery locked to 30 Nov. Slips, BU slips." },
 ];
 
 export type RoomTag = "BU" | "MMR1" | "MMR2" | "Earth" | "Security";
@@ -58,7 +58,7 @@ export const CRITICAL_ROOMS: CriticalRoom[] = [
   { code: "BU-SOC", name: "Security Operations Centre", tag: "BU", target: "02-Dec-26", priority: 1 },
   { code: "BU-RNG", name: "Regional Network Gateway", tag: "BU", target: "02-Dec-26", priority: 1 },
   // Supporting rooms (feed BU).
-  { code: "MMR1", name: "MMR1", tag: "MMR1", target: "29-Jun-26", priority: 2, blockedWeeks: 4, blockedBy: "Sellafield Design" },
+  { code: "MMR1", name: "MMR1", tag: "MMR1", target: "29-Jun-26", priority: 2, blockedWeeks: 4, blockedBy: "Design House" },
   { code: "MMR2", name: "MMR2", tag: "MMR2", target: "29-Jun-26", priority: 2 },
   { code: "MER1-LV", name: "MER1 LV Room", tag: "Earth", target: "08-Jul-26", priority: 2 },
   { code: "MER2-LV", name: "MER2 LV Room", tag: "Earth", target: "09-Jul-26", priority: 2 },
@@ -70,7 +70,7 @@ export const CRITICAL_ROOMS: CriticalRoom[] = [
 ];
 
 export const MILESTONES: { key: string; label: string; date: string }[] = [
-  { key: "POWER_ON", label: "Power on Grangecastle", date: "03 Sep 26" },
+  { key: "POWER_ON", label: "Power on Site", date: "03 Sep 26" },
   { key: "YELLOW_TAG", label: "Yellow Tag", date: "04 Nov 26" },
   { key: "GREEN_TAG", label: "Green Tag", date: "02 Dec 26" },
   { key: "BU", label: "Beneficial Use", date: "02 Dec 26" },
@@ -113,22 +113,22 @@ function d(s: string): string {
 
 export const BASELINE_TASKS: BaselineTask[] = [
   // ---- variance heroes ----
-  { activity_id: "ELE-MER-1010", name: "Install Earth Bar MER1", wbs_path: "Electrical Fit Out MER1", responsible_company: "ardmac", planned_start: d("13-May-26"), planned_end: d("14-May-26"), planned_manpower: 4, actual_manpower: 0, status: "not_started_should_be", blocked_reason: "Earth bar install was due 13-14 May. Day 2 with zero men assigned.", blocking_company: "ardmac", affects_room: "EARTH-M1", cost_per_day: 18000 },
-  { activity_id: "ELE-COLO-1030", name: "Telecoms Bracketery and Containment", wbs_path: "COLO 1-4 Electrical", responsible_company: "onnec", planned_start: d("13-Mar-26"), planned_end: d("20-Apr-26"), planned_manpower: 4, actual_manpower: 4, status: "blocked", blocked_reason: "Cental have not installed brackets — Onnec cannot run fibre. Open since March.", blocking_company: "cental", affects_room: "BU-MMR", cost_per_day: 20000 },
-  { activity_id: "ELE-ADMIN-1020", name: "Install high level Bracketery and Containment AD1-4", wbs_path: "Elec AD01-04", responsible_company: "ardmac", planned_start: d("01-Apr-26"), planned_end: d("01-May-26"), planned_manpower: 3, actual_manpower: 0, status: "blocked", blocked_reason: "Cental bracketery dependency. Affects MMR mech complete date 29-Jun.", blocking_company: "cental", affects_room: "BU-MMR", cost_per_day: 12000 },
-  { activity_id: "MEC-COLO-1040", name: "Water services and connections COLO 1-4", wbs_path: "Mechanical Modules 1-4", responsible_company: "ardmac", planned_start: d("21-Apr-26"), planned_end: d("28-Apr-26"), planned_manpower: 5, actual_manpower: 0, status: "blocked", blocked_reason: "Sellafield Design holding water services spec. 4 weeks open. MMR1 mech first fix cannot start.", blocking_company: "sellafield-design", affects_room: "MMR1", cost_per_day: 15000 },
-  { activity_id: "FAB-ADMIN-1120", name: "External Service Support Steel", wbs_path: "Facility Modules", responsible_company: "ardmac", planned_start: d("16-Mar-26"), planned_end: d("24-Apr-26"), planned_manpower: 4, actual_manpower: 0, status: "blocked", blocked_reason: "Lawrence has not signed external lights spec. Marco cannot cut steel drawings. 3 weeks unanswered. Not an Ardmac issue.", blocking_company: "lawrence-marco", affects_room: "BU-MMR", cost_per_day: 10000 },
-  { activity_id: "PRO-1110", name: "Sprinkler Diesel Pump Generators", wbs_path: "Procurement Sprinkler", responsible_company: "finnings", planned_start: d("14-Oct-25"), planned_end: d("16-Apr-26"), planned_manpower: 0, actual_manpower: 0, status: "not_started_should_be", blocked_reason: "Delivery slipped. Affects FER BU room.", blocking_company: "finnings", affects_room: "BU-FER", cost_per_day: 5000 },
-  { activity_id: "FAB-2000", name: "Generator A Install", wbs_path: "Generator Installation", responsible_company: "finnings", planned_start: d("28-May-26"), planned_end: d("02-Jun-26"), planned_manpower: 5, actual_manpower: 0, status: "not_started_should_be", blocked_reason: "Finnings generator A starts tomorrow per baseline. Site not ready?", blocking_company: "finnings", affects_room: "BU-FER", cost_per_day: 4000 },
-  { activity_id: "CX-1180", name: "DUB16-ADMIN-XFM01 FWT", wbs_path: "Off Site Commissioning / FWT", responsible_company: "ardmac", planned_start: d("13-May-26"), planned_end: d("14-May-26"), planned_manpower: 2, actual_manpower: 0, status: "not_started_should_be", blocked_reason: "Factory witness test was due 13-14 May. Two weeks open.", blocking_company: "ardmac", affects_room: "BU-MMR", cost_per_day: 9000 },
-  { activity_id: "SEC-COLO-1000", name: "FOK for each door type", wbs_path: "Security COLO & ADMIN", responsible_company: "ardmac", planned_start: d("17-Apr-26"), planned_end: d("22-Apr-26"), planned_manpower: 2, actual_manpower: 0, status: "blocked", blocked_reason: "FOK door types waiting on Sellafield spec sign-off AND PRO-1270 door delivery (slipped to 29-May).", blocking_company: "sellafield-design", affects_room: "SEC-COLO", cost_per_day: 7000 },
+  { activity_id: "ELE-MER-1010", name: "Install Earth Bar MER1", wbs_path: "Electrical Fit Out MER1", responsible_company: "main-contractor", planned_start: d("13-May-26"), planned_end: d("14-May-26"), planned_manpower: 4, actual_manpower: 0, status: "not_started_should_be", blocked_reason: "Earth bar install was due 13-14 May. Day 2 with zero men assigned.", blocking_company: "main-contractor", affects_room: "EARTH-M1", cost_per_day: 18000 },
+  { activity_id: "ELE-COLO-1030", name: "Telecoms Bracketery and Containment", wbs_path: "COLO 1-4 Electrical", responsible_company: "telecoms-sub", planned_start: d("13-Mar-26"), planned_end: d("20-Apr-26"), planned_manpower: 4, actual_manpower: 4, status: "blocked", blocked_reason: "MEP Sub have not installed brackets — Telecoms Sub cannot run fibre. Open since March.", blocking_company: "mep-sub", affects_room: "BU-MMR", cost_per_day: 20000 },
+  { activity_id: "ELE-ADMIN-1020", name: "Install high level Bracketery and Containment AD1-4", wbs_path: "Elec AD01-04", responsible_company: "main-contractor", planned_start: d("01-Apr-26"), planned_end: d("01-May-26"), planned_manpower: 3, actual_manpower: 0, status: "blocked", blocked_reason: "MEP Sub bracketery dependency. Affects MMR mech complete date 29-Jun.", blocking_company: "mep-sub", affects_room: "BU-MMR", cost_per_day: 12000 },
+  { activity_id: "MEC-COLO-1040", name: "Water services and ctelecoms-subtions COLO 1-4", wbs_path: "Mechanical Modules 1-4", responsible_company: "main-contractor", planned_start: d("21-Apr-26"), planned_end: d("28-Apr-26"), planned_manpower: 5, actual_manpower: 0, status: "blocked", blocked_reason: "Design House holding water services spec. 4 weeks open. MMR1 mech first fix cannot start.", blocking_company: "design-house", affects_room: "MMR1", cost_per_day: 15000 },
+  { activity_id: "FAB-ADMIN-1120", name: "External Service Support Steel", wbs_path: "Facility Modules", responsible_company: "main-contractor", planned_start: d("16-Mar-26"), planned_end: d("24-Apr-26"), planned_manpower: 4, actual_manpower: 0, status: "blocked", blocked_reason: "Design Lead has not signed external lights spec. Drawings Lead cannot cut steel drawings. 3 weeks unanswered. Not an Main Contractor issue.", blocking_company: "drawings-office", affects_room: "BU-MMR", cost_per_day: 10000 },
+  { activity_id: "PRO-1110", name: "Sprinkler Diesel Pump Generators", wbs_path: "Procurement Sprinkler", responsible_company: "sprinkler-sub", planned_start: d("14-Oct-25"), planned_end: d("16-Apr-26"), planned_manpower: 0, actual_manpower: 0, status: "not_started_should_be", blocked_reason: "Delivery slipped. Affects FER BU room.", blocking_company: "sprinkler-sub", affects_room: "BU-FER", cost_per_day: 5000 },
+  { activity_id: "FAB-2000", name: "Generator A Install", wbs_path: "Generator Installation", responsible_company: "sprinkler-sub", planned_start: d("28-May-26"), planned_end: d("02-Jun-26"), planned_manpower: 5, actual_manpower: 0, status: "not_started_should_be", blocked_reason: "Sprinkler Sub generator A starts tomorrow per baseline. Site not ready?", blocking_company: "sprinkler-sub", affects_room: "BU-FER", cost_per_day: 4000 },
+  { activity_id: "CX-1180", name: "MER-ADMIN-XFM01 FWT", wbs_path: "Off Site Commissioning / FWT", responsible_company: "main-contractor", planned_start: d("13-May-26"), planned_end: d("14-May-26"), planned_manpower: 2, actual_manpower: 0, status: "not_started_should_be", blocked_reason: "Factory witness test was due 13-14 May. Two weeks open.", blocking_company: "main-contractor", affects_room: "BU-MMR", cost_per_day: 9000 },
+  { activity_id: "SEC-COLO-1000", name: "FOK for each door type", wbs_path: "Security COLO & ADMIN", responsible_company: "main-contractor", planned_start: d("17-Apr-26"), planned_end: d("22-Apr-26"), planned_manpower: 2, actual_manpower: 0, status: "blocked", blocked_reason: "FOK door types waiting on Design House spec sign-off AND PRO-1270 door delivery (slipped to 29-May).", blocking_company: "design-house", affects_room: "SEC-COLO", cost_per_day: 7000 },
   // ---- context / on-track ----
-  { activity_id: "CX-1440", name: "DUB16-COLO1-MER1-MSB01 FWT", wbs_path: "Off Site Commissioning / FWT", responsible_company: "ardmac", planned_start: d("02-Jun-26"), planned_end: d("03-Jun-26"), planned_manpower: 2, actual_manpower: 0, status: "on_track", blocked_reason: null, blocking_company: null, affects_room: "MER1-LV", cost_per_day: 0 },
-  { activity_id: "CX-1450", name: "DUB16-COLO1-MER2-MSB01 FWT", wbs_path: "Off Site Commissioning / FWT", responsible_company: "ardmac", planned_start: d("02-Jun-26"), planned_end: d("03-Jun-26"), planned_manpower: 2, actual_manpower: 0, status: "on_track", blocked_reason: null, blocking_company: null, affects_room: "MER2-LV", cost_per_day: 0 },
-  { activity_id: "ELE-COLO-1010", name: "COLO DC 1-4 LV 1st fix containment", wbs_path: "COLO 1-4 LV", responsible_company: "ardmac", planned_start: d("16-Feb-26"), planned_end: d("01-Apr-26"), planned_manpower: 6, actual_manpower: 6, status: "complete", blocked_reason: null, blocking_company: null, affects_room: null, cost_per_day: 0 },
-  { activity_id: "ARC-COLO-1060", name: "HAC system install Modules 1-4", wbs_path: "COLO 1-4 Fit-Out", responsible_company: "dornans", planned_start: d("26-Mar-26"), planned_end: d("30-Apr-26"), planned_manpower: 3, actual_manpower: 3, status: "on_track", blocked_reason: null, blocking_company: null, affects_room: null, cost_per_day: 0 },
-  { activity_id: "ARC-COLO-1080", name: "Firestopping penetrations Modules 1-4", wbs_path: "COLO 1-4 Fit-Out", responsible_company: "auto-fire", planned_start: d("29-May-26"), planned_end: d("03-Jun-26"), planned_manpower: 2, actual_manpower: 2, status: "on_track", blocked_reason: null, blocking_company: null, affects_room: null, cost_per_day: 0 },
-  { activity_id: "FAB-MER-1110", name: "MER2 Floor and Roof", wbs_path: "DUB16 MER2 Fab", responsible_company: "ardmac", planned_start: d("06-Feb-26"), planned_end: d("20-Feb-26"), planned_manpower: 4, actual_manpower: 0, status: "complete", blocked_reason: null, blocking_company: null, affects_room: "MER2-LV", cost_per_day: 0 },
+  { activity_id: "CX-1440", name: "MER-COLO1-MER1-MSB01 FWT", wbs_path: "Off Site Commissioning / FWT", responsible_company: "main-contractor", planned_start: d("02-Jun-26"), planned_end: d("03-Jun-26"), planned_manpower: 2, actual_manpower: 0, status: "on_track", blocked_reason: null, blocking_company: null, affects_room: "MER1-LV", cost_per_day: 0 },
+  { activity_id: "CX-1450", name: "MER-COLO1-MER2-MSB01 FWT", wbs_path: "Off Site Commissioning / FWT", responsible_company: "main-contractor", planned_start: d("02-Jun-26"), planned_end: d("03-Jun-26"), planned_manpower: 2, actual_manpower: 0, status: "on_track", blocked_reason: null, blocking_company: null, affects_room: "MER2-LV", cost_per_day: 0 },
+  { activity_id: "ELE-COLO-1010", name: "COLO DC 1-4 LV 1st fix containment", wbs_path: "COLO 1-4 LV", responsible_company: "main-contractor", planned_start: d("16-Feb-26"), planned_end: d("01-Apr-26"), planned_manpower: 6, actual_manpower: 6, status: "complete", blocked_reason: null, blocking_company: null, affects_room: null, cost_per_day: 0 },
+  { activity_id: "ARC-COLO-1060", name: "HAC system install Modules 1-4", wbs_path: "COLO 1-4 Fit-Out", responsible_company: "fitout-sub", planned_start: d("26-Mar-26"), planned_end: d("30-Apr-26"), planned_manpower: 3, actual_manpower: 3, status: "on_track", blocked_reason: null, blocking_company: null, affects_room: null, cost_per_day: 0 },
+  { activity_id: "ARC-COLO-1080", name: "Firestopping penetrations Modules 1-4", wbs_path: "COLO 1-4 Fit-Out", responsible_company: "fire-sub", planned_start: d("29-May-26"), planned_end: d("03-Jun-26"), planned_manpower: 2, actual_manpower: 2, status: "on_track", blocked_reason: null, blocking_company: null, affects_room: null, cost_per_day: 0 },
+  { activity_id: "FAB-MER-1110", name: "MER2 Floor and Roof", wbs_path: "MER MER2 Fab", responsible_company: "main-contractor", planned_start: d("06-Feb-26"), planned_end: d("20-Feb-26"), planned_manpower: 4, actual_manpower: 0, status: "complete", blocked_reason: null, blocking_company: null, affects_room: "MER2-LV", cost_per_day: 0 },
   ...fillerTasks(),
 ];
 
@@ -136,37 +136,37 @@ export const BASELINE_TASKS: BaselineTask[] = [
 // variance card has weight by contrast.
 function fillerTasks(): BaselineTask[] {
   const rows: [string, string, string, string, TaskStatus][] = [
-    ["ELE-COLO-1020", "COLO LV containment Module 2", "COLO 1-4 LV", "ardmac", "complete"],
-    ["ELE-COLO-1040", "COLO LV cable pull Module 3", "COLO 1-4 LV", "ardmac", "on_track"],
-    ["ELE-COLO-1060", "COLO LV terminations Module 4", "COLO 1-4 LV", "ardmac", "on_track"],
-    ["ELE-COLO-1070", "COLO power distribution checks", "COLO 1-4 LV", "ardmac", "on_track"],
-    ["ELE-COLO-1090", "COLO small power first fix", "COLO 1-4 Electrical", "cental", "on_track"],
-    ["ELE-COLO-1100", "COLO lighting install", "COLO 1-4 Electrical", "cental", "on_track"],
-    ["ELE-COLO-1110", "COLO emergency lighting", "COLO 1-4 Electrical", "cental", "on_track"],
-    ["ELE-COLO-1130", "COLO containment second fix", "COLO 1-4 Electrical", "t-bourke", "on_track"],
-    ["MEC-COLO-1000", "COLO chilled water mains", "Mechanical Modules 1-4", "ardmac", "complete"],
-    ["MEC-COLO-1010", "COLO pipework first fix", "Mechanical Modules 1-4", "ardmac", "on_track"],
-    ["MEC-COLO-1020", "COLO valve sets install", "Mechanical Modules 1-4", "ardmac", "on_track"],
-    ["MEC-COLO-1050", "COLO CRAH connections", "Mechanical Modules 1-4", "t-bourke", "on_track"],
-    ["MEC-COLO-1060", "COLO leak detection", "Mechanical Modules 1-4", "ardmac", "on_track"],
-    ["ARC-ADMIN-1000", "Admin drywall partitions", "Admin Fit-Out", "dornans", "complete"],
-    ["ARC-ADMIN-1040", "Admin ceiling grid", "Admin Fit-Out", "dornans", "on_track"],
-    ["ARC-ADMIN-1080", "Admin floor finishes", "Admin Fit-Out", "dornans", "on_track"],
-    ["ARC-ADMIN-1140", "Admin door frames", "Admin Fit-Out", "dornans", "on_track"],
-    ["FAB-COLO-1080", "COLO external cladding bay 1", "COLO Cladding", "ardmac", "complete"],
-    ["FAB-COLO-1120", "COLO external cladding bay 2", "COLO Cladding", "ardmac", "on_track"],
-    ["FAB-COLO-1190", "COLO roof membrane", "COLO Cladding", "ardmac", "on_track"],
-    ["CX-1110", "DUB16-COLO1-AHU01 FAT", "Off Site Commissioning / FAT", "ardmac", "on_track"],
-    ["CX-1130", "DUB16-COLO1-AHU02 FAT", "Off Site Commissioning / FAT", "ardmac", "on_track"],
-    ["CX-1150", "DUB16-COLO1-PDU01 FAT", "Off Site Commissioning / FAT", "ardmac", "complete"],
-    ["CX-1230", "DUB16-COLO1-PDU02 FWT", "Off Site Commissioning / FWT", "ardmac", "on_track"],
-    ["PRO-1140", "Admin AHU procurement", "Procurement Admin", "ardmac", "complete"],
-    ["PRO-1160", "Admin switchgear procurement", "Procurement Admin", "ardmac", "on_track"],
-    ["PRO-1170", "Admin UPS procurement", "Procurement Admin", "ardmac", "on_track"],
-    ["PRO-1190", "Admin cabling procurement", "Procurement Admin", "ardmac", "complete"],
-    ["SEC-COLO-1010", "Security cable containment", "Security COLO & ADMIN", "ardmac", "on_track"],
-    ["SEC-COLO-1030", "Security camera first fix", "Security COLO & ADMIN", "auto-fire", "on_track"],
-    ["SEC-COLO-1050", "Security access control rough-in", "Security COLO & ADMIN", "auto-fire", "on_track"],
+    ["ELE-COLO-1020", "COLO LV containment Module 2", "COLO 1-4 LV", "main-contractor", "complete"],
+    ["ELE-COLO-1040", "COLO LV cable pull Module 3", "COLO 1-4 LV", "main-contractor", "on_track"],
+    ["ELE-COLO-1060", "COLO LV terminations Module 4", "COLO 1-4 LV", "main-contractor", "on_track"],
+    ["ELE-COLO-1070", "COLO power distribution checks", "COLO 1-4 LV", "main-contractor", "on_track"],
+    ["ELE-COLO-1090", "COLO small power first fix", "COLO 1-4 Electrical", "mep-sub", "on_track"],
+    ["ELE-COLO-1100", "COLO lighting install", "COLO 1-4 Electrical", "mep-sub", "on_track"],
+    ["ELE-COLO-1110", "COLO emergency lighting", "COLO 1-4 Electrical", "mep-sub", "on_track"],
+    ["ELE-COLO-1130", "COLO containment second fix", "COLO 1-4 Electrical", "mech-sub", "on_track"],
+    ["MEC-COLO-1000", "COLO chilled water mains", "Mechanical Modules 1-4", "main-contractor", "complete"],
+    ["MEC-COLO-1010", "COLO pipework first fix", "Mechanical Modules 1-4", "main-contractor", "on_track"],
+    ["MEC-COLO-1020", "COLO valve sets install", "Mechanical Modules 1-4", "main-contractor", "on_track"],
+    ["MEC-COLO-1050", "COLO CRAH ctelecoms-subtions", "Mechanical Modules 1-4", "mech-sub", "on_track"],
+    ["MEC-COLO-1060", "COLO leak detection", "Mechanical Modules 1-4", "main-contractor", "on_track"],
+    ["ARC-ADMIN-1000", "Admin drywall partitions", "Admin Fit-Out", "fitout-sub", "complete"],
+    ["ARC-ADMIN-1040", "Admin ceiling grid", "Admin Fit-Out", "fitout-sub", "on_track"],
+    ["ARC-ADMIN-1080", "Admin floor finishes", "Admin Fit-Out", "fitout-sub", "on_track"],
+    ["ARC-ADMIN-1140", "Admin door frames", "Admin Fit-Out", "fitout-sub", "on_track"],
+    ["FAB-COLO-1080", "COLO external cladding bay 1", "COLO Cladding", "main-contractor", "complete"],
+    ["FAB-COLO-1120", "COLO external cladding bay 2", "COLO Cladding", "main-contractor", "on_track"],
+    ["FAB-COLO-1190", "COLO roof membrane", "COLO Cladding", "main-contractor", "on_track"],
+    ["CX-1110", "MER-COLO1-AHU01 FAT", "Off Site Commissioning / FAT", "main-contractor", "on_track"],
+    ["CX-1130", "MER-COLO1-AHU02 FAT", "Off Site Commissioning / FAT", "main-contractor", "on_track"],
+    ["CX-1150", "MER-COLO1-PDU01 FAT", "Off Site Commissioning / FAT", "main-contractor", "complete"],
+    ["CX-1230", "MER-COLO1-PDU02 FWT", "Off Site Commissioning / FWT", "main-contractor", "on_track"],
+    ["PRO-1140", "Admin AHU procurement", "Procurement Admin", "main-contractor", "complete"],
+    ["PRO-1160", "Admin switchgear procurement", "Procurement Admin", "main-contractor", "on_track"],
+    ["PRO-1170", "Admin UPS procurement", "Procurement Admin", "main-contractor", "on_track"],
+    ["PRO-1190", "Admin cabling procurement", "Procurement Admin", "main-contractor", "complete"],
+    ["SEC-COLO-1010", "Security cable containment", "Security COLO & ADMIN", "main-contractor", "on_track"],
+    ["SEC-COLO-1030", "Security camera first fix", "Security COLO & ADMIN", "fire-sub", "on_track"],
+    ["SEC-COLO-1050", "Security access control rough-in", "Security COLO & ADMIN", "fire-sub", "on_track"],
   ];
   return rows.map(([id, name, wbs, company, status]) => ({
     activity_id: id,
@@ -186,15 +186,15 @@ function fillerTasks(): BaselineTask[] {
 }
 
 export const SITE_DIARY = {
-  submitted_by: "Johnny McKenna",
+  submitted_by: "Commissioning Lead",
   submitted_at_label: "07:42",
   manpower: [
-    { men: 1, activity: "modular lighting", company: "cental" },
-    { men: 3, activity: "containment", company: "ardmac" },
-    { men: 4, activity: "fibre containment", company: "onnec" },
+    { men: 1, activity: "modular lighting", company: "mep-sub" },
+    { men: 3, activity: "containment", company: "main-contractor" },
+    { men: 4, activity: "fibre containment", company: "telecoms-sub" },
   ],
   notes:
-    "Earth bar MER1 still not started. Brackets for fibre runs still missing from Cental. No movement on external lights — Marco still waiting on Lawrence sign-off (3w). Doors and FOK still blocked on Sellafield. Finnings generator A kick-off tomorrow per programme.",
+    "Earth bar MER1 still not started. Brackets for fibre runs still missing from MEP Sub. No movement on external lights — Drawings Lead still waiting on Design Lead sign-off (3w). Doors and FOK still blocked on Design House. Sprinkler Sub generator A kick-off tomorrow per programme.",
 };
 
 // ---------- loadable baseline ----------
@@ -226,7 +226,7 @@ export type Baseline = {
 
 // The static May-27 seed — used until a live ingest overrides it.
 export const DEFAULT_BASELINE: Baseline = {
-  project: { name: "DUB-16 Cx", baseline_revision_date: "2026-04-21" },
+  project: { name: "MER Cx", baseline_revision_date: "2026-04-21" },
   companies: COMPANIES,
   rooms: CRITICAL_ROOMS,
   tasks: BASELINE_TASKS,
@@ -369,7 +369,7 @@ export type CompanyRollup = {
   worstRoom: string | null;
 };
 
-// Companies holding things up (excludes the main contractor — Johnny's own org
+// Companies holding things up (excludes the main contractor — Commissioning Lead's own org
 // — since this board answers "who is holding ME up"). Ranked by £/day.
 export function companyRollups(b: Baseline): CompanyRollup[] {
   const map = new Map<string, BaselineTask[]>();

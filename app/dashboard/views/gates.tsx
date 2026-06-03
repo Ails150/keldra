@@ -58,9 +58,9 @@ const GATES: Gate[] = [
     perDay: "£73k/day",
     note: "Cooling commissioning can't proceed until the items below clear.",
     decisions: [
-      { id: "ELE-COLO-1030", action: "Escalate Cental — director-to-director call on telecoms bracketery", cost: 20 },
+      { id: "ELE-COLO-1030", action: "Escalate MEP Sub — director-to-director call on telecoms bracketery", cost: 20 },
       { id: "ELE-MER-1010", action: "Assign a crew — your own unstaffed MER1 earth bar", cost: 18 },
-      { id: "MEC-COLO-1040", action: "Push Microsoft for Status A sign-off on water services", cost: 15 },
+      { id: "MEC-COLO-1040", action: "Push Hyperscale Client for Status A sign-off on water services", cost: 15 },
     ],
     later: [
       { id: "FAB-ADMIN-1120", note: "Spec change pending on external steel — chase RKD", cost: "£9k/day" },
@@ -86,7 +86,7 @@ const GATES: Gate[] = [
     tagsTotal: 31,
     waitingOn: "Gate C",
     targetDate: "02 Dec 26",
-    note: "Final integrated systems test and handover to Microsoft.",
+    note: "Final integrated systems test and handover to Hyperscale Client.",
   },
 ];
 
@@ -118,7 +118,7 @@ export default function GatesView({
     <section className="mx-auto max-w-4xl px-8 space-y-9">
       {/* Header — the whole story in one line */}
       <div>
-        <p style={eyebrow}>Commissioning gates · DUB-16</p>
+        <p style={eyebrow}>Commissioning gates · MER</p>
         <h1
           className="font-[family-name:var(--font-fraunces)]"
           style={{ fontSize: 22, lineHeight: 1.35, color: BRAND.ink, marginTop: 10 }}

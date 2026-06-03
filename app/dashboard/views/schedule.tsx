@@ -34,7 +34,7 @@ const WEEK_CHANGES: Change[] = [
   },
   {
     tone: "red",
-    text: "Formal escalation to Mark Higgins (Cental) unopened 19 days — no movement",
+    text: "Formal escalation to Operations Manager (MEP Sub) unopened 19 days — no movement",
   },
   {
     tone: "amber",
@@ -65,7 +65,7 @@ type Horizon = {
 };
 
 // Pilot wires this to live critical-path recompute — hardcoded for the demo,
-// drawn from the existing DUB-16 blockers.
+// drawn from the existing MER blockers.
 const HORIZONS: Horizon[] = [
   {
     label: "This week",
@@ -73,21 +73,21 @@ const HORIZONS: Horizon[] = [
     dot: "red",
     verdict: "2 reds must clear or Site Install slips",
     rows: [
-      { id: "ELE-COLO-1030", name: "Telecoms bracketery — Cental blocked", dot: "red" },
+      { id: "ELE-COLO-1030", name: "Telecoms bracketery — MEP Sub blocked", dot: "red" },
       { id: "MEC-COLO-1040", name: "Water services COLO 1-4 — Status A held", dot: "red" },
     ],
-    action: "Director escalation on Cental + Sellafield — PM chases have stalled",
+    action: "Director escalation on MEP Sub + Design House — PM chases have stalled",
   },
   {
     label: "In 3 weeks",
     date: "by 18 Jun",
     dot: "red",
-    verdict: "Steel chain frozen behind Microsoft sign-off",
+    verdict: "Steel chain frozen behind Hyperscale Client sign-off",
     rows: [
       { tag: "Phase", name: "Site Install prep — sequencing at risk", dot: "amber" },
       { id: "FAB-ADMIN-1120", name: "External service support steel", dot: "red" },
     ],
-    action: "Chase Microsoft power-loading sign-off — it releases Lawrence → Marco",
+    action: "Chase Hyperscale Client power-loading sign-off — it releases Drawings Office",
   },
   {
     label: "In 6 weeks",
@@ -111,7 +111,7 @@ export default function ScheduleView(_props: Props) {
           className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em]"
           style={{ color: BRAND.purpleDeep }}
         >
-          Look-ahead · DUB-16
+          Look-ahead · MER
         </p>
         <h1
           className="mt-1 font-[family-name:var(--font-fraunces)] font-semibold"
@@ -182,7 +182,7 @@ function WeekChangesBand() {
         style={{ fontSize: 13, lineHeight: 1.5, color: BRAND.inkMuted, marginTop: 14 }}
       >
         Net: programme moved 4 days the wrong way this week. Three of five changes trace to
-        Microsoft sign-offs.
+        Hyperscale Client sign-offs.
       </p>
     </div>
   );

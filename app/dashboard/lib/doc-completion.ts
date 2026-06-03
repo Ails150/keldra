@@ -12,7 +12,7 @@ export type DocCompletion = {
   source: "procore" | "manual" | "import";
 };
 
-// Canonical 15-doc set from Johnny's tracker.
+// Canonical 15-doc set from Commissioning Lead's tracker.
 export const DOC_SET = [
   "Authorization to Ship",
   "Asset Set in Place Checklist",

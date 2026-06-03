@@ -40,41 +40,41 @@ const ROOT_CAUSE: Record<string, RootCause> = {
   "ELE-COLO-1030": {
     patternLabel: "Deprioritisation — not a supply problem",
     analysis:
-      "The genuine delay was week one — brackets were late from Cental's manufacturer. Everything since has been Cental deprioritising DUB-16. When the brackets arrived on day 53, Cental moved the crew to Project Brown instead.",
+      "The genuine delay was week one — brackets were late from MEP Sub's manufacturer. Everything since has been MEP Sub deprioritising MER. When the brackets arrived on day 53, MEP Sub moved the crew to Project Brown instead.",
     evidence: [
       "Brackets arrived day 53 — crew diverted to Project Brown",
       'Three commitments made, three broken ("Friday", "next week", "2 lads")',
-      "Formal escalation to Mark Higgins unopened after 19 days",
+      "Formal escalation to Operations Manager unopened after 19 days",
       "Now blocking a second task — SCCR cabling — widening downstream impact",
     ],
     verdict:
-      "This needs director-to-director escalation, not another chase. Pawel and Mark have stopped responding to PM-level contact.",
+      "This needs director-to-director escalation, not another chase. Site Lead and Operations Manager have stopped responding to PM-level contact.",
   },
   "MEC-COLO-1040": {
-    patternLabel: "Stuck in design sign-off — traces to Microsoft",
+    patternLabel: "Stuck in design sign-off — traces to Hyperscale Client",
     analysis:
-      "Sellafield has the water services package drafted but can't release Status A without Microsoft director sign-off. Eighteen chases, four responses, all deflecting upward. This is not a Sellafield capacity problem — it's a Microsoft decision sitting unmade.",
+      "Design House has the water services package drafted but can't release Status A without Hyperscale Client director sign-off. Eighteen chases, four responses, all deflecting upward. This is not a Design House capacity problem — it's a Hyperscale Client decision sitting unmade.",
     evidence: [
-      "Status A drafted but awaiting Microsoft sign-off — 21 days",
+      "Status A drafted but awaiting Hyperscale Client sign-off — 21 days",
       "18 chases, 22% response rate, 11-day average reply",
-      "Formal escalation to Cathal Doyle (Director) unopened",
+      "Formal escalation to Design Director (Director) unopened",
       "MMR1 first-fix cannot start until this releases",
     ],
     verdict:
-      "Escalate to Microsoft directly. Sellafield is waiting on the same sign-off you are.",
+      "Escalate to Hyperscale Client directly. Design House is waiting on the same sign-off you are.",
   },
   "FAB-ADMIN-1120": {
     patternLabel: "Design chain stalled three links deep",
     analysis:
-      "Marco can sign the primary supports but not the lighting bracket details — those depend on Lawrence's spec, which depends on Sellafield's service routing, which depends on Microsoft's power loading sign-off. The whole chain is frozen behind one Microsoft decision.",
+      "Drawings Lead can sign the primary supports but not the lighting bracket details — those depend on Design Lead's spec, which depends on Design House's service routing, which depends on Hyperscale Client's power loading sign-off. The whole chain is frozen behind one Hyperscale Client decision.",
     evidence: [
-      "Marco waiting on Lawrence Mahon for lighting spec — 21 days",
-      "Lawrence waiting on Sellafield for service routing — 35 days",
-      "Sellafield waiting on Microsoft for power loading sign-off — 42 days",
+      "Drawings Lead waiting on Design Lead for lighting spec — 21 days",
+      "Design Lead waiting on Design House for service routing — 35 days",
+      "Design House waiting on Hyperscale Client for power loading sign-off — 42 days",
       "Eleven chases, one partial response in eight weeks",
     ],
     verdict:
-      "No amount of chasing Marco will move this. The decision lives at Microsoft.",
+      "No amount of chasing Drawings Lead will move this. The decision lives at Hyperscale Client.",
   },
 };
 
