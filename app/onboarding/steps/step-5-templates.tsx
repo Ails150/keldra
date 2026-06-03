@@ -38,8 +38,8 @@ const TEMPLATES = [
   {
     id: "modular-plant-room",
     name: "Modular Plant Room v1",
-    description: "For skid-delivered MEP. Factory test → site ctelecoms-subt → commissioning → handover.",
-    stages: ["Designed", "Factory tested", "Delivered", "Sited", "Ctelecoms-subted", "Commissioned", "Handed over"],
+    description: "For skid-delivered MEP. Factory test → site connect → commissioning → handover.",
+    stages: ["Designed", "Factory tested", "Delivered", "Sited", "Connected", "Commissioned", "Handed over"],
     recommended: false,
   },
   {

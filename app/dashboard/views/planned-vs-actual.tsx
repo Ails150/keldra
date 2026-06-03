@@ -208,7 +208,7 @@ export default function PlannedVsActualView() {
         />
       </div>
 
-      {/* Impact timeline — ctelecoms-subts the variance to the BU date */}
+      {/* Impact timeline — connects the variance to the BU date */}
       <ImpactTimeline variance={summary.variance} />
 
       {/* Block B — filter chips */}

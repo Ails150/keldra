@@ -157,7 +157,7 @@ function seed(): Activity[] {
     // ===== Design House — 18 chases / 4 responses (~22% · ~11d) =====
     // Water services (MEC-COLO-1040) + FOK doors (SEC-COLO-1000). Slow, not silent.
     entry("s01", "MEC-COLO-1040", "chase", "outbound", "email", "2026-03-10T08:40:00", LEAD,
-      "Kicking off COLO 1-4 water services & ctelecoms-subtions — we need the Status A spec to release first-fix. When can you issue?",
+      "Kicking off COLO 1-4 water services & connections — we need the Status A spec to release first-fix. When can you issue?",
       { recipient: TO_DESIGN_HOUSE, subject: "MEC-COLO-1040 water services — Status A needed" }),
     entry("s02", "SEC-COLO-1000", "chase", "outbound", "keldra", "2026-03-13T09:10:00", PROJ_ENG,
       "Chasing the FOK door-type schedule for Security COLO. Door procurement is gated on your sign-off — when can we expect it?",

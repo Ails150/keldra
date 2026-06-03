@@ -19,7 +19,7 @@ const BUILD_TYPES = [
   {
     id: "modular",
     label: "Modular",
-    desc: "Prefabricated skids/plant rooms delivered and ctelecoms-subted.",
+    desc: "Prefabricated skids/plant rooms delivered and connected.",
   },
   {
     id: "hybrid",

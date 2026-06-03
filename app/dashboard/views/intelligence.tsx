@@ -2,6 +2,7 @@
 
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { BlockerMap } from "../lib/blocker-state";
+import { useDemo, type LiveBlocker } from "../demo-store";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -18,15 +19,65 @@ const MONO_STYLE: React.CSSProperties = {
 const HORIZON_EYEBROW = "HORIZON 2-3 · PILOT MONTHS 6-12 PREVIEW";
 
 export default function IntelligenceView({ project: _p, viewingAs: _v, blockerMap: _b }: Props) {
+  const { rootRollup, openBlockers } = useDemo();
   return (
     <section className="mx-auto max-w-6xl px-8 space-y-10">
       <PageHeader />
+      <RootCauseInsight rootRollup={rootRollup} openBlockers={openBlockers} />
       <DataFlowSection />
       <DailyDigestSection />
       <ReconciliationSection />
       <BenchmarkSection />
       <NorthStarSection />
     </section>
+  );
+}
+
+// ---------- hero: live synthesised root-cause insight ----------
+
+function RootCauseInsight({
+  rootRollup,
+  openBlockers,
+}: {
+  rootRollup: { root: string; count: number }[];
+  openBlockers: LiveBlocker[];
+}) {
+  const total = openBlockers.length;
+  const top = rootRollup[0];
+  if (!top || total === 0) return null;
+  const tracing = openBlockers.filter((b) => b.root === top.root);
+  const burn = tracing.reduce((s, b) => s + b.burn_per_day, 0);
+  return (
+    <div className="relative rounded-2xl border-2 border-accent bg-accent/5 p-6">
+      <p
+        className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-deep"
+        style={MONO_STYLE}
+      >
+        Synthesised insight · live
+      </p>
+      <h2
+        className="mt-2 font-[family-name:var(--font-fraunces)] font-semibold text-ink"
+        style={{ fontSize: 24, lineHeight: 1.25 }}
+      >
+        <span style={{ color: "var(--accent)" }}>{top.count} of {total}</span> active blockers trace
+        to a single root cause: <span style={{ color: "var(--accent)" }}>{top.root}</span>.
+      </h2>
+      <p className="mt-2 text-sm text-ink-mid" style={{ lineHeight: 1.55 }}>
+        Procore shows you {total} separate open blockers. The layer above reads every chain of
+        custody and finds they collapse to one decision — worth £{Math.round(burn / 1000)}k/day.
+        Clear it and {top.count} blockers move at once.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {tracing.map((b) => (
+          <span
+            key={b.id}
+            className="rounded-full border border-accent/40 bg-paper-card px-2.5 py-1 font-mono text-[11px] text-ink"
+          >
+            {b.id} · £{Math.round(b.burn_per_day / 1000)}k
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 

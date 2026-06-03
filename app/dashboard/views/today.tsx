@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { BRAND } from "@/lib/brand";
+import { useDemo } from "../demo-store";
 
 /* Director action queue. Pilot computes this live from gate state +
    cost-of-delay; hardcoded for the demo and kept in step with Gates /
@@ -55,6 +56,9 @@ export default function TodayView({
   onOpenGate: (gateId: string) => void;
 }) {
   const router = useRouter();
+  const { burnPerDay, state } = useDemo();
+  const burnK = Math.round(burnPerDay / 1000);
+  const changes = state.changes.slice(0, 5);
 
   return (
     <section className="mx-auto max-w-4xl px-8">
@@ -70,7 +74,25 @@ export default function TodayView({
         </h1>
       </div>
 
-      {/* Gate ctelecoms-subtion banner — the spine. Click → Gate C. */}
+      {/* What just changed — live feed from the demo loop */}
+      {changes.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <p style={eyebrow}>What just changed</p>
+          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+            {changes.map((c) => (
+              <div
+                key={c.id}
+                style={{ display: "flex", alignItems: "baseline", gap: 10, fontSize: 13, color: BRAND.ink, lineHeight: 1.5 }}
+              >
+                <span style={{ width: 16, flexShrink: 0 }} aria-hidden>{c.icon}</span>
+                <span>{c.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Gate connection banner — the spine. Click → Gate C. */}
       <button
         type="button"
         onClick={() => onOpenGate("C")}
@@ -95,7 +117,7 @@ export default function TodayView({
             className="block"
             style={{ fontSize: 14, color: BRAND.ink, lineHeight: 1.5, marginTop: 6 }}
           >
-            All 3 decisions sit in Gate C — blocked 19 days, £73k/day exposed. Clear them and the
+            All 3 decisions sit in Gate C — blocked 19 days, £{burnK}k/day exposed. Clear them and the
             gate opens.
           </span>
         </span>

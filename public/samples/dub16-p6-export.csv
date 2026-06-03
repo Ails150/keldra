@@ -2,7 +2,7 @@ Activity ID,Activity Name,Start,Finish,WBS,Resources,Original Duration,Total Flo
 ELE-MER-1010,Install Earth Bar MER1,13-May-26,14-May-26,Electrical Fit Out MER1,Main Contractor,2,0
 ELE-COLO-1030,Telecoms Bracketery and Containment,13-Mar-26,20-Apr-26,COLO 1-4 Electrical,Mech Sub,28,0
 ELE-ADMIN-1020,Install high level Bracketery and Containment AD1-4,01-Apr-26,01-May-26,Elec AD01-04,Main Contractor,22,0
-MEC-COLO-1040,Water services and ctelecoms-subtions COLO 1-4,21-Apr-26,28-Apr-26,Mechanical Modules 1-4,Main Contractor,6,0
+MEC-COLO-1040,Water services and connections COLO 1-4,21-Apr-26,28-Apr-26,Mechanical Modules 1-4,Main Contractor,6,0
 FAB-ADMIN-1120,External Service Support Steel,16-Mar-26,24-Apr-26,Facility Modules,Main Contractor,29,0
 CX-1180,MER-ADMIN-XFM01 FWT,13-May-26,14-May-26,Off Site Commissioning / FWT,Main Contractor,2,0
 ELE-COLO-1010,COLO DC 1-4 LV 1st fix containment,16-Feb-26,01-Apr-26,COLO 1-4 LV,Main Contractor,32,12

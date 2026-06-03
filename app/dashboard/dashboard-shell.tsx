@@ -6,6 +6,9 @@ import type { WizardData, ViewingRole, ViewingAs } from "../onboarding/types";
 import SignOutButton from "../sign-out-button";
 import { deriveOrgColour, getInitials, roleLabel } from "./utils";
 import { seedDemoStore, DEMO_VIEWING_AS } from "./lib/demo-seed";
+import { DemoProvider } from "./demo-store";
+import { DemoControls } from "./demo-controls";
+import { GuidedTour } from "./guided-tour";
 import {
   type ActionPayload,
   type BlockerMap,
@@ -300,6 +303,7 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
   const activeColour = deriveOrgColour(active.orgName);
 
   return (
+    <DemoProvider>
     <div className="flex flex-1 flex-col">
       <header className="sticky top-0 z-20 border-b border-paper-line bg-paper/85 backdrop-blur">
         <div
@@ -333,6 +337,7 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
           </div>
 
           <div className="flex items-center gap-3">
+            <DemoControls />
             <a
               href="/field"
               target="_blank"
@@ -583,7 +588,10 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
           onJumpToAssets={jumpToAssets}
         />
       )}
+
+      <GuidedTour onGoToday={() => setTab("today")} onOpenGateC={() => openGate("C")} />
     </div>
+    </DemoProvider>
   );
 }
 

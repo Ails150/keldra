@@ -76,6 +76,19 @@ const ROOT_CAUSE: Record<string, RootCause> = {
     verdict:
       "No amount of chasing Drawings Lead will move this. The decision lives at Hyperscale Client.",
   },
+  "ELE-MER-1010": {
+    patternLabel: "Your own scope — unstaffed, not blocked",
+    analysis:
+      "This isn't a sub holding you up — it's the MER1 earth bar, your own crew, with zero men assigned two days running against a baseline that says it should already be live. No external dependency, no open RFI, no design gate. It just needs a crew put on it today.",
+    evidence: [
+      "Baseline says earth bar live 13–14 May — day 2 with zero men assigned",
+      "No blocking sub and no open RFI — fully within your control",
+      "Earthing gates MER1 LV energisation — downstream of the whole power-on sequence",
+      "£18k/day accruing on an item you can clear yourself",
+    ],
+    verdict:
+      "No one to chase but yourselves. Assign a crew this morning and this clears today.",
+  },
 };
 
 function fmt(iso: string): string {
