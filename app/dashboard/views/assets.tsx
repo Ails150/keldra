@@ -37,6 +37,7 @@ export default function AssetsView({
   const { assets: liveAssets, burnPerDay, openBlockers } = useDemo();
   const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
   const [stageFilter, setStageFilter] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const highlightSet =
     highlightIds && highlightIds.length > 0 ? new Set(highlightIds.map((s) => s.trim())) : null;
@@ -55,8 +56,10 @@ export default function AssetsView({
     if (stageFilter === "RT") list = list.filter((a) => a.current_stage === "RT");
     else if (stageFilter === "YT") list = list.filter((a) => (a.current_stage ?? "").includes("YT"));
     else if (stageFilter === "GT") list = list.filter((a) => (a.current_stage ?? "").includes("GT"));
+    const q = query.trim().toLowerCase();
+    if (q) list = list.filter((a) => [a.asset_id, a.asset_type, a.system, a.location, a.owner_name].some((f) => (f ?? "").toString().toLowerCase().includes(q)));
     return list.sort((a, b) => (SEVERITY[b.current_stage] ?? 0) - (SEVERITY[a.current_stage] ?? 0));
-  }, [liveAssets, highlightSet, stageFilter]);
+  }, [liveAssets, highlightSet, stageFilter, query]);
 
   return (
     <section className="mx-auto max-w-6xl px-8">
@@ -90,8 +93,26 @@ export default function AssetsView({
         </div>
       )}
 
+      {/* Live search — client-side, works alongside the status tiles */}
+      <div className="mt-5 flex items-center gap-3">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search asset ID, type, system, zone or owner…"
+          className="flex-1 rounded-xl border border-paper-line bg-paper-card px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent"
+        />
+        {query && (
+          <button type="button" onClick={() => setQuery("")} className="text-xs font-medium text-accent hover:text-accent-deep">
+            Clear
+          </button>
+        )}
+        <span className="whitespace-nowrap text-xs text-ink-mid">
+          showing {rows.length} of {liveAssets.length}
+        </span>
+      </div>
+
       {/* Table */}
-      <div className="mt-5 overflow-hidden rounded-2xl border border-paper-line bg-paper-card">
+      <div className="mt-3 overflow-hidden rounded-2xl border border-paper-line bg-paper-card">
         <div className="max-h-[62vh] overflow-y-auto">
           <table className="w-full border-collapse text-left">
             <thead className="sticky top-0 z-10 bg-paper-warm">
