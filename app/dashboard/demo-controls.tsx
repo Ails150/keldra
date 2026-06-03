@@ -40,16 +40,16 @@ function FieldCaptureModal({
   onClose: () => void;
   onSubmit: (assetId: string, note: string) => void;
 }) {
-  const { state } = useDemo();
+  const { rawAssets } = useDemo();
   // Offer commissioned COLO assets — flipping one to red-tag is visible everywhere.
   const pickable = useMemo(
     () =>
-      state.assets
+      rawAssets
         .filter((a) => a.current_stage === "On GT" && a.location.startsWith("Colo Hall"))
         .slice(0, 12),
-    [state.assets],
+    [rawAssets],
   );
-  const [assetId, setAssetId] = useState(pickable[0]?.asset_id ?? state.assets[0]?.asset_id ?? "");
+  const [assetId, setAssetId] = useState(pickable[0]?.asset_id ?? rawAssets[0]?.asset_id ?? "");
   const [note, setNote] = useState("Leak detected at CRAH connection — needs re-tag");
 
   return (

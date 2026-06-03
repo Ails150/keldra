@@ -34,14 +34,14 @@ export default function AssetsView({
   blockerMap: BlockerMap | null;
   onOpenBlocker: (id: string) => void;
 }) {
-  const { state, burnPerDay, openBlockers } = useDemo();
+  const { assets: liveAssets, burnPerDay, openBlockers } = useDemo();
   const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
   const [stageFilter, setStageFilter] = useState<string | null>(null);
 
   const highlightSet =
     highlightIds && highlightIds.length > 0 ? new Set(highlightIds.map((s) => s.trim())) : null;
 
-  const stats = useMemo(() => assetStats(state.assets), [state.assets]);
+  const stats = useMemo(() => assetStats(liveAssets), [liveAssets]);
   // £/day is owned by the live blocker set — one source of truth across surfaces.
   const burnByAsset = useMemo(() => {
     const m: Record<string, number> = {};
@@ -50,13 +50,13 @@ export default function AssetsView({
   }, [openBlockers]);
 
   const rows = useMemo(() => {
-    let list = state.assets.slice();
+    let list = liveAssets.slice();
     if (highlightSet) list = list.filter((a) => highlightSet.has((a.asset_id ?? "").trim()));
     if (stageFilter === "RT") list = list.filter((a) => a.current_stage === "RT");
     else if (stageFilter === "YT") list = list.filter((a) => (a.current_stage ?? "").includes("YT"));
     else if (stageFilter === "GT") list = list.filter((a) => (a.current_stage ?? "").includes("GT"));
     return list.sort((a, b) => (SEVERITY[b.current_stage] ?? 0) - (SEVERITY[a.current_stage] ?? 0));
-  }, [state.assets, highlightSet, stageFilter]);
+  }, [liveAssets, highlightSet, stageFilter]);
 
   return (
     <section className="mx-auto max-w-6xl px-8">

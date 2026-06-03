@@ -20,9 +20,9 @@ export default function AuditView({
   viewingAs: ViewingAs;
   onResetBlockers?: () => void | Promise<void>;
 }) {
-  const { state, reset } = useDemo();
-  const events = 133 + state.audit.length;
-  const last = state.audit[0];
+  const { audit, reset } = useDemo();
+  const events = 133 + audit.length;
+  const last = audit[0];
 
   return (
     <section className="mx-auto max-w-6xl px-8 space-y-6">
@@ -50,10 +50,10 @@ export default function AuditView({
       <div className="rounded-2xl border border-paper-line bg-paper-card overflow-hidden">
         <div className="flex items-center justify-between border-b border-paper-line bg-paper-warm px-4 py-2.5">
           <span className="text-xs font-semibold uppercase tracking-wide text-ink-mid">Chain entries · this session</span>
-          <span className="font-mono text-[11px] text-ink-mid">{state.audit.length} live</span>
+          <span className="font-mono text-[11px] text-ink-mid">{audit.length} live</span>
         </div>
         <ul className="divide-y divide-paper-line">
-          {state.audit.map((e, i) => (
+          {audit.map((e, i) => (
             <li key={e.id} className="flex items-start gap-3 px-4 py-3">
               <span className="font-mono text-[11px] text-ink-mid w-24 flex-shrink-0 pt-0.5">{fmtTs(e.ts).split(", ")[1] ?? fmtTs(e.ts)}</span>
               <span className="flex-shrink-0 rounded-full bg-paper-warm px-2 py-0.5 text-[10px] font-semibold text-ink-mid w-44 truncate" title={e.actor}>{e.actor}</span>

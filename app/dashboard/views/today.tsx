@@ -56,9 +56,9 @@ export default function TodayView({
   onOpenGate: (gateId: string) => void;
 }) {
   const router = useRouter();
-  const { burnPerDay, state } = useDemo();
+  const { burnPerDay, changes } = useDemo();
   const burnK = Math.round(burnPerDay / 1000);
-  const changes = state.changes.slice(0, 5);
+  const recent = changes.slice(0, 5);
 
   return (
     <section className="mx-auto max-w-4xl px-8">
@@ -74,18 +74,28 @@ export default function TodayView({
         </h1>
       </div>
 
-      {/* What just changed — live feed from the demo loop */}
-      {changes.length > 0 && (
+      {/* What just changed — live feed (scripted + real field captures) */}
+      {recent.length > 0 && (
         <div style={{ marginTop: 24 }}>
           <p style={eyebrow}>What just changed</p>
-          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-            {changes.map((c) => (
+          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+            {recent.map((c) => (
               <div
                 key={c.id}
-                style={{ display: "flex", alignItems: "baseline", gap: 10, fontSize: 13, color: BRAND.ink, lineHeight: 1.5 }}
+                style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: BRAND.ink, lineHeight: 1.5 }}
               >
                 <span style={{ width: 16, flexShrink: 0 }} aria-hidden>{c.icon}</span>
-                <span>{c.text}</span>
+                <div style={{ minWidth: 0 }}>
+                  <span>{c.text}</span>
+                  {c.photoUrl && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={c.photoUrl}
+                      alt="Field capture"
+                      style={{ marginTop: 6, display: "block", maxHeight: 140, borderRadius: 8, border: `0.5px solid ${BRAND.border}` }}
+                    />
+                  )}
+                </div>
               </div>
             ))}
           </div>

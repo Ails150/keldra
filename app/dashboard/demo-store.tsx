@@ -1,19 +1,29 @@
 "use client";
 
-// Demo-grade live loop. A single in-memory reactive store (React context) that
-// every live surface reads from and writes to. Actions cascade across Today,
-// Assets, Gates and Audit the moment they fire. NOT persisted — resets on
-// reload. This is demo state only; the pilot wires the same actions to Supabase.
+// Demo live loop. The scripted £73k scenario lives in-memory (escalate/resolve/
+// reset). Field captures are REAL: /field (or the header capture) writes to
+// Supabase; this provider loads + subscribes to Supabase Realtime and merges
+// every field event into the same derived state, so a phone submission appears
+// live on the dashboard on another device with no refresh.
 
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 import { generateAssets, type DemoAsset } from "./lib/demo-assets";
+import {
+  clearFieldEvents,
+  deleteFieldEvent,
+  listFieldEvents,
+  signedPhotoUrl,
+  subscribeFieldEvents,
+  type MerFieldEvent,
+} from "@/lib/supabase/mer-field";
 
 export type BlockerStatus = "open" | "escalated" | "resolved";
 
@@ -26,21 +36,16 @@ export type LiveBlocker = {
   owner_org: string;
   status: BlockerStatus;
   raised_by: string;
-  raised_at: string; // ISO
+  raised_at: string;
   burn_per_day: number;
-  root: string; // terminal root cause
-  gate: string; // gate it blocks
+  root: string;
+  gate: string;
+  remote?: boolean;
 };
 
-export type AuditEntry = {
-  id: string;
-  ts: string; // ISO
-  actor: string;
-  action: string;
-  detail: string;
-};
-
-export type Change = { id: string; ts: string; icon: string; text: string };
+export type AuditEntry = { id: string; ts: string; actor: string; action: string; detail: string };
+export type Change = { id: string; ts: string; icon: string; text: string; photoUrl?: string | null };
+type RemoteEvent = MerFieldEvent & { photoUrl?: string | null };
 
 const DEMO_TODAY = "2026-05-28";
 function offset(days: number): string {
@@ -49,7 +54,6 @@ function offset(days: number): string {
   return d.toISOString();
 }
 
-// 7 opening blockers — burns sum to £73k/day, 5 of 7 trace to Hyperscale Client.
 function openingBlockers(): LiveBlocker[] {
   return [
     { id: "ELE-COLO-1030", asset_id: "MER-COLO1-RIO31", title: "Telecoms bracketery — COLO 1-4", system: "Power", owner_role: "Site Lead", owner_org: "MEP Sub", status: "open", raised_by: "Commissioning Lead", raised_at: offset(-19), burn_per_day: 20000, root: "Hyperscale Client", gate: "C" },
@@ -61,14 +65,12 @@ function openingBlockers(): LiveBlocker[] {
     { id: "SEC-COLO-1000", asset_id: "MER-COLO1-EWSD33", title: "FOK door types — awaiting sign-off", system: "Fire", owner_role: "Design Engineer", owner_org: "Design House", status: "open", raised_by: "Project Engineer", raised_at: offset(-18), burn_per_day: 2000, root: "Hyperscale Client", gate: "C" },
   ];
 }
-
 function openingAudit(): AuditEntry[] {
   return [
     { id: "a-seed-2", ts: offset(-1), actor: "Commissioning Lead", action: "Gate B cleared", detail: "Power distribution live — 18/18 tags signed off" },
     { id: "a-seed-1", ts: offset(-3), actor: "Keldra", action: "Baseline ingested", detail: "MER Cx programme rev 21-Apr-26 — chain initialised" },
   ];
 }
-
 function openingChanges(): Change[] {
   return [
     { id: "c-seed-2", ts: offset(-1), icon: "△", text: "BU forecast slipped +4 days — now 20 Dec" },
@@ -76,134 +78,156 @@ function openingChanges(): Change[] {
   ];
 }
 
-export type DemoState = {
-  assets: DemoAsset[];
-  blockers: LiveBlocker[];
-  audit: AuditEntry[];
-  changes: Change[];
-};
-
-function initialState(): DemoState {
-  return {
-    assets: generateAssets(),
-    blockers: openingBlockers(),
-    audit: openingAudit(),
-    changes: openingChanges(),
-  };
+type ScriptedState = { assets: DemoAsset[]; blockers: LiveBlocker[]; audit: AuditEntry[]; changes: Change[] };
+function initialScripted(): ScriptedState {
+  return { assets: generateAssets(), blockers: openingBlockers(), audit: openingAudit(), changes: openingChanges() };
 }
 
-export type GateView = {
-  id: string;
-  tagsDone: number;
-  tagsTotal: number;
-  status: "cleared" | "blocked" | "waiting" | "ready";
-  burnPerDay: number;
-  openCount: number;
-};
+export type GateView = { id: string; tagsDone: number; tagsTotal: number; status: "cleared" | "blocked" | "waiting" | "ready"; burnPerDay: number; openCount: number };
 
 export type DemoApi = {
-  state: DemoState;
+  assets: DemoAsset[];
+  changes: Change[];
+  audit: AuditEntry[];
   openBlockers: LiveBlocker[];
   burnPerDay: number;
   gateC: GateView;
   gateDE: "waiting" | "ready";
   rootRollup: { root: string; count: number }[];
-  // actions
-  raiseTag: (assetId: string, note: string) => void;
+  rawAssets: DemoAsset[];
+  raiseTag: (assetId: string, note: string) => Promise<void>;
   escalate: (blockerId: string, toRole: string) => void;
   resolve: (blockerId: string) => void;
   reset: () => void;
 };
 
 const DemoCtx = createContext<DemoApi | null>(null);
-
 let seq = 0;
 const nextId = (p: string) => `${p}-${Date.now().toString(36)}-${seq++}`;
 const nowIso = () => new Date().toISOString();
 const GATE_C_TOTAL = 20;
 
-export function DemoProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<DemoState>(initialState);
+// Remote field event -> the live structures the dashboard already renders.
+function remoteToBlocker(e: RemoteEvent): LiveBlocker {
+  return { id: `RT-${e.id}`, asset_id: e.asset_id ?? "", title: e.comment || "Red tag raised on site", system: "", owner_role: "Unassigned", owner_org: "—", status: "open", raised_by: e.actor, raised_at: e.created_at, burn_per_day: e.burn_per_day, root: "On site (field)", gate: "C", remote: true };
+}
+function remoteToChange(e: RemoteEvent): Change {
+  const where = e.asset_id || "site";
+  return { id: `c-${e.id}`, ts: e.created_at, icon: "🔴", text: `Red tag raised on ${where}${e.comment ? `: ${e.comment}` : ""} — burn +£${Math.round(e.burn_per_day / 1000)}k/day (from field)`, photoUrl: e.photoUrl };
+}
+function remoteToAudit(e: RemoteEvent): AuditEntry {
+  return { id: `a-${e.id}`, ts: e.created_at, actor: e.actor, action: "Raised red tag (field)", detail: `${e.asset_id || "site"}${e.comment ? ` — ${e.comment}` : ""}` };
+}
 
-  const log = useCallback((s: DemoState, actor: string, action: string, detail: string, change?: Change): DemoState => {
-    const audit = [{ id: nextId("a"), ts: nowIso(), actor, action, detail }, ...s.audit];
-    const changes = change ? [change, ...s.changes] : s.changes;
-    return { ...s, audit, changes };
+export function DemoProvider({ children }: { children: ReactNode }) {
+  const [s, setS] = useState<ScriptedState>(initialScripted);
+  const [remote, setRemote] = useState<RemoteEvent[]>([]);
+
+  // Load existing MER field events + subscribe to Realtime (client-only). All
+  // wrapped so the dashboard still works before the Supabase resources exist.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const events = await listFieldEvents();
+        const withUrls = await Promise.all(events.map(async (e) => ({ ...e, photoUrl: await signedPhotoUrl(e.photo_path).catch(() => null) })));
+        if (!cancelled) setRemote(withUrls);
+      } catch (err) {
+        console.warn("mer field load skipped (backend not ready?):", (err as Error)?.message);
+      }
+    })();
+    let unsub = () => {};
+    try {
+      unsub = subscribeFieldEvents({
+        onInsert: async (e) => {
+          const photoUrl = await signedPhotoUrl(e.photo_path).catch(() => null);
+          setRemote((prev) => (prev.some((x) => x.id === e.id) ? prev : [...prev, { ...e, photoUrl }]));
+        },
+        onDelete: (id) => setRemote((prev) => prev.filter((x) => x.id !== id)),
+      });
+    } catch (err) {
+      console.warn("mer realtime subscribe skipped:", (err as Error)?.message);
+    }
+    return () => { cancelled = true; unsub(); };
   }, []);
 
-  const raiseTag = useCallback((assetId: string, note: string) => {
-    setState((s) => {
-      const asset = s.assets.find((a) => a.asset_id === assetId);
+  const log = useCallback((st: ScriptedState, actor: string, action: string, detail: string, change?: Change): ScriptedState => ({
+    ...st,
+    audit: [{ id: nextId("a"), ts: nowIso(), actor, action, detail }, ...st.audit],
+    changes: change ? [change, ...st.changes] : st.changes,
+  }), []);
+
+  // In-dashboard header capture stays LOCAL/instant (solo demos need no backend).
+  // The real cross-device path is /field -> Supabase -> Realtime (merged below).
+  const raiseTag = useCallback(async (assetId: string, note: string) => {
+    setS((st) => {
       const burn = 4000;
-      const blocker: LiveBlocker = {
-        id: nextId("FIELD"), asset_id: assetId, title: note?.trim() || "Red tag raised on site",
-        system: asset?.system ?? "Cooling", owner_role: "Unassigned", owner_org: "—",
-        status: "open", raised_by: "Field — Site Lead", raised_at: nowIso(), burn_per_day: burn,
-        root: "On site (new)", gate: "C",
-      };
-      const assets = s.assets.map((a) =>
-        a.asset_id === assetId
-          ? { ...a, current_stage: "RT", burn_per_day: burn, red_tag_date: DEMO_TODAY, notes: "Red tag raised in field" }
-          : a,
-      );
-      const next = { ...s, assets, blockers: [blocker, ...s.blockers] };
-      return log(next, "Field — Site Lead", "Raised red tag",
+      const blocker: LiveBlocker = { id: nextId("FIELD"), asset_id: assetId, title: note?.trim() || "Red tag raised on site", system: "", owner_role: "Unassigned", owner_org: "—", status: "open", raised_by: "Field — Site Lead", raised_at: nowIso(), burn_per_day: burn, root: "On site (new)", gate: "C" };
+      const assets = st.assets.map((a) => a.asset_id === assetId ? { ...a, current_stage: "RT", red_tag_date: DEMO_TODAY, notes: "Red tag raised in field" } : a);
+      return log({ ...st, assets, blockers: [blocker, ...st.blockers] }, "Field — Site Lead", "Raised red tag",
         `${assetId}${note?.trim() ? " — " + note.trim() : ""}`,
         { id: nextId("c"), ts: nowIso(), icon: "🔴", text: `Red tag raised on ${assetId} — burn +£4k/day` });
     });
   }, [log]);
 
   const escalate = useCallback((blockerId: string, toRole: string) => {
-    setState((s) => {
-      const b = s.blockers.find((x) => x.id === blockerId);
-      if (!b || b.status === "resolved") return s;
-      const blockers = s.blockers.map((x) => x.id === blockerId ? { ...x, status: "escalated" as BlockerStatus, owner_role: toRole } : x);
-      const next = { ...s, blockers };
-      return log(next, "Commissioning Lead", "Escalated blocker", `${blockerId} → ${toRole}`,
+    setS((st) => {
+      const b = st.blockers.find((x) => x.id === blockerId);
+      if (!b || b.status === "resolved") return st;
+      const blockers = st.blockers.map((x) => x.id === blockerId ? { ...x, status: "escalated" as BlockerStatus, owner_role: toRole } : x);
+      return log({ ...st, blockers }, "Commissioning Lead", "Escalated blocker", `${blockerId} → ${toRole}`,
         { id: nextId("c"), ts: nowIso(), icon: "⚠", text: `${blockerId} escalated to ${toRole}` });
     });
   }, [log]);
 
   const resolve = useCallback((blockerId: string) => {
-    setState((s) => {
-      const b = s.blockers.find((x) => x.id === blockerId);
-      if (!b || b.status === "resolved") return s;
-      const blockers = s.blockers.map((x) => x.id === blockerId ? { ...x, status: "resolved" as BlockerStatus } : x);
-      const assets = s.assets.map((a) => a.asset_id === b.asset_id ? { ...a, current_stage: "On GT", burn_per_day: 0, green_date: DEMO_TODAY } : a);
-      let next = { ...s, blockers, assets };
-      next = log(next, "Commissioning Lead", "Tag cleared", `${blockerId} signed off — ${b.title}`,
+    if (blockerId.startsWith("RT-")) { void deleteFieldEvent(blockerId.slice(3)); return; }
+    setS((st) => {
+      const b = st.blockers.find((x) => x.id === blockerId);
+      if (!b || b.status === "resolved") return st;
+      const blockers = st.blockers.map((x) => x.id === blockerId ? { ...x, status: "resolved" as BlockerStatus } : x);
+      const assets = st.assets.map((a) => a.asset_id === b.asset_id ? { ...a, current_stage: "On GT", green_date: DEMO_TODAY } : a);
+      let next = log({ ...st, blockers, assets }, "Commissioning Lead", "Tag cleared", `${blockerId} signed off — ${b.title}`,
         { id: nextId("c"), ts: nowIso(), icon: "✅", text: `${blockerId} resolved — tag cleared, burn −£${Math.round(b.burn_per_day / 1000)}k/day` });
-      const stillOpen = blockers.filter((x) => x.gate === "C" && x.status !== "resolved").length;
-      if (stillOpen === 0) {
+      if (blockers.filter((x) => x.gate === "C" && x.status !== "resolved").length === 0) {
         next = log(next, "Keldra", "Gate C cleared", "COLO Hall 1 cooling — all tags signed off · Gates D & E unlocked",
-          { id: nextId("c"), ts: nowIso(), icon: "🟢", text: `Gate C cleared — D & E unlocked` });
+          { id: nextId("c"), ts: nowIso(), icon: "🟢", text: "Gate C cleared — D & E unlocked" });
       }
       return next;
     });
   }, [log]);
 
   const reset = useCallback(() => {
-    const fresh = initialState();
-    fresh.audit = [{ id: nextId("a"), ts: nowIso(), actor: "Demo", action: "Demo reset", detail: "Restored opening scenario" }, ...openingAudit()];
-    setState(fresh);
+    void clearFieldEvents();
+    setRemote([]);
+    const fresh = initialScripted();
+    fresh.audit = [{ id: nextId("a"), ts: nowIso(), actor: "Demo", action: "Demo reset", detail: "Restored opening scenario · field rows cleared" }, ...openingAudit()];
+    setS(fresh);
   }, []);
 
   const api = useMemo<DemoApi>(() => {
-    const openBlockers = state.blockers.filter((b) => b.status !== "resolved");
-    const burnPerDay = openBlockers.reduce((s, b) => s + b.burn_per_day, 0);
+    const remoteBlockers = remote.map(remoteToBlocker);
+    const scriptedOpen = s.blockers.filter((b) => b.status !== "resolved");
+    const openBlockers = [...remoteBlockers, ...scriptedOpen];
+    const burnPerDay = openBlockers.reduce((acc, b) => acc + b.burn_per_day, 0);
+
     const openC = openBlockers.filter((b) => b.gate === "C");
-    const tagsDone = Math.max(0, Math.min(GATE_C_TOTAL, GATE_C_TOTAL - openC.length));
     const cleared = openC.length === 0;
-    const gateC: GateView = {
-      id: "C", tagsDone, tagsTotal: GATE_C_TOTAL,
-      status: cleared ? "cleared" : "blocked",
-      burnPerDay: openC.reduce((s, b) => s + b.burn_per_day, 0), openCount: openC.length,
-    };
+    const gateC: GateView = { id: "C", tagsDone: Math.max(0, Math.min(GATE_C_TOTAL, GATE_C_TOTAL - openC.length)), tagsTotal: GATE_C_TOTAL, status: cleared ? "cleared" : "blocked", burnPerDay: openC.reduce((acc, b) => acc + b.burn_per_day, 0), openCount: openC.length };
+
+    const remoteTagged = new Set(remote.map((e) => e.asset_id).filter(Boolean) as string[]);
+    const assets = remoteTagged.size === 0 ? s.assets : s.assets.map((a) => remoteTagged.has(a.asset_id) ? { ...a, current_stage: "RT", red_tag_date: DEMO_TODAY } : a);
+
+    const byTs = (a: { ts: string }, b: { ts: string }) => (a.ts < b.ts ? 1 : -1);
+    const changes = [...remote.map(remoteToChange), ...s.changes].sort(byTs);
+    const audit = [...remote.map(remoteToAudit), ...s.audit].sort(byTs);
+
     const rootMap = new Map<string, number>();
     for (const b of openBlockers) rootMap.set(b.root, (rootMap.get(b.root) ?? 0) + 1);
     const rootRollup = [...rootMap.entries()].map(([root, count]) => ({ root, count })).sort((a, b) => b.count - a.count);
-    return { state, openBlockers, burnPerDay, gateC, gateDE: cleared ? "ready" : "waiting", rootRollup, raiseTag, escalate, resolve, reset };
-  }, [state, raiseTag, escalate, resolve, reset]);
+
+    return { assets, rawAssets: s.assets, changes, audit, openBlockers, burnPerDay, gateC, gateDE: cleared ? "ready" : "waiting", rootRollup, raiseTag, escalate, resolve, reset };
+  }, [s, remote, raiseTag, escalate, resolve, reset]);
 
   return <DemoCtx.Provider value={api}>{children}</DemoCtx.Provider>;
 }

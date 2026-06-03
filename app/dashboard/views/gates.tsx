@@ -211,7 +211,7 @@ function BlockerRow({
       </div>
       <div className="flex items-center justify-end" style={{ gap: 8, marginTop: 12 }}>
         <button type="button" onClick={onOpen} style={{ fontSize: 12, fontWeight: 500, color: BRAND.inkMuted }} className="hover:text-ink">Open trail →</button>
-        {!escalated && (
+        {!escalated && !b.remote && (
           <button type="button" onClick={onEscalate} style={{ fontSize: 12, fontWeight: 500, color: BRAND.warningInk, border: `0.5px solid ${BRAND.warningInk}`, borderRadius: 8, padding: "5px 10px" }} className="hover:opacity-80">Escalate</button>
         )}
         <button type="button" onClick={onResolve} style={{ fontSize: 12, fontWeight: 600, color: BRAND.paperWhite, background: BRAND.successInk, borderRadius: 8, padding: "5px 10px" }} className="hover:opacity-90">Resolve</button>
