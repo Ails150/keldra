@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Blocker, BlockerMap, BlockerStateName } from "../lib/blocker-state";
 import { daysInState } from "../lib/blocker-state";
 import { deriveOrgColour, getInitials, getLinkedBlockers } from "../utils";
 import { slipDays, type ParsedXer } from "../../onboarding/lib/xer-parser";
 import { normalizeStage, nextStage, stageMeta } from "../lib/cx-stages";
 import { deriveDocCompletion } from "../lib/doc-completion";
+import {
+  listAssetHistory,
+  signedPhotoUrl,
+  subscribeFieldEvents,
+  type MerFieldEvent,
+} from "@/lib/supabase/mer-field";
 
 type FieldCapture = {
   kind: "photo" | "voice";
@@ -706,29 +712,75 @@ function BlockerMiniCard({
   );
 }
 
+type HistEntry = { iso: number; date: string; label: string; who: string; photoUrl?: string | null; live?: boolean; key: string };
+
+function liveLabel(e: MerFieldEvent): string {
+  switch (e.kind) {
+    case "red_tag": return e.comment ? `Red tag: ${e.comment}` : "Red tag raised";
+    case "escalated": return `Escalated to ${e.role ?? "director"}`;
+    case "response": return e.comment ? `Reply: ${e.comment}` : "Reply";
+    case "comment": return e.comment ? `Comment: ${e.comment}` : "Comment";
+    case "photo": return "Photo added";
+    case "update": return e.comment ? `Update: ${e.comment}` : "Update";
+    case "resolved": return "Resolved";
+    default: return e.comment || e.kind;
+  }
+}
+
+// History = seeded stage dates merged with the live Supabase log for this asset
+// (comments, photos, escalations, replies), newest first, updating live.
 function HistoryFromCsv({ asset }: { asset: any }) {
-  type Entry = { date: string; label: string; who: string; iso: number };
-  const entries: Entry[] = [];
+  const assetId = (asset?.asset_id ?? "").toString();
 
-  const add = (raw: unknown, label: string, who: string) => {
-    const d = parseDate(raw);
-    if (!d) return;
-    entries.push({
-      date: d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-      label,
-      who,
-      iso: d.getTime(),
+  const seeded = useMemo<HistEntry[]>(() => {
+    const out: HistEntry[] = [];
+    const add = (raw: unknown, label: string, who: string) => {
+      const d = parseDate(raw);
+      if (!d) return;
+      out.push({ iso: d.getTime(), date: d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), label, who, key: `s-${label}-${d.getTime()}` });
+    };
+    add(asset.delivered_date, "Stage moved to Delivered", asset.owner_name || "Logistics");
+    add(asset.installed_date, "Stage moved to Installed", asset.owner_name || "—");
+    add(asset.red_tag_date, "Stage moved to Red-tag candidate", asset.raised_by || asset.owner_name || "—");
+    add(asset.yellow_tag_date, "Stage moved to Yellow", asset.owner_name || "—");
+    add(asset.green_date, "Stage moved to Green", asset.owner_name || "—");
+    return out;
+  }, [asset]);
+
+  const [live, setLive] = useState<HistEntry[]>([]);
+
+  useEffect(() => {
+    if (!assetId) return;
+    let cancelled = false;
+    const toEntry = async (e: MerFieldEvent): Promise<HistEntry> => {
+      const d = new Date(e.created_at);
+      return {
+        iso: d.getTime(),
+        date: d.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
+        label: liveLabel(e),
+        who: e.actor + (e.with_party ? ` · with ${e.with_party}` : ""),
+        photoUrl: await signedPhotoUrl(e.photo_path).catch(() => null),
+        live: true,
+        key: `l-${e.id}`,
+      };
+    };
+    (async () => {
+      try {
+        const hist = await listAssetHistory(assetId);
+        const mapped = await Promise.all(hist.map(toEntry));
+        if (!cancelled) setLive(mapped);
+      } catch (err) {
+        console.warn("asset history load:", (err as Error)?.message);
+      }
+    })();
+    const unsub = subscribeFieldEvents({
+      onInsert: async (e) => { if (e.asset_id !== assetId) return; const ent = await toEntry(e); setLive((p) => (p.some((x) => x.key === ent.key) ? p : [...p, ent])); },
+      onDelete: (id) => setLive((p) => p.filter((x) => x.key !== `l-${id}`)),
     });
-  };
+    return () => { cancelled = true; unsub(); };
+  }, [assetId]);
 
-  add(asset.delivered_date, "Stage moved to Delivered", asset.owner_name || "Logistics");
-  add(asset.installed_date, "Stage moved to Installed", asset.owner_name || "—");
-  add(asset.red_tag_date, "Stage moved to Red-tag candidate", asset.raised_by || asset.owner_name || "—");
-  add(asset.yellow_tag_date, "Stage moved to Yellow", asset.owner_name || "—");
-  add(asset.green_date, "Stage moved to Green", asset.owner_name || "—");
-
-  entries.sort((a, b) => b.iso - a.iso);
-
+  const entries = useMemo(() => [...seeded, ...live].sort((a, b) => b.iso - a.iso), [seeded, live]);
   if (entries.length === 0) return null;
 
   return (
@@ -737,18 +789,25 @@ function HistoryFromCsv({ asset }: { asset: any }) {
         History
       </p>
       <ul className="space-y-2">
-        {entries.map((e, i) => (
+        {entries.map((e) => (
           <li
-            key={`${e.iso}-${i}`}
-            className="rounded-xl border border-paper-line bg-paper-card p-3"
+            key={e.key}
+            className={`rounded-xl border p-3 ${e.live ? "border-accent/40 bg-accent/5" : "border-paper-line bg-paper-card"}`}
           >
             <p className="text-xs text-ink-mid">
+              {e.live && <span className="mr-1 font-semibold text-accent-deep">● LIVE</span>}
               {e.date} — <span className="text-ink">{e.label}</span> ·{" "}
               <span className="font-medium text-ink">{e.who}</span>
             </p>
-            <p className="mt-1 font-mono text-[10px] text-ink-mid/70">
-              sha256:{syntheticHash(asset, `${e.iso}-${i}`)}…
-            </p>
+            {e.photoUrl && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={e.photoUrl} alt="Logged photo" className="mt-2 max-h-40 rounded-lg border border-paper-line object-cover" />
+            )}
+            {!e.live && (
+              <p className="mt-1 font-mono text-[10px] text-ink-mid/70">
+                sha256:{syntheticHash(asset, e.key)}…
+              </p>
+            )}
           </li>
         ))}
       </ul>
