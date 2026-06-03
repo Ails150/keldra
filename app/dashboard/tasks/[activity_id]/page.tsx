@@ -22,6 +22,7 @@ import {
   metricsFor,
 } from "@/lib/activity";
 import { ActivityTimeline, LogActivityModal, Toast } from "../../activity-ui";
+import LiveAssetHistory from "./live-asset-history";
 
 const GBP = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -101,6 +102,12 @@ function fmt(iso: string): string {
 export default function TaskPage() {
   const params = useParams();
   const activityId = decodeURIComponent(String(params.activity_id ?? ""));
+  // Live field items are keyed by asset id (MER-…) and read their history from Supabase.
+  if (/^MER-/.test(activityId)) return <LiveAssetHistory assetId={activityId} />;
+  return <SeededTaskPage activityId={activityId} />;
+}
+
+function SeededTaskPage({ activityId }: { activityId: string }) {
   const [baseline, setBaseline] = useState<Baseline>(DEFAULT_BASELINE);
   const [activity, setActivity] = useState<Activity[]>([]);
   const [metrics, setMetrics] = useState<SilenceMetrics | null>(null);

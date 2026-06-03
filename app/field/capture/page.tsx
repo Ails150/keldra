@@ -3,7 +3,9 @@
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { generateAssets } from "../../dashboard/lib/demo-assets";
-import { submitFieldEvent } from "@/lib/supabase/mer-field";
+import { raiseRedTag } from "@/lib/supabase/mer-field";
+
+const WITH_PARTIES = ["MEP Sub", "Mech Sub", "Design House", "Main Contractor", "Hyperscale Client", "Controls Sub", "Fire Sub", "Sprinkler Sub"];
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -39,15 +41,17 @@ async function fileToJpegBlob(file: File, max = 1000): Promise<Blob> {
 }
 
 export default function FieldCapture() {
-  // MER asset register (the COLO assets a foreman would tag on site).
+  // Commissioned COLO Hall 1 assets (tasks under Gate C) — tagging one is always
+  // a NEW red tag, so it can't be masked by a seed item that's already red.
   const assets = useMemo(
-    () => generateAssets().filter((a) => a.location.startsWith("Colo Hall")).slice(0, 60),
+    () => generateAssets().filter((a) => a.location === "Colo Hall 1" && a.current_stage === "On GT").slice(0, 40),
     [],
   );
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [assetId, setAssetId] = useState(assets[0]?.asset_id ?? "");
+  const [withParty, setWithParty] = useState(WITH_PARTIES[0]);
   const [submitting, setSubmitting] = useState(false);
   const [doneId, setDoneId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,11 +73,12 @@ export default function FieldCapture() {
     setError(null);
     try {
       const photoBlob = photoFileRef.current ? await fileToJpegBlob(photoFileRef.current).catch(() => null) : null;
-      const { id } = await submitFieldEvent({
-        assetId: assetId || null,
+      const { id } = await raiseRedTag({
+        assetId,
         comment: text.trim() || null,
         photoBlob,
-        actor: "Field — Site Lead",
+        withParty,
+        gate: "C",
       });
       setDoneId(id);
     } catch (e: any) {
@@ -149,6 +154,20 @@ export default function FieldCapture() {
             <option key={a.asset_id} value={a.asset_id}>
               {a.asset_id} — {a.asset_type}
             </option>
+          ))}
+        </select>
+      </label>
+
+      {/* Who it's with */}
+      <label className="block">
+        <span className="text-xs font-semibold uppercase tracking-wide text-ink-mid">Who&apos;s it with?</span>
+        <select
+          value={withParty}
+          onChange={(e) => setWithParty(e.target.value)}
+          className="mt-2 min-h-[48px] w-full rounded-2xl border border-paper-line bg-paper-card px-4 text-base text-ink outline-none focus:border-accent"
+        >
+          {WITH_PARTIES.map((p) => (
+            <option key={p} value={p}>{p}</option>
           ))}
         </select>
       </label>

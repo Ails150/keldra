@@ -1,10 +1,9 @@
 "use client";
 
-// Demo live loop. The scripted £73k scenario lives in-memory (escalate/resolve/
-// reset). Field captures are REAL: /field (or the header capture) writes to
-// Supabase; this provider loads + subscribes to Supabase Realtime and merges
-// every field event into the same derived state, so a phone submission appears
-// live on the dashboard on another device with no refresh.
+// Demo live loop. The scripted £73k scenario is in-memory (escalate/resolve/
+// reset). Field history is REAL: /field logs entries to Supabase against an
+// asset; this provider loads + subscribes and merges them so Gate C's blocking
+// list, Today, Assets, the live burn and Audit update cross-device, no refresh.
 
 import {
   createContext,
@@ -19,6 +18,7 @@ import { generateAssets, type DemoAsset } from "./lib/demo-assets";
 import {
   clearFieldEvents,
   deleteFieldEvent,
+  escalateRedTag,
   listFieldEvents,
   signedPhotoUrl,
   subscribeFieldEvents,
@@ -33,7 +33,7 @@ export type LiveBlocker = {
   title: string;
   system: string;
   owner_role: string;
-  owner_org: string;
+  owner_org: string; // "who it's with"
   status: BlockerStatus;
   raised_by: string;
   raised_at: string;
@@ -44,7 +44,7 @@ export type LiveBlocker = {
 };
 
 export type AuditEntry = { id: string; ts: string; actor: string; action: string; detail: string };
-export type Change = { id: string; ts: string; icon: string; text: string; photoUrl?: string | null };
+export type Change = { id: string; ts: string; icon: string; text: string; photoUrl?: string | null; live?: boolean };
 type RemoteEvent = MerFieldEvent & { photoUrl?: string | null };
 
 const DEMO_TODAY = "2026-05-28";
@@ -107,24 +107,33 @@ const nextId = (p: string) => `${p}-${Date.now().toString(36)}-${seq++}`;
 const nowIso = () => new Date().toISOString();
 const GATE_C_TOTAL = 20;
 
-// Remote field event -> the live structures the dashboard already renders.
 function remoteToBlocker(e: RemoteEvent): LiveBlocker {
-  return { id: `RT-${e.id}`, asset_id: e.asset_id ?? "", title: e.comment || "Red tag raised on site", system: "", owner_role: "Unassigned", owner_org: "—", status: "open", raised_by: e.actor, raised_at: e.created_at, burn_per_day: e.burn_per_day, root: "On site (field)", gate: "C", remote: true };
+  return { id: `RT-${e.id}`, asset_id: e.asset_id ?? "", title: e.comment || "Red tag raised on site", system: "", owner_role: "Waiting on", owner_org: e.with_party || "Unassigned", status: "open", raised_by: e.actor, raised_at: e.created_at, burn_per_day: e.burn_per_day, root: e.with_party ? `${e.with_party} (field)` : "On site (field)", gate: e.gate || "C", remote: true };
 }
 function remoteToChange(e: RemoteEvent): Change {
-  const where = e.asset_id || "site";
-  return { id: `c-${e.id}`, ts: e.created_at, icon: "🔴", text: `Red tag raised on ${where}${e.comment ? `: ${e.comment}` : ""} — burn +£${Math.round(e.burn_per_day / 1000)}k/day (from field)`, photoUrl: e.photoUrl };
+  const at = e.asset_id || "site";
+  const base = { id: `c-${e.id}`, ts: e.created_at, photoUrl: e.photoUrl, live: true };
+  switch (e.kind) {
+    case "escalated": return { ...base, icon: "⚠", text: `${at} escalated to ${e.role ?? "director"} (field item)` };
+    case "comment": return { ...base, icon: "💬", text: `Comment on ${at}${e.comment ? `: ${e.comment}` : ""}` };
+    case "photo": return { ...base, icon: "📷", text: `Photo added on ${at}` };
+    case "update": return { ...base, icon: "✎", text: `Update on ${at}${e.comment ? `: ${e.comment}` : ""}` };
+    case "response": return { ...base, icon: "↩", text: `Reply on ${at}${e.comment ? `: ${e.comment}` : ""}` };
+    case "resolved": return { ...base, icon: "✅", text: `${at} resolved` };
+    default: return { ...base, icon: "🔴", text: `Red tag on ${at}${e.comment ? `: ${e.comment}` : ""}${e.with_party ? ` · with ${e.with_party}` : ""} — burn +£${Math.round(e.burn_per_day / 1000)}k/day` };
+  }
 }
 function remoteToAudit(e: RemoteEvent): AuditEntry {
-  return { id: `a-${e.id}`, ts: e.created_at, actor: e.actor, action: "Raised red tag (field)", detail: `${e.asset_id || "site"}${e.comment ? ` — ${e.comment}` : ""}` };
+  const at = e.asset_id || "site";
+  const action = e.kind === "red_tag" ? "Raised red tag (field)" : e.kind === "escalated" ? "Escalated blocker" : `Logged ${e.kind}`;
+  const detail = `${at}${e.with_party ? ` · with ${e.with_party}` : ""}${e.comment ? ` — ${e.comment}` : ""}`;
+  return { id: `a-${e.id}`, ts: e.created_at, actor: e.actor, action, detail };
 }
 
 export function DemoProvider({ children }: { children: ReactNode }) {
   const [s, setS] = useState<ScriptedState>(initialScripted);
   const [remote, setRemote] = useState<RemoteEvent[]>([]);
 
-  // Load existing MER field events + subscribe to Realtime (client-only). All
-  // wrapped so the dashboard still works before the Supabase resources exist.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -133,7 +142,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const withUrls = await Promise.all(events.map(async (e) => ({ ...e, photoUrl: await signedPhotoUrl(e.photo_path).catch(() => null) })));
         if (!cancelled) setRemote(withUrls);
       } catch (err) {
-        console.warn("mer field load skipped (backend not ready?):", (err as Error)?.message);
+        console.warn("mer field load skipped:", (err as Error)?.message);
       }
     })();
     let unsub = () => {};
@@ -157,20 +166,25 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     changes: change ? [change, ...st.changes] : st.changes,
   }), []);
 
-  // In-dashboard header capture stays LOCAL/instant (solo demos need no backend).
-  // The real cross-device path is /field -> Supabase -> Realtime (merged below).
+  // Header capture stays LOCAL/instant (solo demos need no backend). The real
+  // cross-device path is /field -> Supabase -> Realtime (merged below).
   const raiseTag = useCallback(async (assetId: string, note: string) => {
     setS((st) => {
       const burn = 4000;
-      const blocker: LiveBlocker = { id: nextId("FIELD"), asset_id: assetId, title: note?.trim() || "Red tag raised on site", system: "", owner_role: "Unassigned", owner_org: "—", status: "open", raised_by: "Field — Site Lead", raised_at: nowIso(), burn_per_day: burn, root: "On site (new)", gate: "C" };
+      const blocker: LiveBlocker = { id: nextId("FIELD"), asset_id: assetId, title: note?.trim() || "Red tag raised on site", system: "", owner_role: "Waiting on", owner_org: "On site", status: "open", raised_by: "Field — Site Lead", raised_at: nowIso(), burn_per_day: burn, root: "On site (new)", gate: "C" };
       const assets = st.assets.map((a) => a.asset_id === assetId ? { ...a, current_stage: "RT", red_tag_date: DEMO_TODAY, notes: "Red tag raised in field" } : a);
-      return log({ ...st, assets, blockers: [blocker, ...st.blockers] }, "Field — Site Lead", "Raised red tag",
-        `${assetId}${note?.trim() ? " — " + note.trim() : ""}`,
-        { id: nextId("c"), ts: nowIso(), icon: "🔴", text: `Red tag raised on ${assetId} — burn +£4k/day` });
+      return log({ ...st, assets, blockers: [blocker, ...st.blockers] }, "Field — Site Lead", "Raised red tag", `${assetId}${note?.trim() ? " — " + note.trim() : ""}`,
+        { id: nextId("c"), ts: nowIso(), icon: "🔴", text: `Red tag on ${assetId} — burn +£4k/day`, live: true });
     });
   }, [log]);
 
   const escalate = useCallback((blockerId: string, toRole: string) => {
+    if (blockerId.startsWith("RT-")) {
+      const eventId = blockerId.slice(3);
+      const ev = remote.find((x) => x.id === eventId);
+      if (ev?.asset_id) void escalateRedTag({ assetId: ev.asset_id, parentId: eventId, toRole });
+      return;
+    }
     setS((st) => {
       const b = st.blockers.find((x) => x.id === blockerId);
       if (!b || b.status === "resolved") return st;
@@ -178,7 +192,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       return log({ ...st, blockers }, "Commissioning Lead", "Escalated blocker", `${blockerId} → ${toRole}`,
         { id: nextId("c"), ts: nowIso(), icon: "⚠", text: `${blockerId} escalated to ${toRole}` });
     });
-  }, [log]);
+  }, [log, remote]);
 
   const resolve = useCallback((blockerId: string) => {
     if (blockerId.startsWith("RT-")) { void deleteFieldEvent(blockerId.slice(3)); return; }
@@ -206,17 +220,16 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const api = useMemo<DemoApi>(() => {
-    const remoteBlockers = remote.map(remoteToBlocker);
-    const scriptedOpen = s.blockers.filter((b) => b.status !== "resolved");
-    const openBlockers = [...remoteBlockers, ...scriptedOpen];
+    const redTags = remote.filter((e) => e.kind === "red_tag");
+    const openBlockers = [...redTags.map(remoteToBlocker), ...s.blockers.filter((b) => b.status !== "resolved")];
     const burnPerDay = openBlockers.reduce((acc, b) => acc + b.burn_per_day, 0);
 
     const openC = openBlockers.filter((b) => b.gate === "C");
     const cleared = openC.length === 0;
     const gateC: GateView = { id: "C", tagsDone: Math.max(0, Math.min(GATE_C_TOTAL, GATE_C_TOTAL - openC.length)), tagsTotal: GATE_C_TOTAL, status: cleared ? "cleared" : "blocked", burnPerDay: openC.reduce((acc, b) => acc + b.burn_per_day, 0), openCount: openC.length };
 
-    const remoteTagged = new Set(remote.map((e) => e.asset_id).filter(Boolean) as string[]);
-    const assets = remoteTagged.size === 0 ? s.assets : s.assets.map((a) => remoteTagged.has(a.asset_id) ? { ...a, current_stage: "RT", red_tag_date: DEMO_TODAY } : a);
+    const tagged = new Set(redTags.map((e) => e.asset_id).filter(Boolean) as string[]);
+    const assets = tagged.size === 0 ? s.assets : s.assets.map((a) => tagged.has(a.asset_id) ? { ...a, current_stage: "RT", red_tag_date: DEMO_TODAY } : a);
 
     const byTs = (a: { ts: string }, b: { ts: string }) => (a.ts < b.ts ? 1 : -1);
     const changes = [...remote.map(remoteToChange), ...s.changes].sort(byTs);

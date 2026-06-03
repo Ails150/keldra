@@ -125,6 +125,14 @@ export function ActivityTimeline({
                   <p className="mt-0.5 whitespace-pre-line text-[13px] leading-relaxed text-ink">
                     {e.body}
                   </p>
+                  {e.metadata.photo_url && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={e.metadata.photo_url}
+                      alt="Logged photo evidence"
+                      style={{ marginTop: 8, display: "block", maxHeight: 200, borderRadius: 8, border: `0.5px solid ${BRAND.border}` }}
+                    />
+                  )}
 
                   {e.type === "status_change" && e.metadata.new_status && (
                     <div className="mt-2 flex items-center gap-1.5 text-[11px]">

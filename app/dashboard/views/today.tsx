@@ -82,11 +82,19 @@ export default function TodayView({
             {recent.map((c) => (
               <div
                 key={c.id}
-                style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: BRAND.ink, lineHeight: 1.5 }}
+                style={{
+                  display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: BRAND.ink, lineHeight: 1.5,
+                  ...(c.live ? { background: BRAND.dangerSoft, borderLeft: `3px solid ${BRAND.dangerInk}`, borderRadius: "0 8px 8px 0", padding: "8px 10px" } : {}),
+                }}
               >
                 <span style={{ width: 16, flexShrink: 0 }} aria-hidden>{c.icon}</span>
                 <div style={{ minWidth: 0 }}>
-                  <span>{c.text}</span>
+                  {c.live && (
+                    <span style={{ display: "inline-block", marginBottom: 3, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: BRAND.dangerInk }}>
+                      ● LIVE · JUST NOW
+                    </span>
+                  )}
+                  <div><span>{c.text}</span></div>
                   {c.photoUrl && (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img

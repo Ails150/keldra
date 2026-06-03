@@ -49,6 +49,7 @@ export type Activity = {
     old_cost?: number;
     new_cost?: number;
     cost_change_reason?: string;
+    photo_url?: string;
   };
   created_at: string;
   created_by: string;

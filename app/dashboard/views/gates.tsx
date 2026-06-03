@@ -165,7 +165,7 @@ function GateDetail({
           <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
             {blockers.map((b) => (
               <BlockerRow key={b.id} b={b}
-                onOpen={() => router.push(`/dashboard/tasks/${encodeURIComponent(b.id)}`)}
+                onOpen={() => router.push(`/dashboard/tasks/${encodeURIComponent(b.remote ? b.asset_id : b.id)}`)}
                 onEscalate={() => onEscalate(b.id, "Operations Director")}
                 onResolve={() => onResolve(b.id)} />
             ))}
