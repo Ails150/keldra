@@ -45,28 +45,28 @@ function uuid(): string {
 }
 
 const WORKSPACE_KEY = "mer_workspace_id";
+export const DEFAULT_WORKSPACE = "demo";
 
-// Workspace (company) id — the scope for ALL field data. Resolved from ?w=<id>
-// in the URL (wins + persists, so a phone opening the Field link joins that
-// workspace), else the stored id, else a fresh one (so different prospect
-// companies stay isolated). Everyone on the same workspace shares one dataset;
-// the PM dashboard and the field phones that joined it see each other live.
+// Workspace (company) id — the scope for ALL field data.
+//   ?w=<id> in the URL  -> that private named workspace (wins + persists), so a
+//                          phone opening the Field link joins it.
+//   no ?w=              -> the shared common workspace ("demo"). A laptop
+//                          dashboard and a phone field app, both opened plain,
+//                          share automatically with zero setup. A cold load
+//                          always lands here even if an old (random) id is in
+//                          localStorage — we overwrite it.
 export function getWorkspaceId(): string {
-  if (typeof window === "undefined") return "ssr";
+  if (typeof window === "undefined") return DEFAULT_WORKSPACE;
   try {
     const fromUrl = new URLSearchParams(window.location.search).get("w");
     if (fromUrl) {
       window.localStorage.setItem(WORKSPACE_KEY, fromUrl);
       return fromUrl;
     }
-    let id = window.localStorage.getItem(WORKSPACE_KEY);
-    if (!id) {
-      id = uuid();
-      window.localStorage.setItem(WORKSPACE_KEY, id);
-    }
-    return id;
+    window.localStorage.setItem(WORKSPACE_KEY, DEFAULT_WORKSPACE);
+    return DEFAULT_WORKSPACE;
   } catch {
-    return "nows";
+    return DEFAULT_WORKSPACE;
   }
 }
 

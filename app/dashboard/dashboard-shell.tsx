@@ -9,7 +9,7 @@ import { seedDemoStore, DEMO_VIEWING_AS } from "./lib/demo-seed";
 import { DemoProvider } from "./demo-store";
 import { DemoControls, FieldLink } from "./demo-controls";
 import { GuidedTour } from "./guided-tour";
-import { getWorkspaceId } from "@/lib/supabase/mer-field";
+import { getWorkspaceId, DEFAULT_WORKSPACE } from "@/lib/supabase/mer-field";
 import {
   type ActionPayload,
   type BlockerMap,
@@ -137,8 +137,10 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
   useEffect(() => {
     try {
       const id = getWorkspaceId();
+      // Only surface ?w= for a private (non-default) workspace — keep the plain
+      // shared-default URL clean.
       const params = new URLSearchParams(window.location.search);
-      if (params.get("w") !== id) {
+      if (id !== DEFAULT_WORKSPACE && params.get("w") !== id) {
         params.set("w", id);
         window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
       }
