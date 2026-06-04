@@ -22,9 +22,11 @@ export function DemoControls() {
       </button>
       <button
         type="button"
-        onClick={() => reset()}
+        onClick={() => {
+          if (window.confirm("This clears all field logs — are you sure?")) reset();
+        }}
         className="hidden md:inline-flex items-center rounded-xl border border-paper-line bg-paper-card px-3 py-2 text-xs font-medium text-ink-mid transition-colors hover:border-accent hover:text-accent"
-        title="Restore the opening demo scenario"
+        title="Restore the opening demo scenario (asks to confirm — clears all field logs)"
       >
         ↺ Reset demo
       </button>

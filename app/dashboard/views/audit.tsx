@@ -71,7 +71,7 @@ export default function AuditView({
         <button
           type="button"
           onClick={() => {
-            if (confirm("Reset the demo to the opening scenario?")) {
+            if (confirm("This clears all field logs — are you sure?")) {
               reset();
               void onResetBlockers?.();
             }
