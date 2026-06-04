@@ -50,6 +50,10 @@ export type Activity = {
     new_cost?: number;
     cost_change_reason?: string;
     photo_url?: string;
+    // Set on entries bridged in from a phone field capture (mer_field_events).
+    field?: boolean;
+    kind?: string;
+    with_party?: string | null;
   };
   created_at: string;
   created_by: string;
@@ -561,6 +565,17 @@ export function buildSynopsis(
     bold: `${daysOpen(task)} days open`,
     detail: `· since ${fmtDMY(task.planned_start)}`,
   });
+
+  // Row — live field reports logged from a phone on site (the loop into the trail)
+  const field = asc.filter((e) => e.metadata.field);
+  if (field.length > 0) {
+    const last = field[field.length - 1];
+    const note = last.body ? lastSentence(last.body) : last.metadata.kind ?? "field entry";
+    rows.push({
+      bold: `${field.length} field report${field.length === 1 ? "" : "s"} from site`,
+      detail: `latest ${relTimeWords(last.created_at, now)} — ${note}`,
+    });
+  }
 
   // Row 2 — outbound chases
   const outbound = asc.filter((e) => e.direction === "outbound");

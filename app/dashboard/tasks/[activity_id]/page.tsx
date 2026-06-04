@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
@@ -23,6 +23,48 @@ import {
 } from "@/lib/activity";
 import { ActivityTimeline, LogActivityModal, Toast } from "../../activity-ui";
 import LiveAssetHistory from "./live-asset-history";
+import {
+  type MerFieldEvent,
+  listAssetHistory,
+  signedPhotoUrl,
+  subscribeFieldEvents,
+} from "@/lib/supabase/mer-field";
+
+// A phone field capture (mer_field_events, keyed by task id) rendered as an
+// Activity so it drops straight into the trail, synopsis and root-cause count.
+function fieldKindLabel(kind: string): string {
+  switch (kind) {
+    case "red_tag": return "🔴 Red tag raised on site";
+    case "photo": return "📷 Photo captured on site";
+    case "comment": return "Site note";
+    case "update": return "Site update";
+    case "escalated": return "Escalated from site";
+    case "response": return "Response from site";
+    case "resolved": return "Resolved on site";
+    default: return "Field entry";
+  }
+}
+
+async function fieldEventToActivity(e: MerFieldEvent): Promise<Activity> {
+  const photo_url = e.photo_path ? await signedPhotoUrl(e.photo_path).catch(() => null) : null;
+  const withSuffix = e.with_party ? ` · with ${e.with_party}` : "";
+  return {
+    id: `field-${e.id}`,
+    task_id: e.asset_id ?? "",
+    project_id: "mer",
+    type: "note",
+    direction: "internal",
+    channel: null,
+    actor: { name: e.actor || "Field — Site Lead", company_slug: "field", role: e.role || "Field" },
+    recipient: null,
+    subject: fieldKindLabel(e.kind) + withSuffix,
+    body: e.comment ?? "",
+    attachments: [],
+    metadata: { field: true, kind: e.kind, with_party: e.with_party, ...(photo_url ? { photo_url } : {}) },
+    created_at: e.created_at,
+    created_by: e.actor || "Field",
+  };
+}
 
 const GBP = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -109,22 +151,65 @@ export default function TaskPage() {
 
 function SeededTaskPage({ activityId }: { activityId: string }) {
   const [baseline, setBaseline] = useState<Baseline>(DEFAULT_BASELINE);
-  const [activity, setActivity] = useState<Activity[]>([]);
-  const [metrics, setMetrics] = useState<SilenceMetrics | null>(null);
+  const [logged, setLogged] = useState<Activity[]>([]);
+  const [fieldActivity, setFieldActivity] = useState<Activity[]>([]);
   const [logOpen, setLogOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => setBaseline(loadBaseline()), []);
   useEffect(() => {
-    const e = listActivityForTask(activityId);
-    setActivity(e);
-    setMetrics(metricsFor(e));
+    setLogged(listActivityForTask(activityId));
   }, [activityId]);
 
+  // Live phone field captures for this task, merged into the trail. Re-fetch +
+  // re-subscribe on open and on focus/visibility so an open page never goes
+  // stale, plus realtime INSERT/DELETE for instant cross-device updates.
+  useEffect(() => {
+    if (!activityId) return;
+    let cancelled = false;
+    let unsub = () => {};
+    const load = async () => {
+      try {
+        const hist = await listAssetHistory(activityId);
+        const mapped = await Promise.all(hist.map(fieldEventToActivity));
+        if (!cancelled) setFieldActivity(mapped);
+      } catch (err) {
+        console.warn("field trail load:", (err as Error)?.message);
+      }
+    };
+    const resubscribe = () => {
+      try { unsub(); } catch {}
+      unsub = subscribeFieldEvents({
+        onInsert: async (e) => {
+          if ((e.asset_id ?? "") !== activityId) return;
+          const a = await fieldEventToActivity(e);
+          setFieldActivity((p) => (p.some((x) => x.id === a.id) ? p : [...p, a]));
+        },
+        onDelete: (id) => setFieldActivity((p) => p.filter((x) => x.id !== `field-${id}`)),
+      });
+    };
+    const resync = () => { void load(); resubscribe(); };
+    resync();
+    const onVis = () => { if (document.visibilityState === "visible") resync(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", resync);
+    return () => {
+      cancelled = true;
+      try { unsub(); } catch {}
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", resync);
+    };
+  }, [activityId]);
+
+  // The trail the whole page reads from: logged (localStorage) + live field.
+  const activity = useMemo(
+    () => [...logged, ...fieldActivity].sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    [logged, fieldActivity],
+  );
+  const metrics = useMemo<SilenceMetrics>(() => metricsFor(activity), [activity]);
+
   function refresh() {
-    const e = listActivityForTask(activityId);
-    setActivity(e);
-    setMetrics(metricsFor(e));
+    setLogged(listActivityForTask(activityId));
   }
   function showToast(m: string) {
     setToast(m);

@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
-import { generateAssets } from "../../dashboard/lib/demo-assets";
+import { loadBaseline } from "../../dashboard/lib/baseline-seed";
 import { raiseRedTag } from "@/lib/supabase/mer-field";
 
 const WITH_PARTIES = ["MEP Sub", "Mech Sub", "Design House", "Main Contractor", "Hyperscale Client", "Controls Sub", "Fire Sub", "Sprinkler Sub"];
@@ -41,16 +41,20 @@ async function fileToJpegBlob(file: File, max = 1000): Promise<Blob> {
 }
 
 export default function FieldCapture() {
-  // Commissioned COLO Hall 1 assets (tasks under Gate C) — tagging one is always
-  // a NEW red tag, so it can't be masked by a seed item that's already red.
-  const assets = useMemo(
-    () => generateAssets().filter((a) => a.location === "Colo Hall 1" && a.current_stage === "On GT").slice(0, 40),
+  // The phone logs against a TASK directly — the same tasks the director sees on
+  // the dashboard. The entry lands in that task's Activity trail, synopsis and
+  // root-cause. Offer the open (blocked / not-started) tasks, costliest first.
+  const tasks = useMemo(
+    () =>
+      loadBaseline()
+        .tasks.filter((t) => t.status === "blocked" || t.status === "not_started_should_be")
+        .sort((a, z) => z.cost_per_day - a.cost_per_day),
     [],
   );
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [text, setText] = useState("");
-  const [assetId, setAssetId] = useState(assets[0]?.asset_id ?? "");
+  const [assetId, setAssetId] = useState(tasks[0]?.activity_id ?? "");
   const [withParty, setWithParty] = useState(WITH_PARTIES[0]);
   const [submitting, setSubmitting] = useState(false);
   const [doneId, setDoneId] = useState<string | null>(null);
@@ -142,17 +146,17 @@ export default function FieldCapture() {
         className="w-full rounded-2xl border border-paper-line bg-paper-card p-4 text-base text-ink outline-none focus:border-accent"
       />
 
-      {/* Asset */}
+      {/* Task */}
       <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-wide text-ink-mid">Which asset?</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-ink-mid">Which task?</span>
         <select
           value={assetId}
           onChange={(e) => setAssetId(e.target.value)}
           className="mt-2 min-h-[48px] w-full rounded-2xl border border-paper-line bg-paper-card px-4 text-base text-ink outline-none focus:border-accent"
         >
-          {assets.map((a) => (
-            <option key={a.asset_id} value={a.asset_id}>
-              {a.asset_id} — {a.asset_type}
+          {tasks.map((t) => (
+            <option key={t.activity_id} value={t.activity_id}>
+              {t.activity_id} — {t.name}
             </option>
           ))}
         </select>

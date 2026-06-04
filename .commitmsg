@@ -1,0 +1,10 @@
+﻿Bridge phone field captures into the task Activity trail
+
+Phone /field/capture now logs against a TASK (not an asset): the mer_field_events
+row asset_id carries the task id. The seeded task page loads + subscribes to
+those rows, converts each to an Activity (timestamp, actor, kind, comment,
+with_party, photo) and merges it into the trail - so it feeds the Activity
+timeline, the silence metrics, the Synopsis (new field-reports-from-site row +
+last-activity), and the AI root-cause entry count, all live and cross-device.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
