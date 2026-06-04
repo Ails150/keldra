@@ -44,6 +44,25 @@ function uuid(): string {
   });
 }
 
+const SESSION_KEY = "mer_session_id";
+
+// Stable per-visitor id (localStorage, generated on first load). Every field
+// read/write scopes to it so self-serve prospects each see only their own
+// entries on top of the shared seeded scenario — and can't wipe each other's.
+export function getSessionId(): string {
+  if (typeof window === "undefined") return "ssr";
+  try {
+    let id = window.localStorage.getItem(SESSION_KEY);
+    if (!id) {
+      id = uuid();
+      window.localStorage.setItem(SESSION_KEY, id);
+    }
+    return id;
+  } catch {
+    return "nostore";
+  }
+}
+
 async function uploadPhoto(id: string, blob: Blob): Promise<string | null> {
   const supabase = createClient();
   const path = `mer/${id}.jpg`;
@@ -71,6 +90,7 @@ export async function logEntry(input: {
   const { error } = await supabase.from(MER_TABLE).insert({
     id,
     project: "MER",
+    session_id: getSessionId(),
     asset_id: input.assetId,
     kind: input.kind,
     comment: input.comment ?? null,
@@ -98,27 +118,28 @@ export function escalateRedTag(input: { assetId: string; parentId: string; toRol
 
 export async function listFieldEvents(): Promise<MerFieldEvent[]> {
   const supabase = createClient();
-  const { data, error } = await supabase.from(MER_TABLE).select("*").eq("project", "MER").order("created_at", { ascending: true });
+  const { data, error } = await supabase.from(MER_TABLE).select("*").eq("project", "MER").eq("session_id", getSessionId()).order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as MerFieldEvent[];
 }
 
-// Full logged history for one asset, oldest first.
+// Full logged history for one asset, oldest first — scoped to this visitor.
 export async function listAssetHistory(assetId: string): Promise<MerFieldEvent[]> {
   const supabase = createClient();
-  const { data, error } = await supabase.from(MER_TABLE).select("*").eq("project", "MER").eq("asset_id", assetId).order("created_at", { ascending: true });
+  const { data, error } = await supabase.from(MER_TABLE).select("*").eq("project", "MER").eq("session_id", getSessionId()).eq("asset_id", assetId).order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as MerFieldEvent[];
 }
 
+// Reset clears ONLY this visitor's field rows.
 export async function clearFieldEvents(): Promise<void> {
   const supabase = createClient();
-  await supabase.from(MER_TABLE).delete().eq("project", "MER");
+  await supabase.from(MER_TABLE).delete().eq("project", "MER").eq("session_id", getSessionId());
 }
 
 export async function deleteFieldEvent(id: string): Promise<void> {
   const supabase = createClient();
-  await supabase.from(MER_TABLE).delete().eq("id", id);
+  await supabase.from(MER_TABLE).delete().eq("id", id).eq("session_id", getSessionId());
 }
 
 export async function signedPhotoUrl(path: string | null): Promise<string | null> {
@@ -137,7 +158,7 @@ export function subscribeFieldEvents(handlers: { onInsert: (e: MerFieldEvent) =>
   const supabase = createClient();
   const ch = supabase
     .channel(`mer-field-events-${++_channelSeq}`)
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: MER_TABLE }, (p) => handlers.onInsert(p.new as MerFieldEvent))
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: MER_TABLE, filter: `session_id=eq.${getSessionId()}` }, (p) => handlers.onInsert(p.new as MerFieldEvent))
     .on("postgres_changes", { event: "DELETE", schema: "public", table: MER_TABLE }, (p) => { const o = p.old as { id?: string }; if (o?.id) handlers.onDelete(o.id); })
     .subscribe();
   return () => { void supabase.removeChannel(ch); };
