@@ -44,23 +44,36 @@ function uuid(): string {
   });
 }
 
-const SESSION_KEY = "mer_session_id";
+const WORKSPACE_KEY = "mer_workspace_id";
 
-// Stable per-visitor id (localStorage, generated on first load). Every field
-// read/write scopes to it so self-serve prospects each see only their own
-// entries on top of the shared seeded scenario — and can't wipe each other's.
-export function getSessionId(): string {
+// Workspace (company) id — the scope for ALL field data. Resolved from ?w=<id>
+// in the URL (wins + persists, so a phone opening the Field link joins that
+// workspace), else the stored id, else a fresh one (so different prospect
+// companies stay isolated). Everyone on the same workspace shares one dataset;
+// the PM dashboard and the field phones that joined it see each other live.
+export function getWorkspaceId(): string {
   if (typeof window === "undefined") return "ssr";
   try {
-    let id = window.localStorage.getItem(SESSION_KEY);
+    const fromUrl = new URLSearchParams(window.location.search).get("w");
+    if (fromUrl) {
+      window.localStorage.setItem(WORKSPACE_KEY, fromUrl);
+      return fromUrl;
+    }
+    let id = window.localStorage.getItem(WORKSPACE_KEY);
     if (!id) {
       id = uuid();
-      window.localStorage.setItem(SESSION_KEY, id);
+      window.localStorage.setItem(WORKSPACE_KEY, id);
     }
     return id;
   } catch {
-    return "nostore";
+    return "nows";
   }
+}
+
+// The phone join-link carrying the CURRENT workspace.
+export function workspaceFieldUrl(): string {
+  if (typeof window === "undefined") return "/field/capture";
+  return `${window.location.origin}/field/capture?w=${encodeURIComponent(getWorkspaceId())}`;
 }
 
 async function uploadPhoto(id: string, blob: Blob): Promise<string | null> {
@@ -90,7 +103,7 @@ export async function logEntry(input: {
   const { error } = await supabase.from(MER_TABLE).insert({
     id,
     project: "MER",
-    session_id: getSessionId(),
+    session_id: getWorkspaceId(),
     asset_id: input.assetId,
     kind: input.kind,
     comment: input.comment ?? null,
@@ -118,7 +131,7 @@ export function escalateRedTag(input: { assetId: string; parentId: string; toRol
 
 export async function listFieldEvents(): Promise<MerFieldEvent[]> {
   const supabase = createClient();
-  const { data, error } = await supabase.from(MER_TABLE).select("*").eq("project", "MER").eq("session_id", getSessionId()).order("created_at", { ascending: true });
+  const { data, error } = await supabase.from(MER_TABLE).select("*").eq("project", "MER").eq("session_id", getWorkspaceId()).order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as MerFieldEvent[];
 }
@@ -126,7 +139,7 @@ export async function listFieldEvents(): Promise<MerFieldEvent[]> {
 // Full logged history for one asset, oldest first — scoped to this visitor.
 export async function listAssetHistory(assetId: string): Promise<MerFieldEvent[]> {
   const supabase = createClient();
-  const { data, error } = await supabase.from(MER_TABLE).select("*").eq("project", "MER").eq("session_id", getSessionId()).eq("asset_id", assetId).order("created_at", { ascending: true });
+  const { data, error } = await supabase.from(MER_TABLE).select("*").eq("project", "MER").eq("session_id", getWorkspaceId()).eq("asset_id", assetId).order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as MerFieldEvent[];
 }
@@ -134,12 +147,12 @@ export async function listAssetHistory(assetId: string): Promise<MerFieldEvent[]
 // Reset clears ONLY this visitor's field rows.
 export async function clearFieldEvents(): Promise<void> {
   const supabase = createClient();
-  await supabase.from(MER_TABLE).delete().eq("project", "MER").eq("session_id", getSessionId());
+  await supabase.from(MER_TABLE).delete().eq("project", "MER").eq("session_id", getWorkspaceId());
 }
 
 export async function deleteFieldEvent(id: string): Promise<void> {
   const supabase = createClient();
-  await supabase.from(MER_TABLE).delete().eq("id", id).eq("session_id", getSessionId());
+  await supabase.from(MER_TABLE).delete().eq("id", id).eq("session_id", getWorkspaceId());
 }
 
 export async function signedPhotoUrl(path: string | null): Promise<string | null> {
@@ -158,7 +171,7 @@ export function subscribeFieldEvents(handlers: { onInsert: (e: MerFieldEvent) =>
   const supabase = createClient();
   const ch = supabase
     .channel(`mer-field-events-${++_channelSeq}`)
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: MER_TABLE, filter: `session_id=eq.${getSessionId()}` }, (p) => handlers.onInsert(p.new as MerFieldEvent))
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: MER_TABLE, filter: `session_id=eq.${getWorkspaceId()}` }, (p) => handlers.onInsert(p.new as MerFieldEvent))
     .on("postgres_changes", { event: "DELETE", schema: "public", table: MER_TABLE }, (p) => { const o = p.old as { id?: string }; if (o?.id) handlers.onDelete(o.id); })
     .subscribe();
   return () => { void supabase.removeChannel(ch); };

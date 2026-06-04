@@ -7,8 +7,9 @@ import SignOutButton from "../sign-out-button";
 import { deriveOrgColour, getInitials, roleLabel } from "./utils";
 import { seedDemoStore, DEMO_VIEWING_AS } from "./lib/demo-seed";
 import { DemoProvider } from "./demo-store";
-import { DemoControls } from "./demo-controls";
+import { DemoControls, FieldLink } from "./demo-controls";
 import { GuidedTour } from "./guided-tour";
+import { getWorkspaceId } from "@/lib/supabase/mer-field";
 import {
   type ActionPayload,
   type BlockerMap,
@@ -129,6 +130,21 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // Reflect the workspace id in the dashboard URL (?w=…) so it's shareable and
+  // the Field-mode link/QR always carries the current workspace.
+  useEffect(() => {
+    try {
+      const id = getWorkspaceId();
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("w") !== id) {
+        params.set("w", id);
+        window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+      }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   // Hydrate blocker state once the project is known.
@@ -338,14 +354,7 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
 
           <div className="flex items-center gap-3">
             <DemoControls />
-            <a
-              href="/field"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-accent-deep transition-colors hover:text-accent md:inline"
-            >
-              Field mode ↗
-            </a>
+            <FieldLink />
             <button
               type="button"
               onClick={() => setInviteOpen(true)}
