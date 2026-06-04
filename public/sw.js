@@ -1,38 +1,36 @@
-// Keldra service worker — network-first with a cache fallback so the app keeps
-// working offline. Falls back to the cached /dashboard shell when a navigation
-// can't be served.
-const CACHE = "keldra-v1";
+// Keldra service worker — SELF-DESTRUCT.
+//
+// The previous version was a network-first cache that, on flaky mobile
+// networks, served a stale app shell + stale JS chunks (the cache name never
+// changed), so installed phones kept running an old build. This version takes
+// over from it, deletes every cache, unregisters itself, and reloads open tabs
+// so every device pulls the latest build from the network. There is NO fetch
+// handler — nothing is intercepted or served from cache anymore.
 
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
-});
-
-self.addEventListener("fetch", (event) => {
-  const { request } = event;
-  if (request.method !== "GET") return;
-
-  event.respondWith(
-    fetch(request)
-      .then((response) => {
-        const copy = response.clone();
-        caches
-          .open(CACHE)
-          .then((cache) => cache.put(request, copy))
-          .catch(() => {});
-        return response;
-      })
-      .catch(async () => {
-        const cached = await caches.match(request);
-        if (cached) return cached;
-        if (request.mode === "navigate") {
-          const shell = await caches.match("/dashboard");
-          if (shell) return shell;
-        }
-        return Response.error();
-      }),
+  event.waitUntil(
+    (async () => {
+      try {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      } catch {
+        /* ignore */
+      }
+      try {
+        await self.registration.unregister();
+      } catch {
+        /* ignore */
+      }
+      try {
+        const clients = await self.clients.matchAll({ type: "window" });
+        for (const client of clients) client.navigate(client.url);
+      } catch {
+        /* ignore */
+      }
+    })(),
   );
 });
