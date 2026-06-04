@@ -136,7 +136,11 @@ export function DemoProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    let unsub = () => {};
+
+    // Authoritative re-fetch — replaces the set, catching anything missed while
+    // the tab was backgrounded (realtime drops messages it didn't deliver).
+    const loadRemote = async () => {
       try {
         const events = await listFieldEvents();
         const withUrls = await Promise.all(events.map(async (e) => ({ ...e, photoUrl: await signedPhotoUrl(e.photo_path).catch(() => null) })));
@@ -144,20 +148,35 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.warn("mer field load skipped:", (err as Error)?.message);
       }
-    })();
-    let unsub = () => {};
-    try {
-      unsub = subscribeFieldEvents({
-        onInsert: async (e) => {
-          const photoUrl = await signedPhotoUrl(e.photo_path).catch(() => null);
-          setRemote((prev) => (prev.some((x) => x.id === e.id) ? prev : [...prev, { ...e, photoUrl }]));
-        },
-        onDelete: (id) => setRemote((prev) => prev.filter((x) => x.id !== id)),
-      });
-    } catch (err) {
-      console.warn("mer realtime subscribe skipped:", (err as Error)?.message);
-    }
-    return () => { cancelled = true; unsub(); };
+    };
+    const resubscribe = () => {
+      try { unsub(); } catch {}
+      try {
+        unsub = subscribeFieldEvents({
+          onInsert: async (e) => {
+            const photoUrl = await signedPhotoUrl(e.photo_path).catch(() => null);
+            setRemote((prev) => (prev.some((x) => x.id === e.id) ? prev : [...prev, { ...e, photoUrl }]));
+          },
+          onDelete: (id) => setRemote((prev) => prev.filter((x) => x.id !== id)),
+        });
+      } catch (err) {
+        console.warn("mer realtime subscribe skipped:", (err as Error)?.message);
+      }
+    };
+    // Realtime is an additive layer; re-fetch + re-subscribe on focus/visibility
+    // so a backgrounded dashboard catches up within ~1s with no manual reload.
+    const resync = () => { void loadRemote(); resubscribe(); };
+    resync();
+    const onVis = () => { if (document.visibilityState === "visible") resync(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", resync);
+
+    return () => {
+      cancelled = true;
+      try { unsub(); } catch {}
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", resync);
+    };
   }, []);
 
   const log = useCallback((st: ScriptedState, actor: string, action: string, detail: string, change?: Change): ScriptedState => ({

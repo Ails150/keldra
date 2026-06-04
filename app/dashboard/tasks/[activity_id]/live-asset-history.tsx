@@ -54,7 +54,8 @@ export default function LiveAssetHistory({ assetId }: { assetId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    let unsub = () => {};
+    const loadHistory = async () => {
       try {
         const hist = await listAssetHistory(assetId);
         const withUrls = await Promise.all(hist.map(sign));
@@ -64,12 +65,25 @@ export default function LiveAssetHistory({ assetId }: { assetId: string }) {
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
-    const unsub = subscribeFieldEvents({
-      onInsert: async (e) => { if (e.asset_id !== assetId) return; const r = await sign(e); setRows((prev) => (prev.some((x) => x.id === e.id) ? prev : [...prev, r])); if (!rootIdRef.current && e.kind === "red_tag") rootIdRef.current = e.id; },
-      onDelete: (id) => setRows((prev) => prev.filter((x) => x.id !== id)),
-    });
-    return () => { cancelled = true; unsub(); };
+    };
+    const resubscribe = () => {
+      try { unsub(); } catch {}
+      unsub = subscribeFieldEvents({
+        onInsert: async (e) => { if (e.asset_id !== assetId) return; const r = await sign(e); setRows((prev) => (prev.some((x) => x.id === e.id) ? prev : [...prev, r])); if (!rootIdRef.current && e.kind === "red_tag") rootIdRef.current = e.id; },
+        onDelete: (id) => setRows((prev) => prev.filter((x) => x.id !== id)),
+      });
+    };
+    const resync = () => { void loadHistory(); resubscribe(); };
+    resync();
+    const onVis = () => { if (document.visibilityState === "visible") resync(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", resync);
+    return () => {
+      cancelled = true;
+      try { unsub(); } catch {}
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", resync);
+    };
   }, [assetId, sign]);
 
   const ordered = useMemo(() => rows.slice().sort((a, b) => (a.created_at < b.created_at ? -1 : 1)), [rows]);

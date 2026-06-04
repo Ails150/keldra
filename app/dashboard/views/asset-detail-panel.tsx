@@ -764,7 +764,8 @@ function HistoryFromCsv({ asset }: { asset: any }) {
         key: `l-${e.id}`,
       };
     };
-    (async () => {
+    let unsub = () => {};
+    const loadHistory = async () => {
       try {
         const hist = await listAssetHistory(assetId);
         const mapped = await Promise.all(hist.map(toEntry));
@@ -772,12 +773,27 @@ function HistoryFromCsv({ asset }: { asset: any }) {
       } catch (err) {
         console.warn("asset history load:", (err as Error)?.message);
       }
-    })();
-    const unsub = subscribeFieldEvents({
-      onInsert: async (e) => { if (e.asset_id !== assetId) return; const ent = await toEntry(e); setLive((p) => (p.some((x) => x.key === ent.key) ? p : [...p, ent])); },
-      onDelete: (id) => setLive((p) => p.filter((x) => x.key !== `l-${id}`)),
-    });
-    return () => { cancelled = true; unsub(); };
+    };
+    const resubscribe = () => {
+      try { unsub(); } catch {}
+      unsub = subscribeFieldEvents({
+        onInsert: async (e) => { if (e.asset_id !== assetId) return; const ent = await toEntry(e); setLive((p) => (p.some((x) => x.key === ent.key) ? p : [...p, ent])); },
+        onDelete: (id) => setLive((p) => p.filter((x) => x.key !== `l-${id}`)),
+      });
+    };
+    // Re-fetch + re-subscribe whenever the panel opens and on focus/visibility,
+    // so an already-open dashboard never goes stale.
+    const resync = () => { void loadHistory(); resubscribe(); };
+    resync();
+    const onVis = () => { if (document.visibilityState === "visible") resync(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", resync);
+    return () => {
+      cancelled = true;
+      try { unsub(); } catch {}
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", resync);
+    };
   }, [assetId]);
 
   const entries = useMemo(() => [...seeded, ...live].sort((a, b) => b.iso - a.iso), [seeded, live]);
