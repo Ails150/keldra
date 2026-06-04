@@ -128,10 +128,15 @@ export async function signedPhotoUrl(path: string | null): Promise<string | null
   return data?.signedUrl ?? null;
 }
 
+let _channelSeq = 0;
+
+// Each caller gets its OWN channel topic — Supabase reuses a channel by name and
+// rejects adding postgres_changes callbacks after subscribe(), so multiple
+// subscribers (provider + asset panel + history page) must not share a name.
 export function subscribeFieldEvents(handlers: { onInsert: (e: MerFieldEvent) => void; onDelete: (id: string) => void }): () => void {
   const supabase = createClient();
   const ch = supabase
-    .channel("mer-field-events")
+    .channel(`mer-field-events-${++_channelSeq}`)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: MER_TABLE }, (p) => handlers.onInsert(p.new as MerFieldEvent))
     .on("postgres_changes", { event: "DELETE", schema: "public", table: MER_TABLE }, (p) => { const o = p.old as { id?: string }; if (o?.id) handlers.onDelete(o.id); })
     .subscribe();
