@@ -64,8 +64,9 @@ alter table public.mer_field_events
   alter column org_id        set default public.auth_org_id(),
   alter column actor_user_id set default auth.uid();
 
--- 6. NEW-USER TRIGGER — create a public.users row on signup, honouring an
---    org_invite by email (so magic-link login alone provisions Johnny).
+-- 6. NEW-USER TRIGGER — create a public.users row when an auth user is created,
+--    honouring an org_invite by email (so creating Johnny in the Auth dashboard
+--    auto-maps him to Ardmac with role pm — no manual profile step).
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare inv public.org_invites;
@@ -168,10 +169,22 @@ select gen_random_uuid(), 'Ardmac'
 where not exists (select 1 from public.organisations where name = 'Ardmac');
 
 insert into public.org_invites (email, org_id, role, full_name)
-select 'jonathan.mckenna@ardmac.com', o.id, 'pm', 'Johnny McKenna'
-from public.organisations o where o.name = 'Ardmac'
+select v.email, o.id, v.role, v.full_name
+from public.organisations o
+cross join (values
+  ('jonathan.mckenna@ardmac.com', 'pm', 'Johnny McKenna'),
+  -- throwaway QA account for end-to-end verification (delete when done)
+  ('fieldtest@keldra.io',          'pm', 'Field Test')
+) as v(email, role, full_name)
+where o.name = 'Ardmac'
 on conflict (email) do update
   set org_id = excluded.org_id, role = excluded.role, full_name = excluded.full_name;
+
+-- NOTE: accounts + passwords are created in the Supabase Auth dashboard
+-- (Authentication -> Users -> Add user -> Create new user, with "Auto Confirm
+-- User" ticked). The handle_new_user trigger above reads the matching invite on
+-- creation and maps the new user to Ardmac with the right role automatically.
+-- No password is stored in this file or anywhere in the repo (rule #3).
 
 -- backfill a profile row for any existing auth user (e.g. the admin account)
 insert into public.users (id, full_name, role)
@@ -183,61 +196,17 @@ on conflict (id) do nothing;
 update public.users set role = 'superadmin'
 where id = (select id from auth.users where lower(email) = lower('ailsdoherty00@gmail.com'));
 
--- 11. SEED Johnny's auth account — CONFIRMED + temporary password so magic-link
---     login still works on his phone AND the insert can be verified. Clear the
---     password later with:
---       update auth.users set encrypted_password = '' where email='jonathan.mckenna@ardmac.com';
---     Temp password: Ardmac!Field2026
-do $$
-declare
-  v_uid   uuid;
-  v_org   uuid;
-  v_email text := 'jonathan.mckenna@ardmac.com';
-  v_pw    text := 'Ardmac!Field2026';
-begin
-  select id into v_org from public.organisations where name = 'Ardmac' limit 1;
-  select id into v_uid from auth.users where lower(email) = lower(v_email);
-
-  if v_uid is null then
-    v_uid := gen_random_uuid();
-    insert into auth.users (
-      instance_id, id, aud, role, email,
-      encrypted_password, email_confirmed_at,
-      raw_app_meta_data, raw_user_meta_data,
-      created_at, updated_at,
-      confirmation_token, recovery_token, email_change_token_new, email_change
-    ) values (
-      '00000000-0000-0000-0000-000000000000', v_uid, 'authenticated', 'authenticated', v_email,
-      extensions.crypt(v_pw, extensions.gen_salt('bf')), now(),
-      '{"provider":"email","providers":["email"]}'::jsonb,
-      jsonb_build_object('full_name', 'Johnny McKenna'),
-      now(), now(), '', '', '', ''
-    );
-    insert into auth.identities (
-      provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
-    ) values (
-      v_uid::text, v_uid,
-      jsonb_build_object('sub', v_uid::text, 'email', v_email, 'email_verified', true),
-      'email', now(), now(), now()
-    );
-  else
-    update auth.users
-      set encrypted_password = extensions.crypt(v_pw, extensions.gen_salt('bf')),
-          email_confirmed_at = coalesce(email_confirmed_at, now())
-      where id = v_uid;
-  end if;
-
-  -- ensure Johnny's profile is mapped to Ardmac / pm (covers pre-existing rows)
-  insert into public.users (id, org_id, full_name, role)
-  values (v_uid, v_org, 'Johnny McKenna', 'pm')
-  on conflict (id) do update
-    set org_id = excluded.org_id, full_name = excluded.full_name, role = 'pm';
-exception when others then
-  -- Never let a GoTrue-version quirk in the auth seed roll back the migration.
-  -- If this fires, Johnny can still magic-link in (trigger provisions him); the
-  -- temp-password verification path just won't be available.
-  raise notice 'Johnny auth seed skipped: %', sqlerrm;
-end $$;
+-- 11. (Accounts are created in the Auth dashboard — see the NOTE above. No
+--      passwords live in this repo.) If a user was created BEFORE this migration
+--      (so the trigger never fired for them), map them to Ardmac here by email.
+update public.users u
+  set org_id = o.id,
+      role  = coalesce(i.role, u.role),
+      full_name = coalesce(u.full_name, i.full_name)
+from auth.users au
+join public.org_invites i on lower(i.email) = lower(au.email)
+join public.organisations o on o.id = i.org_id
+where u.id = au.id;
 
 -- 12. SANITY OUTPUT -----------------------------------------------------------
 select 'org'  as kind, id::text, name        as detail from public.organisations
