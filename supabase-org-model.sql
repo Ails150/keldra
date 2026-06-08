@@ -232,6 +232,11 @@ begin
   values (v_uid, v_org, 'Johnny McKenna', 'pm')
   on conflict (id) do update
     set org_id = excluded.org_id, full_name = excluded.full_name, role = 'pm';
+exception when others then
+  -- Never let a GoTrue-version quirk in the auth seed roll back the migration.
+  -- If this fires, Johnny can still magic-link in (trigger provisions him); the
+  -- temp-password verification path just won't be available.
+  raise notice 'Johnny auth seed skipped: %', sqlerrm;
 end $$;
 
 -- 12. SANITY OUTPUT -----------------------------------------------------------
