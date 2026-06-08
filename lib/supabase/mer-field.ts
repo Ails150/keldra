@@ -84,6 +84,61 @@ async function uploadPhoto(id: string, blob: Blob): Promise<string | null> {
   return path;
 }
 
+// ----------------------------------------------------------------------------
+// SCOPE — the org/workspace a read, write or subscription is bound to.
+//
+//   logged-in org member  -> { mode:'org', orgId, userId, fullName }
+//   logged-in superadmin  -> { mode:'org', orgId:null }  (RLS returns every org)
+//   anonymous visitor     -> { mode:'workspace', workspaceId }  (legacy ?w= demo)
+//
+// Fully defensive: anything unexpected (no session, users table absent before
+// the migration runs, query error) falls back to the workspace demo, so the
+// public app.keldra.io demo keeps working unchanged.
+// ----------------------------------------------------------------------------
+export type OrgContext = {
+  userId: string;
+  orgId: string | null;
+  role: string;
+  fullName: string | null;
+  email: string | null;
+};
+
+type Scope =
+  | { mode: "org"; orgId: string | null; userId: string; fullName: string | null }
+  | { mode: "workspace"; workspaceId: string };
+
+export async function getOrgContext(): Promise<OrgContext | null> {
+  if (typeof window === "undefined") return null;
+  try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data, error } = await supabase
+      .from("users")
+      .select("org_id, role, full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (error) return null; // table not migrated yet — treat as anonymous
+    return {
+      userId: user.id,
+      orgId: (data?.org_id as string | null) ?? null,
+      role: (data?.role as string) ?? "member",
+      fullName: (data?.full_name as string | null) ?? null,
+      email: user.email ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function resolveScope(): Promise<Scope> {
+  const ctx = await getOrgContext();
+  if (ctx && (ctx.orgId || ctx.role === "superadmin")) {
+    return { mode: "org", orgId: ctx.orgId, userId: ctx.userId, fullName: ctx.fullName };
+  }
+  return { mode: "workspace", workspaceId: getWorkspaceId() };
+}
+
 // Log any history entry against an asset. Returns the new id.
 export async function logEntry(input: {
   assetId: string;
@@ -100,10 +155,10 @@ export async function logEntry(input: {
   const supabase = createClient();
   const id = uuid();
   const photo_path = input.photoBlob ? await uploadPhoto(id, input.photoBlob) : null;
-  const { error } = await supabase.from(MER_TABLE).insert({
+  const scope = await resolveScope();
+  const row: Record<string, unknown> = {
     id,
     project: "MER",
-    session_id: getWorkspaceId(),
     asset_id: input.assetId,
     kind: input.kind,
     comment: input.comment ?? null,
@@ -114,7 +169,17 @@ export async function logEntry(input: {
     gate: input.gate ?? null,
     parent_id: input.parentId ?? null,
     burn_per_day: input.kind === "red_tag" ? (input.burnPerDay ?? FIELD_BURN_PER_DAY) : 0,
-  });
+  };
+  if (scope.mode === "org") {
+    // org_id / actor_user_id also default from the JWT server-side, but we set
+    // them explicitly so it's unambiguous which org & user logged the entry.
+    row.org_id = scope.orgId;
+    row.actor_user_id = scope.userId;
+    if (scope.fullName) row.actor = scope.fullName;
+  } else {
+    row.session_id = scope.workspaceId;
+  }
+  const { error } = await supabase.from(MER_TABLE).insert(row);
   if (error) throw error;
   return { id };
 }
@@ -129,30 +194,54 @@ export function escalateRedTag(input: { assetId: string; parentId: string; toRol
   return logEntry({ assetId: input.assetId, kind: "escalated", parentId: input.parentId, role: input.toRole, actor: input.actor ?? "Commissioning Lead", comment: `Escalated to ${input.toRole}` });
 }
 
+// Scope a read query: org members -> their org_id (superadmin -> every org via
+// RLS, no filter); anonymous -> their ?w= workspace via session_id.
+function applyScope<T extends { eq: (c: string, v: string) => T }>(q: T, scope: Scope): T {
+  if (scope.mode === "org") {
+    return scope.orgId ? q.eq("org_id", scope.orgId) : q;
+  }
+  return q.eq("session_id", scope.workspaceId);
+}
+
 export async function listFieldEvents(): Promise<MerFieldEvent[]> {
   const supabase = createClient();
-  const { data, error } = await supabase.from(MER_TABLE).select("*").eq("project", "MER").eq("session_id", getWorkspaceId()).order("created_at", { ascending: true });
+  const scope = await resolveScope();
+  const base = supabase.from(MER_TABLE).select("*").eq("project", "MER");
+  const { data, error } = await applyScope(base, scope).order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as MerFieldEvent[];
 }
 
-// Full logged history for one asset, oldest first — scoped to this visitor.
+// Full logged history for one asset, oldest first — scoped to org / workspace.
 export async function listAssetHistory(assetId: string): Promise<MerFieldEvent[]> {
   const supabase = createClient();
-  const { data, error } = await supabase.from(MER_TABLE).select("*").eq("project", "MER").eq("session_id", getWorkspaceId()).eq("asset_id", assetId).order("created_at", { ascending: true });
+  const scope = await resolveScope();
+  const base = supabase.from(MER_TABLE).select("*").eq("project", "MER").eq("asset_id", assetId);
+  const { data, error } = await applyScope(base, scope).order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as MerFieldEvent[];
 }
 
-// Reset clears ONLY this visitor's field rows.
+// Reset clears ONLY the caller's own scope (their org, or their ?w= workspace).
+// Superadmin (orgId null) is a no-op here — we never bulk-delete every org.
 export async function clearFieldEvents(): Promise<void> {
   const supabase = createClient();
-  await supabase.from(MER_TABLE).delete().eq("project", "MER").eq("session_id", getWorkspaceId());
+  const scope = await resolveScope();
+  if (scope.mode === "org") {
+    if (!scope.orgId) return;
+    await supabase.from(MER_TABLE).delete().eq("project", "MER").eq("org_id", scope.orgId);
+  } else {
+    await supabase.from(MER_TABLE).delete().eq("project", "MER").eq("session_id", scope.workspaceId);
+  }
 }
 
 export async function deleteFieldEvent(id: string): Promise<void> {
   const supabase = createClient();
-  await supabase.from(MER_TABLE).delete().eq("id", id).eq("session_id", getWorkspaceId());
+  const scope = await resolveScope();
+  // RLS already restricts to the caller's org; the extra scope filter keeps the
+  // legacy workspace path from deleting another visitor's row.
+  const q = supabase.from(MER_TABLE).delete().eq("id", id);
+  await applyScope(q, scope);
 }
 
 export async function signedPhotoUrl(path: string | null): Promise<string | null> {
@@ -169,10 +258,29 @@ let _channelSeq = 0;
 // subscribers (provider + asset panel + history page) must not share a name.
 export function subscribeFieldEvents(handlers: { onInsert: (e: MerFieldEvent) => void; onDelete: (id: string) => void }): () => void {
   const supabase = createClient();
-  const ch = supabase
-    .channel(`mer-field-events-${++_channelSeq}`)
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: MER_TABLE, filter: `session_id=eq.${getWorkspaceId()}` }, (p) => handlers.onInsert(p.new as MerFieldEvent))
-    .on("postgres_changes", { event: "DELETE", schema: "public", table: MER_TABLE }, (p) => { const o = p.old as { id?: string }; if (o?.id) handlers.onDelete(o.id); })
-    .subscribe();
-  return () => { void supabase.removeChannel(ch); };
+  // Scope resolution is async; set the channel up once we know it, and let the
+  // returned unsubscribe tear down whatever exists by then.
+  let ch: ReturnType<typeof supabase.channel> | null = null;
+  let cancelled = false;
+  void (async () => {
+    const scope = await resolveScope();
+    if (cancelled) return;
+    // org member -> org_id filter; superadmin (orgId null) -> no filter (RLS
+    // still limits the stream to rows they can SELECT); anon -> session_id.
+    const insertFilter =
+      scope.mode === "org"
+        ? scope.orgId
+          ? `org_id=eq.${scope.orgId}`
+          : undefined
+        : `session_id=eq.${scope.workspaceId}`;
+    const insertOpts = insertFilter
+      ? { event: "INSERT" as const, schema: "public", table: MER_TABLE, filter: insertFilter }
+      : { event: "INSERT" as const, schema: "public", table: MER_TABLE };
+    ch = supabase
+      .channel(`mer-field-events-${++_channelSeq}`)
+      .on("postgres_changes", insertOpts, (p) => handlers.onInsert(p.new as MerFieldEvent))
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: MER_TABLE }, (p) => { const o = p.old as { id?: string }; if (o?.id) handlers.onDelete(o.id); })
+      .subscribe();
+  })();
+  return () => { cancelled = true; if (ch) void supabase.removeChannel(ch); };
 }

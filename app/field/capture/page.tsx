@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { loadBaseline } from "../../dashboard/lib/baseline-seed";
-import { raiseRedTag } from "@/lib/supabase/mer-field";
+import { getOrgContext, raiseRedTag, type OrgContext } from "@/lib/supabase/mer-field";
 
 const WITH_PARTIES = ["MEP Sub", "Mech Sub", "Design House", "Main Contractor", "Hyperscale Client", "Controls Sub", "Fire Sub", "Sprinkler Sub"];
 
@@ -51,6 +51,13 @@ export default function FieldCapture() {
         .sort((a, z) => z.cost_per_day - a.cost_per_day),
     [],
   );
+
+  const [org, setOrg] = useState<OrgContext | null>(null);
+  useEffect(() => {
+    let live = true;
+    getOrgContext().then((c) => { if (live) setOrg(c); });
+    return () => { live = false; };
+  }, []);
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [text, setText] = useState("");
@@ -124,6 +131,18 @@ export default function FieldCapture() {
         Raise a red tag
       </h1>
       <p className="text-sm text-ink-mid">Photo + what you found. It lands on the director dashboard live.</p>
+
+      {org && (org.orgId || org.role === "superadmin") ? (
+        <div className="flex items-center gap-2 rounded-xl border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-ink">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent text-paper text-[11px] font-semibold">
+            {(org.fullName || org.email || "U").trim()[0]?.toUpperCase()}
+          </span>
+          <span>
+            Logging as <span className="font-semibold">{org.fullName || org.email}</span>
+            {org.email && org.fullName ? <span className="text-ink-mid"> · {org.email}</span> : null}
+          </span>
+        </div>
+      ) : null}
 
       {/* Photo */}
       <div className="rounded-2xl border border-paper-line bg-paper-card p-4">

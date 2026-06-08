@@ -101,7 +101,13 @@ const DEMO_ROLE_OPTIONS: RoleOption[] = [
   },
 ];
 
-export default function DashboardShell({ userEmail }: { userEmail: string }) {
+export default function DashboardShell({
+  userEmail,
+  orgBadge,
+}: {
+  userEmail: string;
+  orgBadge?: string | null;
+}) {
   const [project, setProject] = useState<WizardData | null | undefined>(undefined);
   const [tab, setTab] = useState<Tab>("gates");
   const [viewingAs, setViewingAs] = useState<ViewingAs | null>(null);
@@ -364,6 +370,14 @@ export default function DashboardShell({ userEmail }: { userEmail: string }) {
             >
               <span aria-hidden>＋</span> Tag in another organisation
             </button>
+            {orgBadge && (
+              <span
+                className="hidden md:inline-flex items-center rounded-full bg-accent/10 px-2.5 py-1 text-[11px] font-semibold text-accent-deep"
+                title={`Signed in to ${orgBadge}`}
+              >
+                {orgBadge}
+              </span>
+            )}
             <span className="hidden md:inline text-xs text-ink-mid">{userEmail}</span>
             <div
               className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-paper font-semibold text-sm"
