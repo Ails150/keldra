@@ -128,6 +128,7 @@ export async function sendTaskEmail(opts: {
   orgId: string;
   taskCode: string;
   to: string;
+  cc?: string[];
   subject: string;
   html: string;
   text?: string;
@@ -159,6 +160,7 @@ export async function sendTaskEmail(opts: {
     body: JSON.stringify({
       from,
       to: [opts.to],
+      ...(opts.cc && opts.cc.length ? { cc: opts.cc } : {}),
       subject,
       html: opts.html,
       ...(opts.text ? { text: opts.text } : {}),

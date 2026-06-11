@@ -19,6 +19,7 @@ export async function GET() {
   tick("SUPABASE_SERVICE_ROLE_KEY present", hasService);
   tick("RESEND_API_KEY present", !!process.env.RESEND_API_KEY);
   tick("RESEND_WEBHOOK_SECRET present", !!process.env.RESEND_WEBHOOK_SECRET);
+  tick("CRON_SECRET present", !!process.env.CRON_SECRET);
   tick("NEXT_PUBLIC_SUPABASE_URL present", !!process.env.NEXT_PUBLIC_SUPABASE_URL);
   tick("NEXT_PUBLIC_SUPABASE_ANON_KEY present", !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 

@@ -4,6 +4,7 @@ import { parseThreadAddress } from "@/lib/email/task-email";
 import { verifyResendWebhook } from "@/lib/email/svix";
 import { stripQuotedReply } from "@/lib/email/strip-quote";
 import { attachmentAllowed, storeEmailAttachment } from "@/lib/email/attachments";
+import { pauseSequenceForTask } from "@/lib/sequences/engine";
 
 // Resend inbound webhook (email.received). Order of operations:
 //  1. Verify the Svix signature — reject anything unsigned.
@@ -114,6 +115,11 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ status: "logged-error" }, { status: 202 });
   }
+
+  // An inbound reply pauses any active chase sequence on this task.
+  await pauseSequenceForTask(admin, matched.orgId, matched.taskCode, "inbound reply").catch(
+    () => {},
+  );
 
   // Heavy lifting (attachment download + upload) happens after the 200.
   const attachments = extractAttachments(data);

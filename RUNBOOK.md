@@ -33,6 +33,7 @@ You need four new values:
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → `service_role` secret |
 | `RESEND_API_KEY` | Resend → API Keys → Create API Key |
 | `RESEND_WEBHOOK_SECRET` | Resend → Webhooks → (your inbound endpoint) → Signing Secret (`whsec_…`) |
+| `CRON_SECRET` | Make up a long random string — shared secret the pg_cron tick sends to `/api/sequences/tick` |
 | `NEXT_PUBLIC_SITE_URL` *(optional)* | Your production URL, e.g. `https://app.keldra.io` |
 
 `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` already exist.
@@ -86,7 +87,9 @@ Paste and **Run** each file **in this exact order**. All are idempotent
 4. **`supabase-instances.sql`** — `projects`, `tasks`, `gates`, `blockers`,
    `org_config`, the `task_threads.task_id` FK, the `hyperscaler-dc` template
    and `init_org_from_template()`, plus the Ardmac org_config seed.
-5. **`supabase-health.sql`** — `setup_health()` for the health check below.
+5. **`supabase-sequences.sql`** — `task_sequences`, `sequence_audit`, and the
+   `sequence` block added to org_config (sending OFF by default).
+6. **`supabase-health.sql`** — `setup_health()` for the health check below.
 
 Each file ends with a sanity `SELECT` — check it returns without error.
 
@@ -266,6 +269,42 @@ Run these end-to-end. Use throwaway addresses like `fieldtest+1@keldra.io`.
 > → pick **Ardmac** → you should see the hyperscaler-dc terminology/gates;
 > edit a term, Save, reload — the change persists.
 
+## Chase sequences (virtual PM) — setup
+
+Sequences are **off by default**: even with everything wired, nothing auto-sends
+until you enable an org. Steps live in `org_config.sequence` (editable in the
+config screen). Default cadence: step 1 at +2 days, step 2 (CC escalation
+contact) at +4, step 3 (flag-to-report) at +7, from when the sequence starts.
+
+1. **Set `CRON_SECRET`** in `.env.local` AND Netlify (a long random string).
+2. **Wire the pg_cron tick** in Supabase SQL editor (needs `pg_cron` + `pg_net`,
+   both available on Supabase). Replace the secret with your `CRON_SECRET`:
+   ```sql
+   create extension if not exists pg_cron;
+   create extension if not exists pg_net;
+   select cron.schedule('keldra-sequence-tick', '*/15 * * * *', $$
+     select net.http_post(
+       url     := 'https://app.keldra.io/api/sequences/tick',
+       headers := jsonb_build_object('x-cron-secret', '<YOUR_CRON_SECRET>'),
+       body    := '{}'::jsonb
+     );
+   $$);
+   ```
+   (Every 15 min; the engine only sends within the org's working hours + daily
+   cap.)
+3. **Enable an org:** sign in as superadmin → `/dashboard/admin/config` → pick the
+   org → tick **"Enable automatic sending for this org"** → Save. (Edit the step
+   copy / working hours / daily cap in the `sequence` JSON on the same screen.)
+4. **Use it:** on a task, the "Chase sequence" panel → **Start chase sequence**
+   (recipient, their commitment quote, optional escalation CC, deadline). The
+   panel shows "Step 1 of 3 · next … · pauses on reply". The **Escalation lane**
+   at `/dashboard/sequences` lists all active sequences. Any inbound reply on the
+   task pauses the sequence automatically; you can also pause/resume/stop it.
+
+> **Safety:** the escalation CC is only ever the address you typed — it never
+> guesses. Steps are logged to the task trail (as the sent email) and to
+> `sequence_audit` ("auto-chase step N").
+
 ## Secrets summary — what to get and where
 
 | Secret | Get it from (click-path) | Goes in |
@@ -273,6 +312,7 @@ Run these end-to-end. Use throwaway addresses like `fieldtest+1@keldra.io`.
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → **Project Settings → API** → "Project API keys" → reveal **`service_role`** → copy | `.env.local` **and** Netlify |
 | `RESEND_API_KEY` | Resend → **API Keys** → **Create API Key** (Full access or Sending) → copy once | `.env.local` **and** Netlify |
 | `RESEND_WEBHOOK_SECRET` | Resend → **Webhooks** → open your inbound (`email.received`) endpoint → **Signing Secret** (`whsec_…`) → copy | `.env.local` **and** Netlify |
+| `CRON_SECRET` | Invent a long random string (e.g. `openssl rand -hex 32`) — the pg_cron tick sends it as `x-cron-secret` | `.env.local` **and** Netlify (+ paste into the pg_cron SQL) |
 | `NEXT_PUBLIC_SITE_URL` *(optional)* | Your production URL, `https://app.keldra.io` | `.env.local` **and** Netlify |
 | `NEXT_PUBLIC_SUPABASE_URL` *(exists)* | Supabase → Project Settings → API → Project URL | already set |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` *(exists)* | Supabase → Project Settings → API → `anon` `public` key | already set |

@@ -22,7 +22,9 @@ returns jsonb language sql stable security definer set search_path = public as $
       'tasks',                  to_regclass('public.tasks') is not null,
       'gates',                  to_regclass('public.gates') is not null,
       'blockers',               to_regclass('public.blockers') is not null,
-      'org_config',             to_regclass('public.org_config') is not null
+      'org_config',             to_regclass('public.org_config') is not null,
+      'task_sequences',         to_regclass('public.task_sequences') is not null,
+      'sequence_audit',         to_regclass('public.sequence_audit') is not null
     ),
     'rls', jsonb_build_object(
       'org_invite_links',       coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.org_invite_links')), false),
@@ -34,7 +36,9 @@ returns jsonb language sql stable security definer set search_path = public as $
       'tasks',                  coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.tasks')), false),
       'gates',                  coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.gates')), false),
       'blockers',               coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.blockers')), false),
-      'org_config',             coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.org_config')), false)
+      'org_config',             coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.org_config')), false),
+      'task_sequences',         coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.task_sequences')), false),
+      'sequence_audit',         coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.sequence_audit')), false)
     ),
     'functions', jsonb_build_object(
       'auth_role',             to_regprocedure('public.auth_role()') is not null,

@@ -8,6 +8,7 @@ type OrgConfig = {
   gate_structure?: { code: string; name: string }[];
   blocker_taxonomy?: string[];
   escalation_cadences?: Record<string, number>;
+  sequence?: Record<string, unknown>;
 };
 
 type OrgRow = { id: string; name: string; config: OrgConfig | null; template: string | null };
@@ -21,6 +22,7 @@ export default function OrgConfigEditor() {
   const [terminology, setTerminology] = useState<Record<string, string>>({});
   const [cadences, setCadences] = useState<Record<string, string>>({});
   const [arraysJson, setArraysJson] = useState("");
+  const [seqEnabled, setSeqEnabled] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,11 +40,13 @@ export default function OrgConfigEditor() {
         {
           gate_structure: cfg.gate_structure ?? [],
           blocker_taxonomy: cfg.blocker_taxonomy ?? [],
+          sequence: cfg.sequence ?? {},
         },
         null,
         2,
       ),
     );
+    setSeqEnabled(!!(cfg.sequence as { enabled?: boolean } | undefined)?.enabled);
   }, []);
 
   useEffect(() => {
@@ -74,13 +78,15 @@ export default function OrgConfigEditor() {
   async function save() {
     setStatus(null);
     setError(null);
-    let arrays: { gate_structure?: unknown; blocker_taxonomy?: unknown };
+    let arrays: { gate_structure?: unknown; blocker_taxonomy?: unknown; sequence?: Record<string, unknown> };
     try {
       arrays = JSON.parse(arraysJson);
     } catch {
-      setError("Gate structure / taxonomy isn't valid JSON.");
+      setError("Gate structure / taxonomy / sequence isn't valid JSON.");
       return;
     }
+    // Preserve the sequence block; the toggle is the source of truth for enabled.
+    const sequence = { ...(arrays.sequence ?? {}), enabled: seqEnabled };
     const config: OrgConfig = {
       terminology,
       escalation_cadences: Object.fromEntries(
@@ -88,6 +94,7 @@ export default function OrgConfigEditor() {
       ),
       gate_structure: (arrays.gate_structure as OrgConfig["gate_structure"]) ?? [],
       blocker_taxonomy: (arrays.blocker_taxonomy as string[]) ?? [],
+      sequence,
     };
 
     const res = await fetch("/api/org-config", {
@@ -182,8 +189,25 @@ export default function OrgConfigEditor() {
           </section>
 
           <section>
+            <h2 className="text-sm font-semibold text-ink">Chase sequences</h2>
+            <label className="mt-2 flex items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={seqEnabled}
+                onChange={(e) => setSeqEnabled(e.target.checked)}
+              />
+              Enable automatic sending for this org
+            </label>
+            <p className="mt-1 text-[11px] text-ink-mid">
+              Off by default. When off, sequences are tracked and shown but never
+              auto-send. Step copy, working hours, daily cap and timezone live in
+              the JSON below (under <code>sequence</code>).
+            </p>
+          </section>
+
+          <section>
             <h2 className="text-sm font-semibold text-ink">
-              Gate structure &amp; blocker taxonomy (JSON)
+              Gate structure, blocker taxonomy &amp; sequence (JSON)
             </h2>
             <textarea
               value={arraysJson}
