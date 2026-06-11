@@ -7,6 +7,15 @@ import type { Activity } from "@/lib/activity";
 
 const BUCKET = "task-email-attachments";
 
+// Mirror of the server allowlist + 10MB cap, for a friendly client-side check.
+const ACCEPT =
+  "image/png,image/jpeg,image/gif,image/webp,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv";
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+// A piece of existing trail evidence (a field-capture photo) that can be
+// re-attached to an outgoing email in one tick.
+export type EvidenceItem = { id: string; name: string; thumbUrl: string | null };
+
 type AttachmentRow = {
   id: string;
   filename: string | null;
@@ -138,27 +147,58 @@ export function useTaskEmails(taskCode: string) {
 
 export function EmailUpdateModal({
   taskCode,
+  evidence = [],
   onClose,
   onSent,
 }: {
   taskCode: string;
+  evidence?: EvidenceItem[];
   onClose: () => void;
   onSent: () => void;
 }) {
   const [to, setTo] = useState("");
   const [subject, setSubject] = useState("Status update requested");
   const [message, setMessage] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [selectedEvidence, setSelectedEvidence] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function addFiles(list: FileList | null) {
+    if (!list) return;
+    const next: File[] = [];
+    for (const f of Array.from(list)) {
+      if (f.size > MAX_FILE_BYTES) {
+        setError(`"${f.name}" is over 10MB.`);
+        continue;
+      }
+      next.push(f);
+    }
+    setFiles((cur) => [...cur, ...next]);
+  }
+
+  function toggleEvidence(id: string) {
+    setSelectedEvidence((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   async function send() {
     setSending(true);
     setError(null);
-    const res = await fetch("/api/tasks/email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskCode, to, subject, message }),
-    });
+    const fd = new FormData();
+    fd.set("taskCode", taskCode);
+    fd.set("to", to);
+    fd.set("subject", subject);
+    fd.set("message", message);
+    fd.set("evidence", JSON.stringify([...selectedEvidence]));
+    for (const f of files) fd.append("files", f);
+
+    // No Content-Type header — the browser sets the multipart boundary.
+    const res = await fetch("/api/tasks/email", { method: "POST", body: fd });
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     setSending(false);
     if (!res.ok) {
@@ -209,10 +249,94 @@ export function EmailUpdateModal({
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            rows={5}
+            rows={4}
             placeholder="Ask for a status update…"
             className={input}
           />
+
+          {/* Attach existing trail evidence (field-capture photos) */}
+          {evidence.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-mid">
+                Attach evidence from this task
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {evidence.map((ev) => {
+                  const on = selectedEvidence.has(ev.id);
+                  return (
+                    <button
+                      key={ev.id}
+                      type="button"
+                      onClick={() => toggleEvidence(ev.id)}
+                      title={ev.name}
+                      className="relative h-16 w-16 overflow-hidden rounded-lg border-2 transition-colors"
+                      style={{ borderColor: on ? BRAND.purple : BRAND.border }}
+                    >
+                      {ev.thumbUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={ev.thumbUrl} alt={ev.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-[10px] text-ink-mid">
+                          photo
+                        </span>
+                      )}
+                      {on && (
+                        <span
+                          className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[10px] text-paper"
+                          style={{ backgroundColor: BRAND.purple }}
+                        >
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Upload new files */}
+          <div>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-paper-line px-3 py-1.5 text-xs font-medium text-ink hover:border-accent hover:text-accent">
+              📎 Add files
+              <input
+                type="file"
+                multiple
+                accept={ACCEPT}
+                className="hidden"
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <span className="ml-2 text-[11px] text-ink-mid">
+              images, PDF, docs · 10MB each
+            </span>
+            {files.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {files.map((f, i) => (
+                  <li
+                    key={`${f.name}-${i}`}
+                    className="flex items-center justify-between rounded-md border border-paper-line px-2 py-1 text-[11px] text-ink"
+                  >
+                    <span className="truncate">
+                      📎 {f.name} · {(f.size / 1024 / 1024).toFixed(1)} MB
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setFiles((cur) => cur.filter((_, j) => j !== i))}
+                      className="ml-2 flex-shrink-0 text-ink-mid hover:text-red-600"
+                      aria-label={`Remove ${f.name}`}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
 

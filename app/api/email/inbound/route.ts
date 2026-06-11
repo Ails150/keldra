@@ -3,8 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { parseThreadAddress } from "@/lib/email/task-email";
 import { verifyResendWebhook } from "@/lib/email/svix";
 import { stripQuotedReply } from "@/lib/email/strip-quote";
-
-const BUCKET = "task-email-attachments";
+import { attachmentAllowed, storeEmailAttachment } from "@/lib/email/attachments";
 
 // Resend inbound webhook (email.received). Order of operations:
 //  1. Verify the Svix signature — reject anything unsigned.
@@ -244,21 +243,17 @@ async function storeAttachments(
       }
       if (!bytes) continue;
 
-      const safeName = att.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `${opts.orgId}/${opts.taskCode}/${opts.emailId}/${safeName}`;
-      const { error: upErr } = await admin.storage.from(BUCKET).upload(path, bytes, {
-        contentType: att.contentType ?? "application/octet-stream",
-        upsert: true,
-      });
-      if (upErr) continue;
+      // Same allowlist + 10MB cap as outbound. Disallowed/oversized inbound
+      // files are skipped (we already accepted the email itself).
+      if (!attachmentAllowed(att.contentType, bytes.byteLength).ok) continue;
 
-      await admin.from("task_email_attachments").insert({
-        email_id: opts.emailId,
-        org_id: opts.orgId,
+      await storeEmailAttachment(admin, {
+        emailId: opts.emailId,
+        orgId: opts.orgId,
+        taskCode: opts.taskCode,
         filename: att.filename,
-        content_type: att.contentType,
-        size_bytes: bytes.byteLength,
-        storage_path: path,
+        contentType: att.contentType,
+        bytes,
       });
     } catch {
       // best-effort per attachment; one bad file shouldn't drop the rest.

@@ -218,6 +218,20 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
   );
   const metrics = useMemo<SilenceMetrics>(() => metricsFor(activity), [activity]);
 
+  // Field-capture photos on this task, offered as one-tick "attach evidence"
+  // thumbnails in the email modal (the chase-with-the-photo flow).
+  const evidence = useMemo(
+    () =>
+      fieldActivity
+        .filter((a) => a.metadata.photo_url)
+        .map((a) => ({
+          id: a.id.replace(/^field-/, ""),
+          name: a.subject || "Field photo",
+          thumbUrl: a.metadata.photo_url ?? null,
+        })),
+    [fieldActivity],
+  );
+
   function refresh() {
     setLogged(listActivityForTask(activityId));
   }
@@ -432,6 +446,7 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
       {emailOpen && (
         <EmailUpdateModal
           taskCode={task.activity_id}
+          evidence={evidence}
           onClose={() => setEmailOpen(false)}
           onSent={() => {
             reloadEmails();

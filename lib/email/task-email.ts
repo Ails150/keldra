@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { storeEmailAttachment, type OutAttachment } from "@/lib/email/attachments";
 
 // reply.keldra.io is the ONLY Resend-verified domain (sending + receiving).
 // We both send FROM and receive replies AT the per-thread address on this
@@ -100,6 +101,7 @@ export async function sendTaskEmail(opts: {
   subject: string;
   html: string;
   text?: string;
+  attachments?: OutAttachment[];
   actorUserId?: string | null;
 }): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY;
@@ -130,6 +132,15 @@ export async function sendTaskEmail(opts: {
       subject,
       html: opts.html,
       ...(opts.text ? { text: opts.text } : {}),
+      ...(opts.attachments && opts.attachments.length
+        ? {
+            attachments: opts.attachments.map((a) => ({
+              filename: a.filename,
+              content: a.bytes.toString("base64"),
+              ...(a.contentType ? { content_type: a.contentType } : {}),
+            })),
+          }
+        : {}),
     }),
   });
 
@@ -165,6 +176,19 @@ export async function sendTaskEmail(opts: {
     throw new Error(
       `Email sent but logging failed: ${error?.message ?? "unknown error"}`,
     );
+  }
+
+  // Persist each sent attachment to the private bucket + task_email_attachments
+  // so it renders on the trail (audit log of exactly what went out, with files).
+  for (const att of opts.attachments ?? []) {
+    await storeEmailAttachment(admin, {
+      emailId: row.id,
+      orgId: opts.orgId,
+      taskCode: opts.taskCode,
+      filename: att.filename,
+      contentType: att.contentType,
+      bytes: att.bytes,
+    });
   }
 
   return { emailId: row.id, resendId };
