@@ -67,3 +67,14 @@ export async function getSessionState(): Promise<SessionState> {
 export function isAdminRole(role: string | null | undefined): boolean {
   return role === "org_admin" || role === "superadmin";
 }
+
+// Field-app users live entirely in /field; never the dashboard.
+export function isFieldRole(role: string | null | undefined): boolean {
+  return role === "field";
+}
+
+// Viewers are read-only; field users don't use the dashboard write surfaces.
+// Everyone else (member/manager/org_admin/superadmin + legacy roles) can write.
+export function canWrite(role: string | null | undefined): boolean {
+  return role !== "viewer" && role !== "field";
+}

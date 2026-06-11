@@ -1,17 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getSessionState } from "@/lib/auth/profile";
+import { landingPathForRole } from "@/lib/auth/landing";
 import LoginForm from "./login-form";
 
 export default async function Home() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const state = await getSessionState();
 
-  if (user) {
-    redirect("/dashboard");
-  }
+  // Route signed-in users by role: field users to /field, everyone else to the
+  // dashboard. Confirmed-but-unmapped users go finish setup.
+  if (state.status === "ready") redirect(landingPathForRole(state.profile.role));
+  if (state.status === "needs-setup") redirect("/finish-setup");
+  // anonymous / unverified (pre-migration) → show the login form.
 
   return (
     <main className="flex flex-1 flex-col bg-paper">

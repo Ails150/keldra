@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getSessionState } from "@/lib/auth/profile";
+import { getSessionState, canWrite } from "@/lib/auth/profile";
 import { sendTaskEmail } from "@/lib/email/task-email";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -21,6 +21,12 @@ export async function POST(request: NextRequest) {
   if (state.status !== "ready" || !state.profile.org_id) {
     return NextResponse.json(
       { error: "You need to be signed in to your organisation to send email." },
+      { status: 403 },
+    );
+  }
+  if (!canWrite(state.profile.role)) {
+    return NextResponse.json(
+      { error: "Your role is read-only." },
       { status: 403 },
     );
   }

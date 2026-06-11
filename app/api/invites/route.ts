@@ -43,7 +43,10 @@ export async function POST(request: NextRequest) {
     body = {};
   }
 
-  const role = body.role === "org_admin" ? "org_admin" : "member";
+  // Dashboard roles (org_admin/manager/viewer) + the field-app role; anything
+  // unrecognised falls back to the safe default.
+  const ALLOWED_ROLES = ["org_admin", "manager", "viewer", "field", "member"];
+  const role = ALLOWED_ROLES.includes(body.role ?? "") ? (body.role as string) : "member";
   const maxUses =
     typeof body.maxUses === "number" && body.maxUses > 0
       ? Math.floor(body.maxUses)

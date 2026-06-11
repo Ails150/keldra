@@ -109,10 +109,12 @@ export function useTaskEmails(taskCode: string) {
       if (user) {
         const { data: profile } = await supabase
           .from("users")
-          .select("org_id")
+          .select("org_id, role")
           .eq("id", user.id)
           .maybeSingle();
-        setCanEmail(!!profile?.org_id);
+        // Org members can send, except read-only viewers and field users.
+        const role = (profile?.role as string | null) ?? null;
+        setCanEmail(!!profile?.org_id && role !== "viewer" && role !== "field");
       } else {
         setCanEmail(false);
       }

@@ -198,6 +198,22 @@ Run these end-to-end. Use throwaway addresses like `fieldtest+1@keldra.io`.
 4. **Action:** Sign out, try the **old** password. **Expected:** rejected.
    Try the **new** password. **Expected:** signs in.
 
+### 8f. Field invite end-to-end (two-surface roles)
+1. **Action:** As an admin, open **"Invite people"** → choose **"Field app
+   access"** → Generate link. **Expected:** invite created with role
+   "Field worker".
+2. **Action:** On a real phone, open the link. **Expected:** a phone-first
+   "Join … on site" page; sign up, confirm email, sign in.
+3. **Expected:** the field user lands **directly in `/field`** (never the
+   dashboard), and sees the Add-to-Home-Screen hint. Visiting `/` or
+   `/dashboard` as this user redirects back to `/field`.
+4. **Action:** In the field app, log a blocker/update **with a photo**.
+   **Expected:** an admin signed into the dashboard sees that capture on the
+   relevant task's Activity trail.
+5. **Role checks:** a **viewer** invite → dashboard loads read-only (no invite
+   panel, no "Email update", no field capture — `/field` redirects them to
+   `/dashboard`). A **manager** can send email and open `/field`.
+
 ### 8d. Finish-setup guardrail
 - **Action:** (Edge case) If an auth user ever exists with no `public.users`
   row, signing in routes them to **`/finish-setup`** with options to create an

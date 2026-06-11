@@ -22,6 +22,7 @@ export default async function JoinPage({
 
   let orgName: string | null = null;
   let invalidReason: string | null = null;
+  let isField = false;
 
   try {
     const admin = createAdminClient();
@@ -38,6 +39,7 @@ export default async function JoinPage({
     } else if (invite.max_uses != null && invite.use_count >= invite.max_uses) {
       invalidReason = "This invite link has already been fully used.";
     } else {
+      isField = invite.role === "field";
       const { data: org } = await admin
         .from("organisations")
         .select("name")
@@ -83,20 +85,21 @@ export default async function JoinPage({
                 className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-accent-deep"
                 style={{ fontFamily: "var(--font-geist-mono, ui-monospace, monospace)" }}
               >
-                You&apos;ve been invited
+                {isField ? "Field app invite" : "You've been invited"}
               </p>
               <h1
                 className="mt-4 font-[family-name:var(--font-fraunces)] font-medium text-ink"
                 style={{ fontSize: 40, lineHeight: 1.05, letterSpacing: "-0.01em" }}
               >
-                Join {orgName} on Keldra
+                {isField ? `Join ${orgName} on site` : `Join ${orgName} on Keldra`}
               </h1>
               <p
                 className="mt-3 font-[family-name:var(--font-fraunces)] italic text-ink-mid"
                 style={{ fontSize: 16, lineHeight: 1.55, maxWidth: 520 }}
               >
-                Set up your account below. You&apos;ll get a confirmation email,
-                and once you confirm you&apos;ll land straight in {orgName}.
+                {isField
+                  ? "Set up your account below — it takes ten seconds. Confirm your email, then open Keldra on your phone to capture blockers and photos from site."
+                  : `Set up your account below. You'll get a confirmation email, and once you confirm you'll land straight in ${orgName}.`}
               </p>
             </>
           )}
@@ -104,7 +107,7 @@ export default async function JoinPage({
 
         {!invalidReason && (
           <section className="flex-1 pb-16">
-            <JoinForm token={token} orgName={orgName ?? "your organisation"} />
+            <JoinForm token={token} orgName={orgName ?? "your organisation"} isField={isField} />
           </section>
         )}
       </div>

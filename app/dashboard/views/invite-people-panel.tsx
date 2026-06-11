@@ -12,6 +12,14 @@ type Invite = {
   created_at: string;
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  org_admin: "Org admin",
+  manager: "Manager",
+  viewer: "Viewer",
+  field: "Field worker",
+  member: "Member",
+};
+
 function inviteUrl(token: string): string {
   const origin =
     typeof window !== "undefined" ? window.location.origin : "https://app.keldra.io";
@@ -29,7 +37,11 @@ function statusOf(inv: Invite): { label: string; tone: "live" | "spent" | "expir
 export default function InvitePeoplePanel({ onClose }: { onClose: () => void }) {
   const [invites, setInvites] = useState<Invite[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [role, setRole] = useState<"member" | "org_admin">("member");
+  // Two invite paths: dashboard access (with a role picker) or field-app access
+  // (role fixed to "field", deliberately simple).
+  const [kind, setKind] = useState<"dashboard" | "field">("dashboard");
+  const [dashRole, setDashRole] = useState<"org_admin" | "manager" | "viewer">("manager");
+  const role = kind === "field" ? "field" : dashRole;
   const [maxUses, setMaxUses] = useState("");
   const [expiresInDays, setExpiresInDays] = useState("");
   const [creating, setCreating] = useState(false);
@@ -137,19 +149,56 @@ export default function InvitePeoplePanel({ onClose }: { onClose: () => void }) 
         <div className="overflow-y-auto p-6">
           {/* Create */}
           <div className="rounded-xl border border-paper-line bg-paper p-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {/* What the link grants */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setKind("dashboard")}
+                className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                  kind === "dashboard"
+                    ? "border-accent bg-accent/5"
+                    : "border-paper-line hover:border-accent/50"
+                }`}
+              >
+                <p className="text-sm font-semibold text-ink">Dashboard access</p>
+                <p className="text-[11px] text-ink-mid">Full web dashboard</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setKind("field")}
+                className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                  kind === "field"
+                    ? "border-accent bg-accent/5"
+                    : "border-paper-line hover:border-accent/50"
+                }`}
+              >
+                <p className="text-sm font-semibold text-ink">Field app access</p>
+                <p className="text-[11px] text-ink-mid">Field capture app on their phone</p>
+              </button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-mid">
                   Role
                 </label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as "member" | "org_admin")}
-                  className="w-full rounded-xl border border-border-soft bg-paper-card px-3 py-2.5 text-sm text-ink outline-none focus:border-accent"
-                >
-                  <option value="member">Member</option>
-                  <option value="org_admin">Org admin</option>
-                </select>
+                {kind === "dashboard" ? (
+                  <select
+                    value={dashRole}
+                    onChange={(e) =>
+                      setDashRole(e.target.value as "org_admin" | "manager" | "viewer")
+                    }
+                    className="w-full rounded-xl border border-border-soft bg-paper-card px-3 py-2.5 text-sm text-ink outline-none focus:border-accent"
+                  >
+                    <option value="org_admin">Org admin</option>
+                    <option value="manager">Manager</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
+                ) : (
+                  <div className="rounded-xl border border-border-soft bg-paper px-3 py-2.5 text-sm text-ink-mid">
+                    Field worker
+                  </div>
+                )}
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-mid">
@@ -238,9 +287,7 @@ export default function InvitePeoplePanel({ onClose }: { onClose: () => void }) 
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-mid">
-                      <span className="font-medium text-ink">
-                        {inv.role === "org_admin" ? "Org admin" : "Member"}
-                      </span>
+                      <span className="font-medium text-ink">{ROLE_LABELS[inv.role] ?? inv.role}</span>
                       <span>·</span>
                       <span>
                         {inv.use_count}

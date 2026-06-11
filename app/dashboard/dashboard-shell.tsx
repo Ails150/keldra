@@ -107,6 +107,7 @@ export default function DashboardShell({
   orgBadge,
   showDemo = true,
   canInvite = false,
+  canWrite = true,
 }: {
   userEmail: string;
   orgBadge?: string | null;
@@ -117,6 +118,8 @@ export default function DashboardShell({
   showDemo?: boolean;
   // org_admin / superadmin → can open the "Invite people" panel.
   canInvite?: boolean;
+  // false for viewers (read-only) — hides write affordances.
+  canWrite?: boolean;
 }) {
   const [project, setProject] = useState<WizardData | null | undefined>(undefined);
   const [tab, setTab] = useState<Tab>("gates");
@@ -391,13 +394,15 @@ export default function DashboardShell({
                 <span aria-hidden>＋</span> Invite people
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setInviteOpen(true)}
-              className="hidden md:inline-flex items-center gap-2 rounded-xl border border-paper-line bg-paper-card px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
-            >
-              <span aria-hidden>＋</span> Tag in another organisation
-            </button>
+            {canWrite && (
+              <button
+                type="button"
+                onClick={() => setInviteOpen(true)}
+                className="hidden md:inline-flex items-center gap-2 rounded-xl border border-paper-line bg-paper-card px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+              >
+                <span aria-hidden>＋</span> Tag in another organisation
+              </button>
+            )}
             {orgBadge && (
               <span
                 className="hidden md:inline-flex items-center rounded-full bg-accent/10 px-2.5 py-1 text-[11px] font-semibold text-accent-deep"

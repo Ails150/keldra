@@ -9,10 +9,16 @@ const INPUT =
 export default function JoinForm({
   token,
   orgName,
+  isField = false,
 }: {
   token: string;
   orgName: string;
+  isField?: boolean;
 }) {
+  // Phone-first field invites get bigger touch targets.
+  const fieldInput = isField ? " text-base" : "";
+  const inputCls = INPUT + fieldInput;
+  const fieldHeight = isField ? 58 : 52;
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -52,8 +58,18 @@ export default function JoinForm({
         <p className="mt-2 text-sm text-ink-mid" style={{ lineHeight: 1.55 }}>
           We&apos;ve sent a confirmation link to <strong>{email}</strong>. Click
           it to activate your account, then sign in — you&apos;ll join{" "}
-          {orgName} automatically.
+          {orgName} automatically{isField ? " on your phone" : ""}.
         </p>
+        {isField && (
+          <div className="mt-4 rounded-xl border border-paper-line bg-paper-warm/60 p-4 text-sm text-ink">
+            <p className="font-semibold">📲 Add Keldra to your Home Screen</p>
+            <p className="mt-1 text-ink-mid">
+              After you sign in, tap your browser&apos;s <strong>Share</strong>{" "}
+              button → <strong>Add to Home Screen</strong>, so capturing from site
+              is one tap away.
+            </p>
+          </div>
+        )}
         <Link
           href="/"
           className="mt-6 inline-block text-sm font-medium text-accent hover:text-accent-deep"
@@ -75,8 +91,8 @@ export default function JoinForm({
           onChange={(e) => setFullName(e.target.value)}
           placeholder="Your name"
           disabled={loading}
-          className={INPUT}
-          style={{ height: 52, fontSize: 15 }}
+          className={inputCls}
+          style={{ height: fieldHeight, fontSize: 15 }}
         />
         <input
           type="email"
@@ -86,8 +102,8 @@ export default function JoinForm({
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email"
           disabled={loading}
-          className={INPUT}
-          style={{ height: 52, fontSize: 15 }}
+          className={inputCls}
+          style={{ height: fieldHeight, fontSize: 15 }}
         />
         <input
           type="password"
@@ -97,8 +113,8 @@ export default function JoinForm({
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password (8+ characters)"
           disabled={loading}
-          className={INPUT}
-          style={{ height: 52, fontSize: 15 }}
+          className={inputCls}
+          style={{ height: fieldHeight, fontSize: 15 }}
         />
         <button
           type="submit"

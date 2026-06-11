@@ -6,7 +6,7 @@
 //   - confirmed user, no profile → /finish-setup (friendly, not a crash).
 import { redirect } from "next/navigation";
 import DashboardShell from "./dashboard-shell";
-import { getSessionState, isAdminRole } from "@/lib/auth/profile";
+import { getSessionState, isAdminRole, isFieldRole, canWrite } from "@/lib/auth/profile";
 
 export default async function Dashboard() {
   const state = await getSessionState();
@@ -16,6 +16,9 @@ export default async function Dashboard() {
 
   if (state.status === "ready") {
     const { profile, email } = state;
+    // Hard routing: field-app users never see the dashboard.
+    if (isFieldRole(profile.role)) redirect("/field");
+
     const isSuper = profile.role === "superadmin";
     const isDemoOrg = (profile.org_name ?? "").trim().toLowerCase() === "ardmac";
     return (
@@ -24,6 +27,7 @@ export default async function Dashboard() {
         orgBadge={profile.org_name ?? (isSuper ? "All orgs · superadmin" : null)}
         showDemo={isSuper || isDemoOrg}
         canInvite={isAdminRole(profile.role)}
+        canWrite={canWrite(profile.role)}
       />
     );
   }
