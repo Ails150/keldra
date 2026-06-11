@@ -93,9 +93,11 @@ Each file ends with a sanity `SELECT` — check it returns without error.
 
 Supabase → **Authentication → URL Configuration**:
 - **Site URL:** `https://app.keldra.io`
-- **Redirect URLs:** add both
+- **Redirect URLs:** add all of these
   - `https://app.keldra.io/auth/callback`
+  - `https://app.keldra.io/reset-password` *(password-reset flow)*
   - `http://localhost:3000/auth/callback` (for local testing)
+  - `http://localhost:3000/reset-password` (for local testing)
 
 Confirm **Authentication → Providers → Email** has **"Confirm email" ON**
 (this is what sends the confirmation email on sign-up).
@@ -185,6 +187,16 @@ Run these end-to-end. Use throwaway addresses like `fieldtest+1@keldra.io`.
    **Expected:** it does **not** appear on any task. As superadmin, open
    **`/dashboard/admin/unmatched`** — the tampered message is listed with
    reason "token mismatch / unknown thread".
+
+### 8e. Password reset
+1. **Action:** On the login page click **"Forgot password?"** with a real
+   account's email. **Expected:** "reset link on its way" message.
+2. **Action:** Open the email, click the link. **Expected:** you land on
+   **`/reset-password`** (NOT the dashboard) with a "Set a new password" form.
+3. **Action:** Enter a new password + confirm → save. **Expected:** you're
+   redirected to `/dashboard` (or `/field` for a field-role user).
+4. **Action:** Sign out, try the **old** password. **Expected:** rejected.
+   Try the **new** password. **Expected:** signs in.
 
 ### 8d. Finish-setup guardrail
 - **Action:** (Edge case) If an auth user ever exists with no `public.users`

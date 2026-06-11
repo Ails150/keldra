@@ -12,7 +12,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const response = NextResponse.redirect(`${url.origin}/dashboard`);
+  // Honour a safe internal ?next= (used by the password-reset flow to land on
+  // /reset-password). Only same-site absolute paths are allowed.
+  const nextParam = url.searchParams.get("next");
+  const safeNext =
+    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+      ? nextParam
+      : "/dashboard";
+
+  const response = NextResponse.redirect(`${url.origin}${safeNext}`);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

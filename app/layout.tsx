@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import SwRegister from "./sw-register";
+import RecoveryGuard from "./recovery-guard";
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -43,6 +44,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {children}
+        <RecoveryGuard />
         <SwRegister />
       </body>
     </html>
