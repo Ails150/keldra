@@ -246,13 +246,21 @@ Run these end-to-end. Use throwaway addresses like `fieldtest+1@keldra.io`.
 - Outbound email threads now back-link to their `tasks` row when one exists
   (`task_threads.task_id`), best-effort.
 
-**Staged (next, NOT yet wired):** the dashboard still reads its client-side
-localStorage seed. Cutting the views (overview/gates/blockers/tasks) over to
-read from these DB tables is **stage 2**, to be done incrementally with live-DB
-verification so the working demo never breaks. Recommended order: (a) seed
-Ardmac's baseline tasks/gates/blockers into the new tables; (b) add a server
-read layer; (c) switch one view at a time behind the seeded data; (d) retire
-the localStorage seed for authenticated orgs (demo/anon keep it).
+**Read-path cutover status (per view):**
+- **tasks — DONE.** The task page reads its row from the DB `tasks` table for
+  authenticated orgs (falls back to the localStorage seed when the DB has no
+  such row; anonymous/demo never queries the DB). Ardmac's 46 baseline tasks
+  are seeded into the DB via `npx tsx scripts/seed-ardmac.ts` (idempotent),
+  verified against the live DB before commit.
+- **overview / gates / blockers — NOT a table read (left on the seed).** These
+  aren't backed by readable tables: `overview` is hardcoded narrative copy (it
+  ignores its data props), `gates` is hardcoded gate A/B/D/E plus a live Gate C
+  from the in-memory demo store, and `blockers` is an event-sourced state
+  machine (hash-chained events) hydrated from synthetic constraints. Cutting
+  these over faithfully needs new DB modelling first — a constraints + blocker
+  event store, gate tag-progress, and overview analytics — which is a real
+  build, not a read-swap. Recommended as the next stage; until then they stay
+  on the seed (no blank screens).
 
 > **Verify the screen:** sign in as superadmin → open `/dashboard/admin/config`
 > → pick **Ardmac** → you should see the hyperscaler-dc terminology/gates;

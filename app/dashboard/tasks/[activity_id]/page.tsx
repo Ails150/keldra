@@ -7,6 +7,8 @@ import { BRAND } from "@/lib/brand";
 import {
   DEFAULT_BASELINE,
   type Baseline,
+  type BaselineTask,
+  type TaskStatus,
   companyColour,
   companyName,
   daysOpen,
@@ -14,6 +16,7 @@ import {
   loadBaseline,
   taskById,
 } from "../../lib/baseline-seed";
+import { createClient } from "@/lib/supabase/client";
 import {
   type Activity,
   type SilenceMetrics,
@@ -142,6 +145,27 @@ function fmt(iso: string): string {
     : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// Map a DB `tasks` row to the BaselineTask shape the page renders.
+function dbRowToTask(r: Record<string, unknown>): BaselineTask {
+  const s = (v: unknown) => (v == null ? "" : String(v));
+  const n = (v: unknown) => (v == null ? 0 : Number(v));
+  return {
+    activity_id: s(r.code),
+    name: s(r.name) || s(r.code),
+    wbs_path: s(r.wbs_path),
+    responsible_company: s(r.responsible_company),
+    planned_start: s(r.planned_start),
+    planned_end: s(r.planned_end),
+    planned_manpower: n(r.planned_manpower),
+    actual_manpower: n(r.actual_manpower),
+    status: (s(r.status) || "on_track") as TaskStatus,
+    blocked_reason: r.blocked_reason == null ? null : String(r.blocked_reason),
+    blocking_company: r.blocking_company == null ? null : String(r.blocking_company),
+    affects_room: r.affects_room == null ? null : String(r.affects_room),
+    cost_per_day: n(r.cost_per_day),
+  };
+}
+
 export default function TaskPage() {
   const params = useParams();
   const activityId = decodeURIComponent(String(params.activity_id ?? ""));
@@ -162,6 +186,37 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
   // anonymous public demo, so the demo path is untouched.
   const { activities: emailActivity, canEmail, reload: reloadEmails } =
     useTaskEmails(activityId);
+
+  // DB read-path cutover (tasks): for an authenticated org, prefer the task row
+  // from the DB; fall back to the localStorage seed if the DB has no such row
+  // (empty / unmigrated). Anonymous/demo visitors never query the DB (req #1).
+  const [dbTask, setDbTask] = useState<BaselineTask | null>(null);
+  useEffect(() => {
+    if (!activityId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return; // anon/demo → seed only
+        const { data } = await supabase
+          .from("tasks")
+          .select(
+            "code,name,wbs_path,responsible_company,blocking_company,status,blocked_reason,affects_room,planned_start,planned_end,planned_manpower,actual_manpower,cost_per_day",
+          )
+          .eq("code", activityId)
+          .maybeSingle();
+        if (!cancelled && data) setDbTask(dbRowToTask(data));
+      } catch {
+        /* fall back to seed */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activityId]);
 
   useEffect(() => setBaseline(loadBaseline()), []);
   useEffect(() => {
@@ -240,7 +295,7 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
     setTimeout(() => setToast(null), 2500);
   }
 
-  const task = taskById(baseline, activityId);
+  const task = dbTask ?? taskById(baseline, activityId);
 
   if (!task) {
     return (
