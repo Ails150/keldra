@@ -28,6 +28,7 @@ import { ActivityTimeline, LogActivityModal, Toast } from "../../activity-ui";
 import LiveAssetHistory from "./live-asset-history";
 import { useTaskEmails, EmailUpdateModal } from "./task-emails";
 import SequencePanel from "./sequence-panel";
+import TaskAssign from "./task-assign";
 import {
   type MerFieldEvent,
   listAssetHistory,
@@ -392,6 +393,7 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
         {/* Right — activity trail */}
         <aside className="lg:sticky lg:top-6 lg:self-start space-y-4">
           <SequencePanel taskCode={task.activity_id} canManage={canEmail} />
+          <TaskAssign taskCode={task.activity_id} />
           <div className="overflow-hidden rounded-xl" style={{ border: `0.5px solid ${BRAND.border}` }}>
             <div className="px-5 py-4" style={{ borderBottom: `0.5px solid ${BRAND.border}` }}>
               <div className="flex items-center justify-between">

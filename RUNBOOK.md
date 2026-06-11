@@ -89,7 +89,10 @@ Paste and **Run** each file **in this exact order**. All are idempotent
    and `init_org_from_template()`, plus the Ardmac org_config seed.
 5. **`supabase-sequences.sql`** — `task_sequences`, `sequence_audit`, and the
    `sequence` block added to org_config (sending OFF by default).
-6. **`supabase-health.sql`** — `setup_health()` for the health check below.
+6. **`supabase-orgdata.sql`** — `roster`, `blocker_events`, `task_assignments`,
+   and the state-machine columns on `blockers` (backs the full new-org
+   experience: sample blockers/roster + task assignment + field filtering).
+7. **`supabase-health.sql`** — `setup_health()` for the health check below.
 
 Each file ends with a sanity `SELECT` — check it returns without error.
 

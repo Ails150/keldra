@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import { FIELD_PERSONA, inboxMessages, personaBlockers } from "./field-persona";
+import MyFieldTasks from "./my-tasks";
 
 const SIGNIN_KEY = "keldra_field_signin";
 
@@ -28,6 +30,32 @@ export default function FieldHome() {
   const [mounted, setMounted] = useState(false);
   const [signedInAt, setSignedInAt] = useState<string | null>(null);
   const [walksOpen, setWalksOpen] = useState(false);
+
+  // Authenticated org users get their real assigned-tasks view; the anonymous
+  // public demo keeps the persona experience untouched.
+  const [realUser, setRealUser] = useState<{ name: string | null } | null | undefined>(undefined);
+  useEffect(() => {
+    (async () => {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          setRealUser(null);
+          return;
+        }
+        const { data } = await supabase
+          .from("users")
+          .select("full_name, org_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        setRealUser(data?.org_id ? { name: (data.full_name as string | null) ?? null } : null);
+      } catch {
+        setRealUser(null);
+      }
+    })();
+  }, []);
 
   const [blockerCount, setBlockerCount] = useState(0);
   const [blockerBurn, setBlockerBurn] = useState(0);
@@ -62,6 +90,10 @@ export default function FieldHome() {
     }
     setSignedInAt(now);
   }
+
+  // Real authenticated org users → assigned-tasks view; anon demo → persona.
+  if (realUser === undefined) return null;
+  if (realUser) return <MyFieldTasks name={realUser.name} />;
 
   return (
     <div className="space-y-6">

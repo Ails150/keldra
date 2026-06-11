@@ -24,7 +24,10 @@ returns jsonb language sql stable security definer set search_path = public as $
       'blockers',               to_regclass('public.blockers') is not null,
       'org_config',             to_regclass('public.org_config') is not null,
       'task_sequences',         to_regclass('public.task_sequences') is not null,
-      'sequence_audit',         to_regclass('public.sequence_audit') is not null
+      'sequence_audit',         to_regclass('public.sequence_audit') is not null,
+      'roster',                 to_regclass('public.roster') is not null,
+      'blocker_events',         to_regclass('public.blocker_events') is not null,
+      'task_assignments',       to_regclass('public.task_assignments') is not null
     ),
     'rls', jsonb_build_object(
       'org_invite_links',       coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.org_invite_links')), false),
@@ -38,7 +41,10 @@ returns jsonb language sql stable security definer set search_path = public as $
       'blockers',               coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.blockers')), false),
       'org_config',             coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.org_config')), false),
       'task_sequences',         coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.task_sequences')), false),
-      'sequence_audit',         coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.sequence_audit')), false)
+      'sequence_audit',         coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.sequence_audit')), false),
+      'roster',                 coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.roster')), false),
+      'blocker_events',         coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.blocker_events')), false),
+      'task_assignments',       coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.task_assignments')), false)
     ),
     'functions', jsonb_build_object(
       'auth_role',             to_regprocedure('public.auth_role()') is not null,

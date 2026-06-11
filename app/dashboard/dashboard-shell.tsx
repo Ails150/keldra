@@ -667,6 +667,23 @@ function EmptyState({
   canInvite?: boolean;
 }) {
   const [invitePeopleOpen, setInvitePeopleOpen] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [seedError, setSeedError] = useState<string | null>(null);
+
+  async function startWithSampleData() {
+    setSeeding(true);
+    setSeedError(null);
+    const res = await fetch("/api/admin/seed-sample", { method: "POST" });
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) {
+      setSeeding(false);
+      setSeedError(data.error ?? "Couldn't load sample data.");
+      return;
+    }
+    // Re-render the dashboard against the freshly-seeded org data.
+    window.location.reload();
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-paper-line px-8 py-5">
@@ -713,12 +730,25 @@ function EmptyState({
           Run the onboarding wizard to import your team, asset register and
           constraint log. Keldra will wire up your dashboard from the CSVs.
         </p>
-        <Link
-          href="/onboarding"
-          className="mt-8 inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
-        >
-          Set up your first project →
-        </Link>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          {canInvite && (
+            <button
+              type="button"
+              onClick={startWithSampleData}
+              disabled={seeding}
+              className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:opacity-60"
+            >
+              {seeding ? "Loading sample data…" : "Start with sample data"}
+            </button>
+          )}
+          <Link
+            href="/onboarding"
+            className="inline-flex items-center gap-2 rounded-xl border border-paper-line bg-paper-card px-6 py-3 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+          >
+            Set up your first project →
+          </Link>
+        </div>
+        {seedError && <p className="mt-3 text-sm text-red-600">{seedError}</p>}
       </main>
 
       {invitePeopleOpen && (
