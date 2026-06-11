@@ -83,7 +83,10 @@ Paste and **Run** each file **in this exact order**. All are idempotent
 3. **`supabase-email.sql`** — `task_threads`, `task_emails`,
    `task_email_attachments`, `inbound_unmatched`, the private storage bucket,
    RLS, and `user_id_by_email()`.
-4. **`supabase-health.sql`** — `setup_health()` for the health check below.
+4. **`supabase-instances.sql`** — `projects`, `tasks`, `gates`, `blockers`,
+   `org_config`, the `task_threads.task_id` FK, the `hyperscaler-dc` template
+   and `init_org_from_template()`, plus the Ardmac org_config seed.
+5. **`supabase-health.sql`** — `setup_health()` for the health check below.
 
 Each file ends with a sanity `SELECT` — check it returns without error.
 
@@ -228,6 +231,32 @@ Run these end-to-end. Use throwaway addresses like `fieldtest+1@keldra.io`.
   be removed from `public.org_invites` once testing is complete.
 
 ---
+
+## Custom-instance architecture — what's live vs. staged
+
+**Live now (additive, safe):**
+- DB tables `projects`, `tasks`, `gates`, `blockers`, `org_config` (org-scoped
+  + RLS), and `task_threads.task_id`.
+- New orgs initialise from the **hyperscaler-dc** template on signup
+  (`init_org_from_template`), seeding `org_config` + the gate ladder.
+- Ardmac is seeded with the template config + a "MER Cx" project row.
+- **Superadmin config screen** at **`/dashboard/admin/config`** — edit any
+  org's terminology, gate structure, blocker taxonomy and escalation cadences.
+  "Client calibration is data entry, not code."
+- Outbound email threads now back-link to their `tasks` row when one exists
+  (`task_threads.task_id`), best-effort.
+
+**Staged (next, NOT yet wired):** the dashboard still reads its client-side
+localStorage seed. Cutting the views (overview/gates/blockers/tasks) over to
+read from these DB tables is **stage 2**, to be done incrementally with live-DB
+verification so the working demo never breaks. Recommended order: (a) seed
+Ardmac's baseline tasks/gates/blockers into the new tables; (b) add a server
+read layer; (c) switch one view at a time behind the seeded data; (d) retire
+the localStorage seed for authenticated orgs (demo/anon keep it).
+
+> **Verify the screen:** sign in as superadmin → open `/dashboard/admin/config`
+> → pick **Ardmac** → you should see the hyperscaler-dc terminology/gates;
+> edit a term, Save, reload — the change persists.
 
 ## Secrets summary — what to get and where
 

@@ -106,5 +106,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Initialise the org from the default template (org_config + gate ladder).
+  // Best-effort: if the instances migration isn't applied yet, signup still
+  // succeeds and the org can be configured later.
+  try {
+    await admin.rpc("init_org_from_template", {
+      p_org_id: org.id,
+      p_template: "hyperscaler-dc",
+    });
+  } catch {
+    /* instances migration not applied yet — non-fatal */
+  }
+
   return NextResponse.json({ ok: true, needsConfirmation: true });
 }

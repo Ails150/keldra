@@ -81,7 +81,37 @@ export async function ensureThread(
     if (raced) return raced;
     throw new Error(error?.message ?? "Couldn't open an email thread.");
   }
+
+  await linkThreadTask(admin, data.id, orgId, taskCode);
   return data;
+}
+
+// Best-effort: point the thread at its tasks row (task_threads.task_id), once
+// the instances migration exists. Silently no-ops pre-migration so the hot
+// send path never breaks.
+async function linkThreadTask(
+  admin: ReturnType<typeof createAdminClient>,
+  threadId: string,
+  orgId: string,
+  taskCode: string,
+): Promise<void> {
+  try {
+    const { data: task } = await admin
+      .from("tasks")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("code", taskCode)
+      .maybeSingle<{ id: string }>();
+    if (task?.id) {
+      await admin
+        .from("task_threads")
+        .update({ task_id: task.id })
+        .eq("id", threadId)
+        .is("task_id", null);
+    }
+  } catch {
+    /* tasks table / task_id column not present yet — non-fatal */
+  }
 }
 
 // ---- send -------------------------------------------------------------------
