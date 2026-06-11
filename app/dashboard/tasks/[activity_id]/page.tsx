@@ -23,6 +23,7 @@ import {
 } from "@/lib/activity";
 import { ActivityTimeline, LogActivityModal, Toast } from "../../activity-ui";
 import LiveAssetHistory from "./live-asset-history";
+import { useTaskEmails, EmailUpdateModal } from "./task-emails";
 import {
   type MerFieldEvent,
   listAssetHistory,
@@ -154,7 +155,13 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
   const [logged, setLogged] = useState<Activity[]>([]);
   const [fieldActivity, setFieldActivity] = useState<Activity[]>([]);
   const [logOpen, setLogOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Email thread for this task (org-scoped). Empty + canEmail=false for the
+  // anonymous public demo, so the demo path is untouched.
+  const { activities: emailActivity, canEmail, reload: reloadEmails } =
+    useTaskEmails(activityId);
 
   useEffect(() => setBaseline(loadBaseline()), []);
   useEffect(() => {
@@ -203,8 +210,11 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
 
   // The trail the whole page reads from: logged (localStorage) + live field.
   const activity = useMemo(
-    () => [...logged, ...fieldActivity].sort((a, b) => b.created_at.localeCompare(a.created_at)),
-    [logged, fieldActivity],
+    () =>
+      [...logged, ...fieldActivity, ...emailActivity].sort((a, b) =>
+        b.created_at.localeCompare(a.created_at),
+      ),
+    [logged, fieldActivity, emailActivity],
   );
   const metrics = useMemo<SilenceMetrics>(() => metricsFor(activity), [activity]);
 
@@ -317,14 +327,26 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
                 <h2 className="font-[family-name:var(--font-fraunces)] text-ink" style={{ fontSize: 16 }}>
                   Activity trail
                 </h2>
-                <button
-                  type="button"
-                  onClick={() => setLogOpen(true)}
-                  className="rounded text-xs font-medium text-paper"
-                  style={{ backgroundColor: BRAND.purple, padding: "6px 12px" }}
-                >
-                  + Log activity
-                </button>
+                <div className="flex items-center gap-2">
+                  {canEmail && (
+                    <button
+                      type="button"
+                      onClick={() => setEmailOpen(true)}
+                      className="rounded text-xs font-medium text-ink"
+                      style={{ border: `0.5px solid ${BRAND.border}`, padding: "6px 12px" }}
+                    >
+                      ✉ Email update
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setLogOpen(true)}
+                    className="rounded text-xs font-medium text-paper"
+                    style={{ backgroundColor: BRAND.purple, padding: "6px 12px" }}
+                  >
+                    + Log activity
+                  </button>
+                </div>
               </div>
               {metrics && (
                 <p className="mt-2 font-mono text-[12px] text-ink-mid">
@@ -404,6 +426,16 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
           onLogged={() => {
             refresh();
             showToast("Activity logged · timeline updated");
+          }}
+        />
+      )}
+      {emailOpen && (
+        <EmailUpdateModal
+          taskCode={task.activity_id}
+          onClose={() => setEmailOpen(false)}
+          onSent={() => {
+            reloadEmails();
+            showToast("Email sent · reply will land on this trail");
           }}
         />
       )}

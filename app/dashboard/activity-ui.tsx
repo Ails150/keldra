@@ -111,6 +111,14 @@ export function ActivityTimeline({
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-[12px] text-ink">
                       <span className="font-medium">{e.actor.name}</span>
+                      {e.metadata.via_email && (
+                        <span
+                          className="ml-1.5 inline-block rounded-[3px] px-1.5 py-0.5 align-middle font-mono text-[9px] font-semibold uppercase tracking-wide"
+                          style={{ backgroundColor: `${BRAND.purple}1a`, color: BRAND.purple }}
+                        >
+                          via email
+                        </span>
+                      )}
                     </span>
                     <span
                       className="flex-shrink-0 font-mono text-[11px] text-ink-mid"
@@ -174,6 +182,18 @@ export function ActivityTimeline({
                     >
                       📎 {a.name} · {(a.size_kb / 1024).toFixed(1)} MB
                     </button>
+                  ))}
+
+                  {(e.metadata.email_attachments ?? []).map((a) => (
+                    <a
+                      key={a.url}
+                      href={a.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 block rounded-md border border-paper-line px-2 py-1 text-left font-mono text-[11px] text-accent hover:bg-paper-warm"
+                    >
+                      📎 {a.name} · download
+                    </a>
                   ))}
                 </>
               )}

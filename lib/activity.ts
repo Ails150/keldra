@@ -54,6 +54,10 @@ export type Activity = {
     field?: boolean;
     kind?: string;
     with_party?: string | null;
+    // Set on entries bridged in from the email thread (task_emails). Renders a
+    // "via email" badge and downloadable (signed-URL) attachments.
+    via_email?: boolean;
+    email_attachments?: { name: string; url: string }[];
   };
   created_at: string;
   created_by: string;
