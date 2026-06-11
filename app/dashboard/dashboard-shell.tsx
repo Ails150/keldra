@@ -30,6 +30,7 @@ import IntelligenceView from "./views/intelligence";
 import AuditView from "./views/audit";
 import MapView from "./views/map-view";
 import InviteOrgModal from "./views/invite-org-modal";
+import InvitePeoplePanel from "./views/invite-people-panel";
 import BlockerDetailPanel from "./views/blocker-detail-panel";
 import PlannedVsActualView from "./views/planned-vs-actual";
 import HoldingBackView from "./views/holding-back";
@@ -104,15 +105,25 @@ const DEMO_ROLE_OPTIONS: RoleOption[] = [
 export default function DashboardShell({
   userEmail,
   orgBadge,
+  showDemo = true,
+  canInvite = false,
 }: {
   userEmail: string;
   orgBadge?: string | null;
+  // The whole dashboard is a synthetic demo seeded client-side. Real orgs that
+  // aren't the demo org (Ardmac) must NOT see it — they get a clean empty state.
+  // Anonymous/demo visitors and Ardmac keep showDemo = true (public demo path
+  // stays untouched).
+  showDemo?: boolean;
+  // org_admin / superadmin → can open the "Invite people" panel.
+  canInvite?: boolean;
 }) {
   const [project, setProject] = useState<WizardData | null | undefined>(undefined);
   const [tab, setTab] = useState<Tab>("gates");
   const [viewingAs, setViewingAs] = useState<ViewingAs | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [invitePeopleOpen, setInvitePeopleOpen] = useState(false);
   const [blockerMap, setBlockerMap] = useState<BlockerMap | null>(null);
   const [activeBlockerId, setActiveBlockerId] = useState<string | null>(null);
   const [assetFilter, setAssetFilter] = useState<string[] | null>(null);
@@ -122,6 +133,12 @@ export default function DashboardShell({
   // generic-demo lock: always seed synthetic data and ignore any cached real
   // ingest or stored viewing-as. The demo can only ever show the synthetic org.
   useEffect(() => {
+    // A real org that isn't the demo org gets an empty, isolated dashboard —
+    // never the seeded Ardmac/MER demo data.
+    if (!showDemo) {
+      setProject(null);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -136,7 +153,7 @@ export default function DashboardShell({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showDemo]);
 
   // Reflect the workspace id in the dashboard URL (?w=…) so it's shareable and
   // the Field-mode link/QR always carries the current workspace.
@@ -319,7 +336,9 @@ export default function DashboardShell({
   }
 
   if (project === null) {
-    return <EmptyState userEmail={userEmail} />;
+    return (
+      <EmptyState userEmail={userEmail} orgBadge={orgBadge} canInvite={canInvite} />
+    );
   }
 
   const userInitial = userEmail ? userEmail[0].toUpperCase() : "U";
@@ -363,6 +382,15 @@ export default function DashboardShell({
           <div className="flex items-center gap-3">
             <DemoControls />
             <FieldLink />
+            {canInvite && (
+              <button
+                type="button"
+                onClick={() => setInvitePeopleOpen(true)}
+                className="hidden md:inline-flex items-center gap-2 rounded-xl border border-paper-line bg-paper-card px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+              >
+                <span aria-hidden>＋</span> Invite people
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setInviteOpen(true)}
@@ -600,6 +628,10 @@ export default function DashboardShell({
         />
       )}
 
+      {invitePeopleOpen && (
+        <InvitePeoplePanel onClose={() => setInvitePeopleOpen(false)} />
+      )}
+
       {activeBlockerId && blockerMap && blockerMap[activeBlockerId] && (
         <BlockerDetailPanel
           blocker={blockerMap[activeBlockerId]}
@@ -620,7 +652,16 @@ export default function DashboardShell({
   );
 }
 
-function EmptyState({ userEmail }: { userEmail: string }) {
+function EmptyState({
+  userEmail,
+  orgBadge,
+  canInvite,
+}: {
+  userEmail: string;
+  orgBadge?: string | null;
+  canInvite?: boolean;
+}) {
+  const [invitePeopleOpen, setInvitePeopleOpen] = useState(false);
   return (
     <div className="flex flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-paper-line px-8 py-5">
@@ -631,6 +672,23 @@ function EmptyState({ userEmail }: { userEmail: string }) {
           Keldra
         </span>
         <div className="flex items-center gap-4">
+          {orgBadge && (
+            <span
+              className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-1 text-[11px] font-semibold text-accent-deep"
+              title={`Signed in to ${orgBadge}`}
+            >
+              {orgBadge}
+            </span>
+          )}
+          {canInvite && (
+            <button
+              type="button"
+              onClick={() => setInvitePeopleOpen(true)}
+              className="rounded-xl border border-paper-line bg-paper-card px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+            >
+              ＋ Invite people
+            </button>
+          )}
           <span className="text-sm text-ink-mid">{userEmail}</span>
           <SignOutButton />
         </div>
@@ -657,6 +715,10 @@ function EmptyState({ userEmail }: { userEmail: string }) {
           Set up your first project →
         </Link>
       </main>
+
+      {invitePeopleOpen && (
+        <InvitePeoplePanel onClose={() => setInvitePeopleOpen(false)} />
+      )}
     </div>
   );
 }

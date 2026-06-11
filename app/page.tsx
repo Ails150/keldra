@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import LoginForm from "./login-form";
@@ -50,6 +51,20 @@ export default async function Home() {
 
         <section className="flex-1 pb-16">
           <LoginForm />
+          <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+            <Link
+              href="/join"
+              className="font-medium text-accent hover:text-accent-deep"
+            >
+              Have an invite?
+            </Link>
+            <Link
+              href="/signup"
+              className="font-medium text-accent hover:text-accent-deep"
+            >
+              Create your organisation
+            </Link>
+          </div>
         </section>
 
         <footer className="border-t border-paper-line py-5">

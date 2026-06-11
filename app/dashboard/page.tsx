@@ -1,34 +1,34 @@
-// Public demo stays ungated. When a real user is signed in we pass their email
-// + organisation through so the dashboard reflects (and scopes to) their org.
-// Everything is defensive: before the org migration runs, or for anonymous
-// visitors, this falls straight back to the demo identity.
+// Public demo stays ungated. When a real user is signed in we resolve their
+// organisation and scope what they see:
+//   - anonymous / pre-migration  → the synthetic public demo (untouched).
+//   - Ardmac member / superadmin → the seeded MER demo (Ardmac's data today).
+//   - any other real org         → a clean, empty, RLS-isolated dashboard.
+//   - confirmed user, no profile → /finish-setup (friendly, not a crash).
+import { redirect } from "next/navigation";
 import DashboardShell from "./dashboard-shell";
-import { createClient } from "@/lib/supabase/server";
+import { getSessionState, isAdminRole } from "@/lib/auth/profile";
 
 export default async function Dashboard() {
-  let userEmail = "demo@keldra.io";
-  let orgBadge: string | null = null;
+  const state = await getSessionState();
 
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      userEmail = user.email ?? userEmail;
-      const { data } = await supabase
-        .from("users")
-        .select("role, organisations(name)")
-        .eq("id", user.id)
-        .maybeSingle();
-      const org = data?.organisations as { name?: string } | { name?: string }[] | null | undefined;
-      const name = Array.isArray(org) ? org[0]?.name : org?.name;
-      if (name) orgBadge = name;
-      else if (data?.role === "superadmin") orgBadge = "All orgs · superadmin";
-    }
-  } catch {
-    // users table not migrated yet, or no session — keep the demo identity.
+  // Guardrail: confirmed auth user with no public.users row.
+  if (state.status === "needs-setup") redirect("/finish-setup");
+
+  if (state.status === "ready") {
+    const { profile, email } = state;
+    const isSuper = profile.role === "superadmin";
+    const isDemoOrg = (profile.org_name ?? "").trim().toLowerCase() === "ardmac";
+    return (
+      <DashboardShell
+        userEmail={email}
+        orgBadge={profile.org_name ?? (isSuper ? "All orgs · superadmin" : null)}
+        showDemo={isSuper || isDemoOrg}
+        canInvite={isAdminRole(profile.role)}
+      />
+    );
   }
 
-  return <DashboardShell userEmail={userEmail} orgBadge={orgBadge} />;
+  // anonymous (public demo) or unverified (migration not run yet) → demo path.
+  const email = state.status === "unverified" ? state.email : "demo@keldra.io";
+  return <DashboardShell userEmail={email} orgBadge={null} showDemo canInvite={false} />;
 }
