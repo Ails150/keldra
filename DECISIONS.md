@@ -85,10 +85,28 @@ The service-role key reaches only the data API / auth / storage, not
   tasks; "no tasks assigned yet" when none). Live verification needs the table
   (DDL — run `supabase-orgdata.sql`).
 
-## To finish (for the human, then me)
-1. Run `supabase-orgdata.sql` (and `supabase-sequences.sql` if not yet) in the
-   Supabase SQL editor.
-2. Then I can: seed Blake's blockers/roster, build the loader + overview/gates
-   rewrite + kill the name gate (#2/#3), wire the wizard to the DB (#4), and
-   verify the whole thing in Blake — including assigning a task to the field
-   user and confirming `/field` shows exactly that one.
+## Update — migration applied, cutover completed + verified
+`supabase-orgdata.sql` applied. Completed:
+- [x] **2. Cutover done.** `lib/org/dashboard-data.ts` builds WizardData +
+  BlockerMap + Baseline + gate stats from DB rows. The shell renders from it
+  (hydrating the local stores the views read). `overview` + `gates` dual-path:
+  `fromDb` → computed from real blockers/gates; anon demo path unchanged.
+  `blockers` (+ people/holding-back/schedule/today) render from the DB
+  BlockerMap/Baseline.
+- [x] **3. Name gate killed.** No more `ardmac` special-case; any authed org
+  with DB data renders from its rows, else empty state. Pre-migration error →
+  demo fallback (safety only).
+- [x] **4. Wizard → DB.** `/api/onboarding/complete` creates the project +
+  template task set + real emailed `org_invite_links`; the wizard routes
+  authed admins there → real dashboard (no invented numbers). Anon demo wizard
+  untouched. (Invite role mapping: wizard's free-form roles default to
+  `member`; emails send from `invites@reply.keldra.io`.)
+- [x] **5. Verified in Blake (live DB).** 46 tasks, 10 roster, 9 blockers →
+  overview computes **9 open · £100k/day across 5 parties**, top decision
+  ELE-COLO-1030 £20k; gates **A→B→C→BU**, Gate C **blocked £100k/day**.
+  Assigned ELE-COLO-1030 to the field user → the field query returns **exactly
+  that one task**. ✅
+- [x] **6. Assignments + field filtering** — live-verified per above.
+
+Note: the visual browser render is the one thing I can't self-check headlessly;
+the data each view consumes is verified against the live DB.

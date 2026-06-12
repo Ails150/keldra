@@ -166,11 +166,13 @@ begin
   values (p_org_id, public.template_config(p_template), p_template)
   on conflict (org_id) do nothing;
 
-  for g in select * from jsonb_array_elements(public.template_config(p_template)->'gate_structure')
+  for g in
+    select value as v, ordinality as ord
+    from jsonb_array_elements(public.template_config(p_template)->'gate_structure') with ordinality
   loop
     insert into public.gates (org_id, code, name, sort)
-    values (p_org_id, g->>'code', g->>'name', 0)
-    on conflict (org_id, code) do nothing;
+    values (p_org_id, g.v->>'code', g.v->>'name', g.ord::int)
+    on conflict (org_id, code) do update set name = excluded.name, sort = excluded.sort;
   end loop;
 end $$;
 

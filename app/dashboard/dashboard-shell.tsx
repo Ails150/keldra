@@ -6,6 +6,8 @@ import type { WizardData, ViewingRole, ViewingAs } from "../onboarding/types";
 import SignOutButton from "../sign-out-button";
 import { deriveOrgColour, getInitials, roleLabel } from "./utils";
 import { seedDemoStore, DEMO_VIEWING_AS } from "./lib/demo-seed";
+import { saveBaseline } from "./lib/baseline-seed";
+import type { LoadedDashboard } from "@/lib/org/dashboard-data";
 import { DemoProvider } from "./demo-store";
 import { DemoControls, FieldLink } from "./demo-controls";
 import { GuidedTour } from "./guided-tour";
@@ -108,9 +110,13 @@ export default function DashboardShell({
   showDemo = true,
   canInvite = false,
   canWrite = true,
+  dbDashboard,
 }: {
   userEmail: string;
   orgBadge?: string | null;
+  // When present, the dashboard renders from the org's DB rows (built server-
+  // side) instead of the synthetic demo seed.
+  dbDashboard?: LoadedDashboard;
   // The whole dashboard is a synthetic demo seeded client-side. Real orgs that
   // aren't the demo org (Ardmac) must NOT see it — they get a clean empty state.
   // Anonymous/demo visitors and Ardmac keep showDemo = true (public demo path
@@ -136,8 +142,17 @@ export default function DashboardShell({
   // generic-demo lock: always seed synthetic data and ignore any cached real
   // ingest or stored viewing-as. The demo can only ever show the synthetic org.
   useEffect(() => {
-    // A real org that isn't the demo org gets an empty, isolated dashboard —
-    // never the seeded Ardmac/MER demo data.
+    // Authenticated org with DB data → render from the DB (hydrate the local
+    // stores the views read, from server-built rows).
+    if (dbDashboard) {
+      saveBaseline(dbDashboard.baseline);
+      writeBlockerState(dbDashboard.blockerMap);
+      setBlockerMap(dbDashboard.blockerMap);
+      setViewingAs(dbDashboard.project.viewingAs);
+      setProject(dbDashboard.project);
+      return;
+    }
+    // Real org with no DB data → empty state. Anon/demo → the synthetic seed.
     if (!showDemo) {
       setProject(null);
       return;
@@ -156,7 +171,9 @@ export default function DashboardShell({
     return () => {
       cancelled = true;
     };
-  }, [showDemo]);
+  }, [showDemo, dbDashboard]);
+
+  const fromDb = !!dbDashboard;
 
   // Reflect the workspace id in the dashboard URL (?w=…) so it's shareable and
   // the Field-mode link/QR always carries the current workspace.
@@ -529,7 +546,13 @@ export default function DashboardShell({
 
       <main className="flex-1 py-8">
         {tab === "gates" && (
-          <GatesView selectedGate={selectedGate} onSelectGate={setSelectedGate} />
+          <GatesView
+            selectedGate={selectedGate}
+            onSelectGate={setSelectedGate}
+            fromDb={fromDb}
+            dbGates={dbDashboard?.gates}
+            blockerMap={blockerMap}
+          />
         )}
         {tab === "overview" && (
           <OverviewView
@@ -537,6 +560,7 @@ export default function DashboardShell({
             viewingAs={active}
             blockerMap={blockerMap}
             onOpenBlocker={openBlocker}
+            fromDb={fromDb}
           />
         )}
         {tab === "today" && <TodayView onOpenGate={openGate} />}

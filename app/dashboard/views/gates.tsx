@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { BRAND } from "@/lib/brand";
 import { useDemo, type LiveBlocker, type GateView } from "../demo-store";
+import type { BlockerMap } from "../lib/blocker-state";
+import type { DbGate } from "@/lib/org/dashboard-data";
+import { loadBaseline, companyName } from "../lib/baseline-seed";
 
 /* Commissioning gate ladder. Gate C is derived live from the demo store: its
    tag count, status and £/day burn come from the active blocker set, so
@@ -55,7 +58,28 @@ function buildGates(gateC: GateView, gateDE: "waiting" | "ready"): Gate[] {
   ];
 }
 
-export default function GatesView({
+export default function GatesView(props: {
+  selectedGate: string;
+  onSelectGate: (id: string) => void;
+  fromDb?: boolean;
+  dbGates?: DbGate[];
+  blockerMap?: BlockerMap | null;
+}) {
+  // Real org → DB gate ladder; anon demo → the existing live demo gates.
+  if (props.fromDb && props.dbGates) {
+    return (
+      <DbGatesView
+        gates={props.dbGates}
+        blockerMap={props.blockerMap ?? null}
+        selectedGate={props.selectedGate}
+        onSelectGate={props.onSelectGate}
+      />
+    );
+  }
+  return <DemoGatesView selectedGate={props.selectedGate} onSelectGate={props.onSelectGate} />;
+}
+
+function DemoGatesView({
   selectedGate,
   onSelectGate,
 }: {
@@ -217,5 +241,141 @@ function BlockerRow({
         <button type="button" onClick={onResolve} style={{ fontSize: 12, fontWeight: 600, color: BRAND.paperWhite, background: BRAND.successInk, borderRadius: 8, padding: "5px 10px" }} className="hover:opacity-90">Resolve</button>
       </div>
     </div>
+  );
+}
+
+// Real org gate ladder, computed from DB gates + the open blockers on each.
+function DbGatesView({
+  gates,
+  blockerMap,
+  selectedGate,
+  onSelectGate,
+}: {
+  gates: DbGate[];
+  blockerMap: BlockerMap | null;
+  selectedGate: string;
+  onSelectGate: (id: string) => void;
+}) {
+  const router = useRouter();
+  const baseline = loadBaseline();
+  const sel =
+    gates.find((g) => g.code === selectedGate) ??
+    gates.find((g) => g.status === "blocked") ??
+    gates[0];
+  const openBlockers = blockerMap
+    ? Object.values(blockerMap)
+        .filter((b) => b.state !== "closed")
+        .sort((a, b) => b.cost_per_day - a.cost_per_day)
+    : [];
+  const k = (v: number) => `£${Math.round(v / 1000)}k`;
+  const blockedCount = gates.filter((g) => g.status === "blocked").length;
+  const clearedCount = gates.filter((g) => g.status === "cleared").length;
+
+  if (!sel) {
+    return (
+      <section className="mx-auto max-w-4xl px-8">
+        <p className="text-sm text-ink-mid">No gates configured for this org.</p>
+      </section>
+    );
+  }
+  const selP = palette(sel.status);
+
+  return (
+    <section className="mx-auto max-w-4xl px-8 space-y-9">
+      <div>
+        <p style={eyebrow}>Commissioning gates</p>
+        <h1
+          className="font-[family-name:var(--font-fraunces)]"
+          style={{ fontSize: 22, lineHeight: 1.35, color: BRAND.ink, marginTop: 10 }}
+        >
+          {clearedCount} of {gates.length} gates cleared
+          {blockedCount > 0 ? (
+            <>
+              , <span style={{ color: BRAND.dangerInk, fontWeight: 600 }}>{blockedCount} blocking</span>.
+            </>
+          ) : (
+            "."
+          )}
+        </h1>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {gates.map((g) => {
+          const p = palette(g.status);
+          const isSel = g.code === sel.code;
+          return (
+            <button
+              key={g.code}
+              type="button"
+              onClick={() => onSelectGate(g.code)}
+              className="text-left transition-colors"
+              style={{ flex: "1 1 0", minWidth: 124, background: isSel ? p.soft : BRAND.paperWhite, border: `${isSel ? 1.5 : 0.5}px solid ${isSel ? p.ink : BRAND.border}`, borderRadius: 12, padding: "12px 14px", cursor: "pointer" }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-[family-name:var(--font-fraunces)] font-semibold" style={{ fontSize: 18, lineHeight: 1, color: BRAND.ink }}>Gate {g.code}</span>
+                <span className="inline-block flex-shrink-0 rounded-full" style={{ width: 9, height: 9, backgroundColor: p.ink }} />
+              </div>
+              <p style={{ fontSize: 12.5, color: BRAND.ink, marginTop: 6, lineHeight: 1.3 }}>{g.name ?? `Gate ${g.code}`}</p>
+              <p style={{ ...eyebrow, color: p.ink, marginTop: 8 }}>
+                {p.label}
+                {g.openBlockers > 0 ? ` · ${g.openBlockers} open` : ""}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ border: `0.5px solid ${BRAND.border}`, borderRadius: 12, padding: "20px 22px" }}>
+        <p style={{ ...eyebrow, color: selP.ink }}>
+          Gate {sel.code} · {sel.name ?? ""}
+        </p>
+        {sel.status === "blocked" ? (
+          <h2 className="font-[family-name:var(--font-fraunces)]" style={{ fontSize: 20, lineHeight: 1.35, color: BRAND.ink, marginTop: 8 }}>
+            Blocked · <span style={{ color: BRAND.dangerInk, fontWeight: 600 }}>{k(sel.burnPerDay)}/day exposed</span> · {sel.openBlockers} open
+          </h2>
+        ) : sel.status === "waiting" ? (
+          <h2 className="font-[family-name:var(--font-fraunces)]" style={{ fontSize: 20, lineHeight: 1.35, color: BRAND.inkMuted, marginTop: 8 }}>
+            Waiting on an earlier gate{sel.target_date ? ` · target ${sel.target_date}` : ""}
+          </h2>
+        ) : (
+          <h2 className="font-[family-name:var(--font-fraunces)]" style={{ fontSize: 20, lineHeight: 1.35, color: BRAND.successInk, marginTop: 8 }}>
+            Cleared
+          </h2>
+        )}
+
+        {sel.status === "blocked" && openBlockers.length > 0 && (
+          <div style={{ marginTop: 22 }}>
+            <p style={eyebrow}>What&apos;s blocking it · {openBlockers.length} open</p>
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              {openBlockers.map((b) => {
+                const code = b.linked_assets[0] ?? "";
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => code && router.push(`/dashboard/tasks/${encodeURIComponent(code)}`)}
+                    className="w-full text-left"
+                    style={{ background: BRAND.paperWhite, border: `0.5px solid ${BRAND.border}`, borderRadius: 10, padding: "14px 16px", cursor: code ? "pointer" : "default" }}
+                  >
+                    <div className="flex items-start justify-between" style={{ gap: 16 }}>
+                      <span className="min-w-0">
+                        {code && <span className="font-mono" style={{ fontSize: 11, color: BRAND.purpleDeep }}>{code}</span>}
+                        <span className="block" style={{ fontSize: 14, color: BRAND.ink, lineHeight: 1.45 }}>{b.description || b.id}</span>
+                        <span style={{ fontSize: 11.5, color: BRAND.inkMuted }}>
+                          {b.current_owner_org ? `with ${companyName(baseline, b.current_owner_org)}` : "unassigned"} · {b.state}
+                        </span>
+                      </span>
+                      <span className="font-[family-name:var(--font-fraunces)] font-semibold flex-shrink-0" style={{ fontSize: 18, lineHeight: 1, color: BRAND.dangerInk, whiteSpace: "nowrap" }}>
+                        {k(b.cost_per_day)}/day
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

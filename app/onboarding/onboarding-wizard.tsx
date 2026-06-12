@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import type { WizardData, ViewingRole } from "./types";
 import Step1Phase from "./steps/step-1-phase";
 import Step2Organisation from "./steps/step-2-organisation";
@@ -106,13 +107,43 @@ export default function OnboardingWizard({ userEmail }: { userEmail: string }) {
     }
   }
 
-  function next() {
+  async function next() {
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
-    } else {
-      persist(formData);
-      router.push("/onboarding/done");
+      return;
     }
+    // Last step. An authenticated org admin creates REAL records (project,
+    // tasks, emailed invites) and lands on their real DB dashboard — no
+    // invented numbers. The anonymous demo wizard keeps the localStorage path.
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data: prof } = await supabase
+          .from("users")
+          .select("org_id, role")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (prof?.org_id && (prof.role === "org_admin" || prof.role === "superadmin")) {
+          await fetch("/api/onboarding/complete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              projectName: formData.project.name,
+              invites: (formData.invites ?? []).map((i) => ({ email: i.email, role: i.role })),
+            }),
+          });
+          window.location.assign("/dashboard");
+          return;
+        }
+      }
+    } catch {
+      /* fall through to the demo path */
+    }
+    persist(formData);
+    router.push("/onboarding/done");
   }
 
   function prev() {
