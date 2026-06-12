@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionState, isAdminRole } from "@/lib/auth/profile";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { generateInviteLink, sendInviteEmail } from "@/lib/auth/invite-link";
 
 // Resend a direct invite email to a still-pending person.
 export async function POST(request: NextRequest) {
@@ -19,11 +20,11 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
   const origin = new URL(request.url).origin;
-  const { error } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${origin}/reset-password`,
-  });
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  try {
+    const { link } = await generateInviteLink(admin, email, `${origin}/reset-password`);
+    const sent = await sendInviteEmail(email, link, state.profile.org_name ?? "your organisation");
+    return NextResponse.json({ ok: true, message: sent ? `Invite resent to ${email}.` : "Link regenerated (email sender not configured)." });
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }
-  return NextResponse.json({ ok: true });
 }

@@ -32,7 +32,6 @@ import IntelligenceView from "./views/intelligence";
 import AuditView from "./views/audit";
 import MapView from "./views/map-view";
 import InviteOrgModal from "./views/invite-org-modal";
-import InvitePeoplePanel from "./views/invite-people-panel";
 import BlockerDetailPanel from "./views/blocker-detail-panel";
 import PlannedVsActualView from "./views/planned-vs-actual";
 import HoldingBackView from "./views/holding-back";
@@ -132,7 +131,6 @@ export default function DashboardShell({
   const [viewingAs, setViewingAs] = useState<ViewingAs | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [invitePeopleOpen, setInvitePeopleOpen] = useState(false);
   const [blockerMap, setBlockerMap] = useState<BlockerMap | null>(null);
   const [activeBlockerId, setActiveBlockerId] = useState<string | null>(null);
   const [assetFilter, setAssetFilter] = useState<string[] | null>(null);
@@ -403,13 +401,12 @@ export default function DashboardShell({
             <DemoControls />
             <FieldLink />
             {canInvite && (
-              <button
-                type="button"
-                onClick={() => setInvitePeopleOpen(true)}
+              <Link
+                href="/dashboard/people"
                 className="hidden md:inline-flex items-center gap-2 rounded-xl border border-paper-line bg-paper-card px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
               >
-                <span aria-hidden>＋</span> Invite people
-              </button>
+                Team
+              </Link>
             )}
             {canInvite && (
               <Link
@@ -665,9 +662,6 @@ export default function DashboardShell({
         />
       )}
 
-      {invitePeopleOpen && (
-        <InvitePeoplePanel onClose={() => setInvitePeopleOpen(false)} />
-      )}
 
       {activeBlockerId && blockerMap && blockerMap[activeBlockerId] && (
         <BlockerDetailPanel
@@ -698,7 +692,6 @@ function EmptyState({
   orgBadge?: string | null;
   canInvite?: boolean;
 }) {
-  const [invitePeopleOpen, setInvitePeopleOpen] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [seedError, setSeedError] = useState<string | null>(null);
 
@@ -735,13 +728,12 @@ function EmptyState({
             </span>
           )}
           {canInvite && (
-            <button
-              type="button"
-              onClick={() => setInvitePeopleOpen(true)}
+            <Link
+              href="/dashboard/people"
               className="rounded-xl border border-paper-line bg-paper-card px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
             >
-              ＋ Invite people
-            </button>
+              Team
+            </Link>
           )}
           <span className="text-sm text-ink-mid">{userEmail}</span>
           <SignOutButton />
@@ -783,9 +775,6 @@ function EmptyState({
         {seedError && <p className="mt-3 text-sm text-red-600">{seedError}</p>}
       </main>
 
-      {invitePeopleOpen && (
-        <InvitePeoplePanel onClose={() => setInvitePeopleOpen(false)} />
-      )}
     </div>
   );
 }

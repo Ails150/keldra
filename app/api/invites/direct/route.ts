@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionState, isAdminRole } from "@/lib/auth/profile";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { generateInviteLink, sendInviteEmail } from "@/lib/auth/invite-link";
 
 const ROLES = ["org_admin", "manager", "viewer", "field", "member"];
 
@@ -58,22 +59,19 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   const origin = new URL(request.url).origin;
 
-  // Invite (creates the auth user + sends the email). The handle_new_user
-  // trigger creates a bare profile row; we immediately set the org + role so
-  // the profile is correct before they ever click — no finish-setup detour.
-  const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: name },
-    redirectTo: `${origin}/reset-password`,
-  });
-  if (error || !invited.user) {
-    return NextResponse.json(
-      { error: error?.message ?? "Couldn't send the invite." },
-      { status: 400 },
-    );
+  // Generate a set-password link (creates the user if new) and link the profile
+  // first, so it's correct before they click. Email is delivered via Resend (our
+  // verified sender) for reliable delivery.
+  let userId: string;
+  let link: string;
+  try {
+    ({ userId, link } = await generateInviteLink(admin, email, `${origin}/reset-password`));
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }
 
   const { error: profileError } = await admin.from("users").upsert(
-    { id: invited.user.id, org_id: state.profile.org_id, role, full_name: name || null },
+    { id: userId, org_id: state.profile.org_id, role, full_name: name || null },
     { onConflict: "id" },
   );
   if (profileError) {
@@ -83,5 +81,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true });
+  const sent = await sendInviteEmail(email, link, state.profile.org_name ?? "your organisation");
+  return NextResponse.json({
+    ok: true,
+    message: sent ? `Invite sent to ${email}.` : "Invite created (email sender not configured).",
+  });
 }
