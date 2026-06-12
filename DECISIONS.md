@@ -57,6 +57,32 @@ The service-role key reaches only the data API / auth / storage, not
   existing tables (tasks read-path, org provisioning, invites, routing) and
   build/typecheck for the rest.
 
+## Field capture → dashboard-visible blockers (bug fix)
+- **Root cause:** `/field/log` wrote to localStorage (and its "Add photo" was a
+  boolean toggle — no upload); `/field/capture` wrote `mer_field_events`, which
+  the dashboard loader doesn't read. So field "blockers" never reached the
+  `blockers` table the dashboard renders. Confirmed live: 0 field rows in the DB.
+- **RLS gap (the same class that hid earlier bugs):** `blockers` /
+  `blocker_events` had **SELECT-only** policies — a field user couldn't insert
+  them directly. Verified live: direct insert as the authed field user → *"new
+  row violates row-level security policy"*.
+- **Fix:** `/api/field/capture` (server) authenticates via `authedActor`, which
+  derives `org_id` + identity from the **verified session/Bearer token, never the
+  request body** (non-negotiable #1), then writes — via the service role — a real
+  `blockers` row with full loader linkage (task_id, gate, state, cost, raised_by,
+  linked_assets, org_id) + a `blocker_events` "raised" row + a `mer_field_events`
+  row (task trail) + the photo (org-scoped path `{org_id}/…` in mer-field-photos).
+  Field task detail screen `/field/tasks/[code]` drives it; the demo `/field/log`
+  now redirects authed users to the real flow.
+- **Defence-in-depth (non-negotiable #2):** `supabase-field-rls.sql` adds
+  org-scoped INSERT policies on `blockers`/`blocker_events` (field/manager/
+  org_admin/superadmin) + authenticated org-scoped storage policies on
+  mer-field-photos, so RLS isn't a silent gap even though the route uses the
+  service role. (DDL — apply in the SQL editor.)
+- **Proven live** as an authed field user (Bearer, not service key): direct
+  insert denied → API create OK → blocker carries full linkage → photo fetch
+  200 → field user reads it back under RLS → Ardmac dashboard moved 0→1 open.
+
 ## Status
 - [x] **1. Sample data on demand — DONE.** `lib/org/sample-seed.ts` +
   `/api/admin/seed-sample` (org_admin, idempotent) + the empty-state "Start with

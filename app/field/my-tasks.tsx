@@ -69,27 +69,29 @@ export default function MyFieldTasks({ name }: { name: string | null }) {
       ) : (
         <ul className="space-y-3">
           {tasks.map((t) => (
-            <li
-              key={t.code}
-              className="rounded-2xl border border-paper-line bg-paper-card p-4"
-            >
-              <p className="font-mono text-[11px] text-accent-deep">{t.code}</p>
-              <p className="mt-0.5 text-sm font-medium text-ink">{t.name ?? t.code}</p>
-              <p className="mt-1 text-xs text-ink-mid">
-                {(t.status ?? "").replace(/_/g, " ")}
-                {t.affects_room ? ` · ${t.affects_room}` : ""}
-              </p>
+            <li key={t.code}>
+              <Link
+                href={`/field/tasks/${encodeURIComponent(t.code)}`}
+                className="flex items-center justify-between gap-2 rounded-2xl border border-paper-line bg-paper-card p-4 active:bg-paper-warm"
+              >
+                <span className="min-w-0">
+                  <span className="block font-mono text-[11px] text-accent-deep">{t.code}</span>
+                  <span className="mt-0.5 block text-sm font-medium text-ink">{t.name ?? t.code}</span>
+                  <span className="mt-1 block text-xs text-ink-mid">
+                    {(t.status ?? "").replace(/_/g, " ")}
+                    {t.affects_room ? ` · ${t.affects_room}` : ""}
+                  </span>
+                </span>
+                <span className="flex-shrink-0 text-2xl text-ink-mid">›</span>
+              </Link>
             </li>
           ))}
         </ul>
       )}
 
-      <Link
-        href="/field/log"
-        className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-accent-deep px-6 text-base font-semibold text-paper shadow-[0_8px_24px_-8px_rgba(94,37,163,0.6)] active:bg-accent"
-      >
-        <span aria-hidden>+</span> Log blocker or update
-      </Link>
+      <p className="text-center text-xs text-ink-mid">
+        Tap a task above to add a photo, raise a blocker or log an update.
+      </p>
     </div>
   );
 }

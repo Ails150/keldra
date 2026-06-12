@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { logActivity } from "@/lib/activity";
 import {
   COMPANIES,
@@ -10,6 +12,23 @@ import {
 import { FIELD_PERSONA, PERSONA_ACTOR, PM, personaTasks } from "../field-persona";
 
 export default function FieldLog() {
+  const router = useRouter();
+  // Authenticated org users capture via the real per-task flow (task detail →
+  // /api/field/capture). This demo log screen is anon-only.
+  useEffect(() => {
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase.from("users").select("org_id").eq("id", user.id).maybeSingle();
+        if (data?.org_id) router.replace("/field");
+      } catch {
+        /* anon → stay on the demo screen */
+      }
+    })();
+  }, [router]);
+
   const [tasks, setTasks] = useState<BaselineTask[]>([]);
   const [what, setWhat] = useState("");
   const [taskId, setTaskId] = useState("");
