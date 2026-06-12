@@ -26,3 +26,36 @@ export function stripQuotedReply(text: string): string {
 
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
+
+// Minimal HTML → text, for when an inbound email has only an HTML body.
+export function htmlToText(html: string): string {
+  if (!html) return "";
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>(\n)?/gi, "\n")
+    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// Best-effort body: prefer the new text above the quote; never reduce a
+// non-empty message to nothing. Falls back text → html → stripped variants.
+export function bestInboundBody(text: string | null, html: string | null): string {
+  const t = (text ?? "").trim();
+  const h = htmlToText(html ?? "");
+  return (
+    stripQuotedReply(t) ||
+    stripQuotedReply(h) ||
+    t ||
+    h ||
+    ""
+  );
+}
