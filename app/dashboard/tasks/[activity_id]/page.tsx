@@ -30,6 +30,7 @@ import { useTaskEmails, EmailUpdateModal } from "./task-emails";
 import SequencePanel from "./sequence-panel";
 import TaskAssign from "./task-assign";
 import TaskCostEditor from "./task-cost";
+import TaskSummaryPanel from "./task-summary-panel";
 import {
   type MerFieldEvent,
   listAssetHistory,
@@ -356,7 +357,10 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
             </div>
           )}
 
-          <RootCausePanel taskId={task.activity_id} entryCount={activity.length} />
+          <TaskSummaryPanel
+            taskCode={task.activity_id}
+            fallback={<RootCausePanel taskId={task.activity_id} entryCount={activity.length} />}
+          />
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Status" value={statusLabel} />
