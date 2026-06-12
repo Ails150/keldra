@@ -8,26 +8,86 @@ import { landingPathForRole } from "@/lib/auth/landing";
 const INPUT =
   "w-full rounded-[12px] border border-[#dbcce8] bg-white px-4 text-ink placeholder:text-ink-mid/60 outline-none focus:border-accent transition-colors";
 
-export default function ResetPasswordPage() {
+type Phase = "checking" | "ready" | "expired";
+
+// Serves BOTH flows from one page: direct invites ("Create your password") and
+// forgot-password ("Set a new password"). It establishes a session from the
+// email link — whatever form Supabase delivers it in (?code / ?token_hash /
+// #access_token) — then takes only a new password + confirm.
+export default function SetPasswordPage() {
+  const [phase, setPhase] = useState<Phase>("checking");
+  const [isInvite, setIsInvite] = useState(false);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // null = checking, true = recovery/auth session present, false = no session.
-  const [hasSession, setHasSession] = useState<boolean | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
-    // The recovery link lands here with a session already established (via
-    // /auth/callback). If PASSWORD_RECOVERY fires late, mark ready too.
     let done = false;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!done) setHasSession(!!data.session);
+
+    async function establish(): Promise<boolean> {
+      const url = new URL(window.location.href);
+      const sp = url.searchParams;
+      const hashStr = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+      const hp = new URLSearchParams(hashStr);
+
+      const type = sp.get("type") || hp.get("type") || "";
+      if (type === "invite" || type === "signup") setIsInvite(true);
+
+      try {
+        // 1. Implicit flow — tokens in the URL hash.
+        const access_token = hp.get("access_token");
+        const refresh_token = hp.get("refresh_token");
+        if (access_token && refresh_token) {
+          const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+          if (!error) return true;
+        }
+        // 2. token_hash flow (invite / recovery / email confirm).
+        const token_hash = sp.get("token_hash") || hp.get("token_hash");
+        if (token_hash) {
+          const otpType = (type || "invite") as
+            | "invite"
+            | "recovery"
+            | "signup"
+            | "email"
+            | "magiclink";
+          const { error } = await supabase.auth.verifyOtp({ token_hash, type: otpType });
+          if (!error) return true;
+          // Fall back across the common types if the declared one didn't match.
+          for (const t of ["invite", "recovery", "email", "magiclink"] as const) {
+            if (t === otpType) continue;
+            const r = await supabase.auth.verifyOtp({ token_hash, type: t });
+            if (!r.error) return true;
+          }
+        }
+        // 3. PKCE code flow.
+        const code = sp.get("code");
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!error) return true;
+        }
+      } catch {
+        /* fall through */
+      }
+      // 4. A session may already exist (e.g. detectSessionInUrl handled it).
+      const { data } = await supabase.auth.getSession();
+      return !!data.session;
+    }
+
+    establish().then((ok) => {
+      if (done) return;
+      setPhase(ok ? "ready" : "expired");
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || session) {
+
+    // Late events (e.g. PASSWORD_RECOVERY) → ready.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setIsInvite(false);
+      if (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY" || event === "USER_UPDATED") {
         done = true;
-        setHasSession(true);
+        setPhase("ready");
       }
     });
     return () => sub.subscription.unsubscribe();
@@ -54,25 +114,23 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    // Land where this user belongs (field users → /field).
+    // Land in their workspace by role (field → capture, else dashboard).
     let role: string | null = null;
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const { data } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", user.id)
-          .maybeSingle();
+        const { data } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
         role = (data?.role as string | null) ?? null;
       }
     } catch {
-      /* fall back to dashboard */
+      /* default dashboard */
     }
     window.location.assign(landingPathForRole(role));
   }
+
+  const title = isInvite ? "Create your password" : "Set a new password";
 
   return (
     <main className="flex flex-1 flex-col bg-paper">
@@ -92,20 +150,28 @@ export default function ResetPasswordPage() {
             className="mt-8 font-[family-name:var(--font-fraunces)] font-medium text-ink"
             style={{ fontSize: 40, lineHeight: 1.05 }}
           >
-            Set a new password
+            {phase === "expired" ? "Link expired" : title}
           </h1>
 
-          {hasSession === false ? (
+          {phase === "checking" && (
+            <p className="mt-4 text-ink-mid" style={{ fontSize: 16 }}>
+              Checking your link…
+            </p>
+          )}
+
+          {phase === "expired" && (
             <p className="mt-4 text-ink-mid" style={{ fontSize: 16, maxWidth: 520 }}>
-              This page needs a valid recovery link. Open the most recent{" "}
-              <strong>reset password</strong> email and click the link again.{" "}
+              This link has expired or has already been used — ask your admin to
+              resend the invite. There&apos;s nothing to fill in here.{" "}
               <Link href="/" className="font-medium text-accent hover:text-accent-deep">
                 Back to sign in
               </Link>
-              .
             </p>
-          ) : (
+          )}
+
+          {phase === "ready" && (
             <form onSubmit={handleSubmit} className="mt-6 flex w-full max-w-md flex-col gap-3">
+              <p className="text-sm text-ink-mid">Choose a password to finish — that&apos;s it.</p>
               <input
                 type="password"
                 required
@@ -113,7 +179,7 @@ export default function ResetPasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="New password (8+ characters)"
-                disabled={loading || hasSession === null}
+                disabled={loading}
                 className={INPUT}
                 style={{ height: 52, fontSize: 15 }}
               />
@@ -123,18 +189,18 @@ export default function ResetPasswordPage() {
                 autoComplete="new-password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                placeholder="Confirm new password"
-                disabled={loading || hasSession === null}
+                placeholder="Confirm password"
+                disabled={loading}
                 className={INPUT}
                 style={{ height: 52, fontSize: 15 }}
               />
               <button
                 type="submit"
-                disabled={loading || hasSession === null || !password || !confirm}
+                disabled={loading || !password || !confirm}
                 className="w-full rounded-[12px] bg-ink text-paper font-medium transition-colors hover:bg-accent disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{ height: 52, fontSize: 15 }}
               >
-                {loading ? "Saving…" : "Save new password"}
+                {loading ? "Saving…" : "Create password & continue"}
               </button>
               {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
             </form>

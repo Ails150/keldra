@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   const origin = new URL(request.url).origin;
   const { error } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${origin}/auth/callback?next=/reset-password`,
+    redirectTo: `${origin}/reset-password`,
   });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });

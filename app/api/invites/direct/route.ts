@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
   // the profile is correct before they ever click — no finish-setup detour.
   const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(email, {
     data: { full_name: name },
-    redirectTo: `${origin}/auth/callback?next=/reset-password`,
+    redirectTo: `${origin}/reset-password`,
   });
   if (error || !invited.user) {
     return NextResponse.json(
