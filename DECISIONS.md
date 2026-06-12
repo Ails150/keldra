@@ -1,3 +1,20 @@
+# ⛔ STANDING RULE — ALL TEST / PROOF DATA IN THE BLAKE ORG ONLY ⛔
+
+**Ardmac (`437ec2d5-0c94-4ba8-b8bb-328c3f780774`) is a LIVE CUSTOMER org. It is
+NEVER a test target.** Do not create test users, blockers, field events, notes,
+emails, summaries, or ANY proof artifact in Ardmac — or in any org other than
+**Blake (`4451b60f-e13a-4f88-8279-4904e79c38e8`)**.
+
+- Every end-to-end proof runs in **Blake**, with disposable `+alias` / test
+  accounts that are deleted afterwards.
+- **Before any write in a proof/seed script, assert the target `org_id ===
+  Blake`** (`4451b60f-…`). If it isn't Blake, abort.
+- This was violated **twice in one day** (the field-capture and summary proofs
+  wrote fake data — incl. a fake "brackets being installed" entry — into
+  Ardmac's real ELE-COLO-1030 trail). It must not happen again.
+
+---
+
 # DECISIONS — full new-org experience + DB cutover
 
 Running log of judgment calls made while building the "every new org is a
