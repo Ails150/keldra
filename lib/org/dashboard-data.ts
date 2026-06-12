@@ -114,9 +114,32 @@ export async function loadOrgDashboard(
   const tasks = (tasksR.data ?? []).map(taskFromRow);
   if (tasks.length === 0) return { hasData: false };
 
+  // Commercials cascade: task override (cost_per_day) → gate day-rate → org
+  // standing rate. Feeds cost_per_day so exposure/burn reflect real rates.
+  const { data: cfgRows } = await supabase.from("org_config").select("config").limit(1);
+  const commercials =
+    ((cfgRows?.[0]?.config as {
+      commercials?: { gate_rates?: Record<string, number>; standing_rate?: number | null };
+    } | undefined)?.commercials) ?? {};
+  const gateRates = commercials.gate_rates ?? {};
+  const standing = commercials.standing_rate ?? null;
+  const effCost = (raw: unknown, gate: string | null): number => {
+    const c = n(raw);
+    if (c > 0) return c;
+    if (gate && gateRates[gate] != null) return gateRates[gate];
+    if (standing != null) return standing;
+    return 0;
+  };
+  // Standing rate applies to non-complete tasks only (completed work isn't slipping).
+  for (const t of tasks) {
+    if (t.status !== "complete") t.cost_per_day = effCost(t.cost_per_day, null);
+  }
+
   const blockerMap: BlockerMap = {};
   for (const b of blockersR.data ?? []) {
-    blockerMap[s(b.id)] = blockerFromRow(b, eventsR.data ?? []);
+    const blk = blockerFromRow(b, eventsR.data ?? []);
+    blk.cost_per_day = effCost(b.cost_per_day, b.gate ? s(b.gate) : null);
+    blockerMap[s(b.id)] = blk;
   }
 
   const projectName = s(projectsR.data?.[0]?.name) || "Project";
@@ -176,7 +199,7 @@ export async function loadOrgDashboard(
     if (s(b.state) === "closed" || !b.gate) continue;
     const cur = gateStats.get(s(b.gate)) ?? { open: 0, burn: 0 };
     cur.open += 1;
-    cur.burn += n(b.cost_per_day);
+    cur.burn += effCost(b.cost_per_day, s(b.gate));
     gateStats.set(s(b.gate), cur);
   }
   const ordered = (gatesR.data ?? [])

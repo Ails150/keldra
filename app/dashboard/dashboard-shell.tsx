@@ -411,6 +411,14 @@ export default function DashboardShell({
                 <span aria-hidden>＋</span> Invite people
               </button>
             )}
+            {canInvite && (
+              <Link
+                href="/dashboard/settings"
+                className="hidden md:inline-flex items-center gap-2 rounded-xl border border-paper-line bg-paper-card px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+              >
+                Settings
+              </Link>
+            )}
             {canWrite && (
               <button
                 type="button"

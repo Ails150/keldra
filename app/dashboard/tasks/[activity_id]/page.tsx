@@ -29,6 +29,7 @@ import LiveAssetHistory from "./live-asset-history";
 import { useTaskEmails, EmailUpdateModal } from "./task-emails";
 import SequencePanel from "./sequence-panel";
 import TaskAssign from "./task-assign";
+import TaskCostEditor from "./task-cost";
 import {
   type MerFieldEvent,
   listAssetHistory,
@@ -361,7 +362,7 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
             <Field label="Status" value={statusLabel} />
             <Field
               label="Cost of delay"
-              value={task.cost_per_day > 0 ? `${GBP.format(task.cost_per_day)}/day` : "—"}
+              value={task.cost_per_day > 0 ? `${GBP.format(task.cost_per_day)}/day` : "Set day rate"}
               danger={task.cost_per_day > 0}
             />
             <Field label="Planned start" value={fmt(task.planned_start)} />
@@ -394,6 +395,7 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
         <aside className="lg:sticky lg:top-6 lg:self-start space-y-4">
           <SequencePanel taskCode={task.activity_id} canManage={canEmail} />
           <TaskAssign taskCode={task.activity_id} />
+          <TaskCostEditor taskCode={task.activity_id} currentCost={task.cost_per_day} />
           <div className="overflow-hidden rounded-xl" style={{ border: `0.5px solid ${BRAND.border}` }}>
             <div className="px-5 py-4" style={{ borderBottom: `0.5px solid ${BRAND.border}` }}>
               <div className="flex items-center justify-between">

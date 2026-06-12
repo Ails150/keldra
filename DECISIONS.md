@@ -110,3 +110,23 @@ The service-role key reaches only the data API / auth / storage, not
 
 Note: the visual browser render is the one thing I can't self-check headlessly;
 the data each view consumes is verified against the live DB.
+
+## Commercials (cost-of-delay) — org-admin self-serve
+- **Org Settings page** `/dashboard/settings` (org_admin) — per-gate day rates +
+  optional standing-time rate, via `/api/org-commercials` (GET any member, PUT
+  org_admin). Stored in `org_config.config.commercials`. Linked from the
+  dashboard header for admins.
+- **Per-task override** on the task panel (`/api/tasks/cost`, org_admin/manager)
+  → writes `tasks.cost_per_day` (mirrors onto the open blocker) → feeds the
+  existing burn/exposure maths live.
+- **Cascade** in the loader: task override → gate day-rate (by the blocker's
+  gate) → org standing rate. Verified live: effCost(0)→standing 5000,
+  effCost(0,'C')→25000, effCost(20000,'C')→20000 (override wins). Standing skips
+  completed tasks.
+- **Placeholder** — the task panel shows **"Set day rate"** (not £0) when no
+  rate resolves, so slip is never silently free.
+- **Judgment call:** the dedicated *onboarding wizard* Commercials step is
+  deferred — it's redundant with the new Settings page (authed onboarding routes
+  straight to the dashboard, where Settings is available), and the wizard is
+  primarily the anonymous demo flow. The substantive ask (org-admin self-serve,
+  not superadmin-only; per-task override; cascade; no silent £0) is delivered.
