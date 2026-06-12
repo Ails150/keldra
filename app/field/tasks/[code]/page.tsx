@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { NoteComposer } from "@/app/dashboard/tasks/[activity_id]/task-notes";
 
 const WITH_PARTIES = ["", "MEP Sub", "Mech Sub", "Design House", "Main Contractor", "Hyperscale Client", "Fire Sub", "Sprinkler Sub"];
 
@@ -144,6 +145,9 @@ export default function FieldTaskDetail() {
           {submitting ? "Sending…" : "Submit"}
         </button>
       </div>
+
+      {/* Internal team note */}
+      <NoteComposer taskCode={code} onPosted={() => void load()} />
 
       {/* Their submissions on this task */}
       {captures.length > 0 && (

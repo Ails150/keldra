@@ -32,6 +32,7 @@ function timeOnly(iso: string): string {
 }
 
 function dirColour(e: Activity): string {
+  if (e.metadata.internal) return "#0d9488"; // teal — internal team note
   if (e.type === "system") return BRAND.warningInk;
   if (e.direction === "outbound") return BRAND.purple;
   if (e.direction === "inbound") return BRAND.successInk;
@@ -117,6 +118,14 @@ export function ActivityTimeline({
                           style={{ backgroundColor: `${BRAND.purple}1a`, color: BRAND.purple }}
                         >
                           via email
+                        </span>
+                      )}
+                      {e.metadata.internal && (
+                        <span
+                          className="ml-1.5 inline-block rounded-[3px] px-1.5 py-0.5 align-middle font-mono text-[9px] font-semibold uppercase tracking-wide"
+                          style={{ backgroundColor: "#0d9488", color: "#ffffff" }}
+                        >
+                          internal
                         </span>
                       )}
                     </span>

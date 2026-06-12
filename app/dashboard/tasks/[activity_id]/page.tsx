@@ -27,6 +27,7 @@ import {
 import { ActivityTimeline, LogActivityModal, Toast } from "../../activity-ui";
 import LiveAssetHistory from "./live-asset-history";
 import { useTaskEmails, EmailUpdateModal } from "./task-emails";
+import { useTaskNotes, NoteComposer } from "./task-notes";
 import SequencePanel from "./sequence-panel";
 import TaskAssign from "./task-assign";
 import TaskCostEditor from "./task-cost";
@@ -190,6 +191,9 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
   // anonymous public demo, so the demo path is untouched.
   const { activities: emailActivity, canEmail, reload: reloadEmails } =
     useTaskEmails(activityId);
+  const { activities: noteActivity, canPost: canNote, reload: reloadNotes } =
+    useTaskNotes(activityId);
+  const [includeInternalExport, setIncludeInternalExport] = useState(false);
 
   // DB read-path cutover (tasks): for an authenticated org, prefer the task row
   // from the DB; fall back to the localStorage seed if the DB has no such row
@@ -270,10 +274,10 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
   // The trail the whole page reads from: logged (localStorage) + live field.
   const activity = useMemo(
     () =>
-      [...logged, ...fieldActivity, ...emailActivity].sort((a, b) =>
+      [...logged, ...fieldActivity, ...emailActivity, ...noteActivity].sort((a, b) =>
         b.created_at.localeCompare(a.created_at),
       ),
-    [logged, fieldActivity, emailActivity],
+    [logged, fieldActivity, emailActivity, noteActivity],
   );
   const metrics = useMemo<SilenceMetrics>(() => metricsFor(activity), [activity]);
 
@@ -478,14 +482,38 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
               </div>
             )}
 
+            {canNote && (
+              <div style={{ padding: "12px 20px", borderBottom: `0.5px solid ${BRAND.border}` }}>
+                <NoteComposer
+                  taskCode={task.activity_id}
+                  onPosted={() => {
+                    reloadNotes();
+                    showToast("Internal note posted · team only");
+                  }}
+                />
+              </div>
+            )}
             <div className="overflow-y-auto" style={{ maxHeight: "60vh" }}>
               <ActivityTimeline entries={activity} />
             </div>
 
-            <div className="px-5 py-3.5 text-center" style={{ borderTop: `0.5px solid ${BRAND.border}` }}>
+            <div className="px-5 py-3 text-center" style={{ borderTop: `0.5px solid ${BRAND.border}` }}>
+              <label className="mb-1.5 flex items-center justify-center gap-1.5 text-[10px] text-ink-mid">
+                <input
+                  type="checkbox"
+                  checked={includeInternalExport}
+                  onChange={(e) => setIncludeInternalExport(e.target.checked)}
+                />
+                Include internal notes (internal use only)
+              </label>
               <button
                 type="button"
-                onClick={() => showToast("Export — coming in pilot")}
+                onClick={() =>
+                  window.open(
+                    `/api/tasks/export?taskCode=${encodeURIComponent(task.activity_id)}${includeInternalExport ? "&includeInternal=1" : ""}`,
+                    "_blank",
+                  )
+                }
                 className="text-[11px] text-ink-mid hover:text-ink"
               >
                 Export trail as PDF

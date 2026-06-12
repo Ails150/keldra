@@ -57,6 +57,30 @@ The service-role key reaches only the data API / auth / storage, not
   existing tables (tasks read-path, org provisioning, invites, routing) and
   build/typecheck for the rest.
 
+## Internal team notes (per-task)
+- **Table `task_notes`** — SELECT + INSERT grants/policies only ⇒ **immutable**
+  under RLS (no edit/delete), org-scoped. `author_id` + `mentions jsonb` are
+  present so @mentions/notifications can be added later without a migration.
+- **Composer** on the dashboard task panel + the field task detail screen; any
+  org member except viewers can post (text + optional photo). Notes render in the
+  trail with a distinct **teal "INTERNAL"** badge + colour strip.
+- **HARD SEPARATION — enforced server-side (where):**
+  1. *Never in outbound email* — `sendTaskEmail` / `/api/tasks/email` never read
+     `task_notes`; the data is structurally absent from the outbound path.
+  2. *Excluded from export by default* — `/api/tasks/export` only fetches
+     `task_notes` when `includeInternal === "1"`; by default the rows are **never
+     gathered** (not a UI filter). A tampered client can't leak them.
+  3. *Org isolation* — `/api/tasks/notes` derives `org_id` from the verified
+     session (`authedActor`), and RLS is org-scoped; cross-org reads impossible.
+- **Ball-in-court:** internal notes use `direction='internal'` and are NOT
+  counted as an outbound/inbound communication, so they do **not** move
+  ball-in-court (nothing was communicated externally) — by design.
+- **AI summary:** notes ARE fed to the summary (`gatherTrail` includes
+  `task_notes`) as context.
+- **Proof gate:** the live 5-point proof (post from dashboard + field, both see
+  it, export excludes by default, appears in the AI summary) needs the table —
+  run `supabase-notes.sql`, then it's proven + pushed.
+
 ## Field capture → dashboard-visible blockers (bug fix)
 - **Root cause:** `/field/log` wrote to localStorage (and its "Add photo" was a
   boolean toggle — no upload); `/field/capture` wrote `mer_field_events`, which

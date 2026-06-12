@@ -58,6 +58,8 @@ export type Activity = {
     // "via email" badge and downloadable (signed-URL) attachments.
     via_email?: boolean;
     email_attachments?: { name: string; url: string }[];
+    // Internal team note — same-org-only, never emailed, excluded from export.
+    internal?: boolean;
   };
   created_at: string;
   created_by: string;
