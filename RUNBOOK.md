@@ -111,6 +111,11 @@ Supabase → **Authentication → URL Configuration**:
 Confirm **Authentication → Providers → Email** has **"Confirm email" ON**
 (this is what sends the confirmation email on sign-up).
 
+For **direct invites** ("Add person by email"): they use Supabase's built-in
+**Invite user** email (Authentication → Email Templates → "Invite user") with a
+redirect to `/auth/callback?next=/reset-password`. Make sure that template is
+enabled and your SMTP/sender is configured so invites actually deliver.
+
 ---
 
 ## 6. Configure Resend (for the email feature)

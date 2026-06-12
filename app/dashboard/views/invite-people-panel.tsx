@@ -48,6 +48,54 @@ export default function InvitePeoplePanel({ onClose }: { onClose: () => void }) 
   const [createError, setCreateError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
+  // Direct invite (Vantro-style: profile + emailed set-password link).
+  const [dName, setDName] = useState("");
+  const [dEmail, setDEmail] = useState("");
+  const [dKind, setDKind] = useState<"dashboard" | "field">("dashboard");
+  const [dDashRole, setDDashRole] = useState<"org_admin" | "manager" | "viewer">("manager");
+  const dRole = dKind === "field" ? "field" : dDashRole;
+  const [dSending, setDSending] = useState(false);
+  const [dError, setDError] = useState<string | null>(null);
+  const [people, setPeople] = useState<
+    { id: string; name: string; email: string; role: string; pending: boolean }[] | null
+  >(null);
+  const [resending, setResending] = useState<string | null>(null);
+
+  const loadPeople = useCallback(async () => {
+    const res = await fetch("/api/invites/direct");
+    const data = (await res.json().catch(() => ({}))) as { people?: typeof people };
+    if (res.ok) setPeople(data.people ?? []);
+  }, []);
+
+  async function addPerson() {
+    setDSending(true);
+    setDError(null);
+    const res = await fetch("/api/invites/direct", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: dName, email: dEmail, role: dRole }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    setDSending(false);
+    if (!res.ok) {
+      setDError(data.error ?? "Couldn't send the invite.");
+      return;
+    }
+    setDName("");
+    setDEmail("");
+    void loadPeople();
+  }
+
+  async function resend(email: string) {
+    setResending(email);
+    await fetch("/api/invites/direct/resend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    setResending((r) => (r === email ? null : r));
+  }
+
   const load = useCallback(async () => {
     setLoadError(null);
     const res = await fetch("/api/invites");
@@ -65,7 +113,8 @@ export default function InvitePeoplePanel({ onClose }: { onClose: () => void }) 
 
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadPeople();
+  }, [load, loadPeople]);
 
   async function create() {
     setCreating(true);
@@ -147,6 +196,111 @@ export default function InvitePeoplePanel({ onClose }: { onClose: () => void }) 
         </div>
 
         <div className="overflow-y-auto p-6">
+          {/* Add person by email — direct invite */}
+          <div className="rounded-xl border border-paper-line bg-paper p-4">
+            <p className="text-sm font-semibold text-ink">Add person by email</p>
+            <p className="mt-0.5 text-[11px] text-ink-mid">
+              They get an email, set a password, and land straight in their
+              workspace — no signup form, nothing to get wrong.
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <input
+                value={dName}
+                onChange={(e) => setDName(e.target.value)}
+                placeholder="Name"
+                className="w-full rounded-xl border border-border-soft bg-paper-card px-3 py-2.5 text-sm text-ink outline-none focus:border-accent"
+              />
+              <input
+                type="email"
+                value={dEmail}
+                onChange={(e) => setDEmail(e.target.value)}
+                placeholder="Email"
+                className="w-full rounded-xl border border-border-soft bg-paper-card px-3 py-2.5 text-sm text-ink outline-none focus:border-accent"
+              />
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setDKind("dashboard")}
+                className={`rounded-xl border px-3 py-2 text-left text-sm font-medium transition-colors ${dKind === "dashboard" ? "border-accent bg-accent/5 text-ink" : "border-paper-line text-ink-mid hover:border-accent/50"}`}
+              >
+                Dashboard access
+              </button>
+              <button
+                type="button"
+                onClick={() => setDKind("field")}
+                className={`rounded-xl border px-3 py-2 text-left text-sm font-medium transition-colors ${dKind === "field" ? "border-accent bg-accent/5 text-ink" : "border-paper-line text-ink-mid hover:border-accent/50"}`}
+              >
+                Field app
+              </button>
+            </div>
+            {dKind === "dashboard" ? (
+              <select
+                value={dDashRole}
+                onChange={(e) => setDDashRole(e.target.value as "org_admin" | "manager" | "viewer")}
+                className="mt-2 w-full rounded-xl border border-border-soft bg-paper-card px-3 py-2.5 text-sm text-ink outline-none focus:border-accent"
+              >
+                <option value="org_admin">Org admin</option>
+                <option value="manager">Manager</option>
+                <option value="viewer">Viewer</option>
+              </select>
+            ) : (
+              <p className="mt-2 text-[11px] text-ink-mid">Field worker — phone capture app.</p>
+            )}
+            <div className="mt-3 flex items-center justify-between gap-3">
+              {dError ? <p className="text-sm text-red-600">{dError}</p> : <span />}
+              <button
+                type="button"
+                onClick={addPerson}
+                disabled={dSending || !dEmail.trim()}
+                className="rounded-xl bg-ink px-5 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent disabled:opacity-60"
+              >
+                {dSending ? "Sending…" : "Send invite"}
+              </button>
+            </div>
+          </div>
+
+          {/* People + pending */}
+          <h3 className="mt-6 text-xs font-semibold uppercase tracking-wide text-ink-mid">People</h3>
+          {people === null ? (
+            <p className="mt-2 text-sm text-ink-mid">Loading…</p>
+          ) : people.length === 0 ? (
+            <p className="mt-2 text-sm text-ink-mid">No people yet.</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {people.map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-paper-line bg-paper p-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-ink">
+                      {p.name} <span className="text-[11px] text-ink-mid">· {ROLE_LABELS[p.role] ?? p.role}</span>
+                    </p>
+                    <p className="truncate text-[11px] text-ink-mid">{p.email}</p>
+                  </div>
+                  <div className="flex flex-shrink-0 items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${p.pending ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
+                    >
+                      {p.pending ? "Pending" : "Active"}
+                    </span>
+                    {p.pending && (
+                      <button
+                        type="button"
+                        onClick={() => resend(p.email)}
+                        className="rounded-lg border border-paper-line px-2.5 py-1 text-xs font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+                      >
+                        {resending === p.email ? "Sent" : "Resend invite"}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="my-6 border-t border-paper-line" />
+
+          {/* Shareable link (bulk / WhatsApp) */}
+          <p className="mb-3 text-sm font-semibold text-ink">Or share a join link</p>
           {/* Create */}
           <div className="rounded-xl border border-paper-line bg-paper p-4">
             {/* What the link grants */}
