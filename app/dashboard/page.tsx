@@ -26,7 +26,7 @@ export default async function Dashboard() {
     if (profile.org_id) {
       try {
         const supabase = await createClient();
-        dbDashboard = await loadOrgDashboard(supabase, orgName);
+        dbDashboard = await loadOrgDashboard(supabase, orgName, profile.org_id);
       } catch {
         dbDashboard = null; // tables not migrated yet → demo fallback below
       }

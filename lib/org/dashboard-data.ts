@@ -96,14 +96,20 @@ function blockerFromRow(b: any, events: any[]): Blocker {
 export async function loadOrgDashboard(
   supabase: SupabaseClient,
   orgName: string,
+  orgId: string,
 ): Promise<OrgDashboard> {
+  // Scope EVERY query to the viewing org. RLS alone is not enough: a superadmin's
+  // _select policies match all orgs (is_superadmin()), so without this filter a
+  // superadmin's dashboard fans out every org's rows — two orgs that share the
+  // gate codes A/B/C/BU render as duplicate gate cards, and other orgs' blockers
+  // leak in. Filtering by org_id here makes the dashboard one-org for everyone.
   const [tasksR, blockersR, eventsR, rosterR, gatesR, projectsR] = await Promise.all([
-    supabase.from("tasks").select("*"),
-    supabase.from("blockers").select("*"),
-    supabase.from("blocker_events").select("*"),
-    supabase.from("roster").select("*"),
-    supabase.from("gates").select("code,name,target_date,sort"),
-    supabase.from("projects").select("name,baseline_revision_date").limit(1),
+    supabase.from("tasks").select("*").eq("org_id", orgId),
+    supabase.from("blockers").select("*").eq("org_id", orgId),
+    supabase.from("blocker_events").select("*").eq("org_id", orgId),
+    supabase.from("roster").select("*").eq("org_id", orgId),
+    supabase.from("gates").select("code,name,target_date,sort").eq("org_id", orgId),
+    supabase.from("projects").select("name,baseline_revision_date").eq("org_id", orgId).limit(1),
   ]);
 
   // A missing table (pre-migration) surfaces as an error → let the caller fall back.
@@ -116,7 +122,7 @@ export async function loadOrgDashboard(
 
   // Commercials cascade: task override (cost_per_day) → gate day-rate → org
   // standing rate. Feeds cost_per_day so exposure/burn reflect real rates.
-  const { data: cfgRows } = await supabase.from("org_config").select("config").limit(1);
+  const { data: cfgRows } = await supabase.from("org_config").select("config").eq("org_id", orgId).limit(1);
   const commercials =
     ((cfgRows?.[0]?.config as {
       commercials?: { gate_rates?: Record<string, number>; standing_rate?: number | null };
@@ -202,8 +208,13 @@ export async function loadOrgDashboard(
     cur.burn += effCost(b.cost_per_day, s(b.gate));
     gateStats.set(s(b.gate), cur);
   }
+  // One card per DISTINCT gate code. The query is already org-scoped (and the
+  // gates table is unique on (org_id, code)), but dedupe defensively so a stray
+  // duplicate row can never render a second card for the same gate.
+  const seenGate = new Set<string>();
   const ordered = (gatesR.data ?? [])
     .map((g: any) => ({ code: s(g.code), name: g.name ?? null, target_date: g.target_date ?? null, sort: n(g.sort) }))
+    .filter((g) => (seenGate.has(g.code) ? false : (seenGate.add(g.code), true)))
     .sort((a, b) => a.sort - b.sort || a.code.localeCompare(b.code));
   let priorBlocked = false;
   const gates: DbGate[] = ordered.map((g) => {
