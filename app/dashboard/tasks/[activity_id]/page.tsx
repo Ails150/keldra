@@ -32,6 +32,7 @@ import SequencePanel from "./sequence-panel";
 import TaskAssign from "./task-assign";
 import TaskCostEditor from "./task-cost";
 import TaskSummaryPanel from "./task-summary-panel";
+import ShareTaskButton from "./share-task";
 import {
   type MerFieldEvent,
   listAssetHistory,
@@ -402,6 +403,7 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
         {/* Right — activity trail */}
         <aside className="lg:sticky lg:top-6 lg:self-start space-y-4">
           <SequencePanel taskCode={task.activity_id} canManage={canEmail} />
+          {canEmail && <ShareTaskButton taskCode={task.activity_id} full />}
           <TaskAssign taskCode={task.activity_id} />
           <TaskCostEditor taskCode={task.activity_id} currentCost={task.cost_per_day} />
           <div className="overflow-hidden rounded-xl" style={{ border: `0.5px solid ${BRAND.border}` }}>

@@ -165,6 +165,16 @@ export function EmailUpdateModal({
   const [selectedEvidence, setSelectedEvidence] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [company, setCompany] = useState("");
+  const [contacts, setContacts] = useState<{ email: string; name: string | null; company: string | null }[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const res = await fetch(`/api/tasks/contacts?taskCode=${encodeURIComponent(taskCode)}`);
+      if (res.ok) setContacts(((await res.json()) as { contacts?: typeof contacts }).contacts ?? []);
+    })();
+  }, [taskCode]);
 
   function addFiles(list: FileList | null) {
     if (!list) return;
@@ -194,6 +204,8 @@ export function EmailUpdateModal({
     const fd = new FormData();
     fd.set("taskCode", taskCode);
     fd.set("to", to);
+    fd.set("contactName", name);
+    fd.set("contactCompany", company);
     fd.set("subject", subject);
     fd.set("message", message);
     fd.set("evidence", JSON.stringify([...selectedEvidence]));
@@ -238,9 +250,44 @@ export function EmailUpdateModal({
             type="email"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            placeholder="Recipient email"
+            placeholder="Recipient email (anyone — they don't need Keldra)"
             className={input}
           />
+          {contacts.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {contacts.map((c) => (
+                <button
+                  key={c.email}
+                  type="button"
+                  onClick={() => {
+                    setTo(c.email);
+                    if (c.name) setName(c.name);
+                    if (c.company) setCompany(c.company);
+                  }}
+                  className="rounded-full border border-paper-line px-2.5 py-1 text-[11px] text-ink hover:border-accent"
+                >
+                  {c.name || c.email}
+                  {c.company ? ` · ${c.company}` : ""}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Name (optional)"
+              className={input}
+            />
+            <input
+              type="text"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              placeholder="Company (optional)"
+              className={input}
+            />
+          </div>
           <input
             type="text"
             value={subject}

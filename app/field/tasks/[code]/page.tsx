@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { NoteComposer } from "@/app/dashboard/tasks/[activity_id]/task-notes";
+import ShareTaskButton from "@/app/dashboard/tasks/[activity_id]/share-task";
+import FieldEmail from "./field-email";
 
 const WITH_PARTIES = ["", "MEP Sub", "Mech Sub", "Design House", "Main Contractor", "Hyperscale Client", "Fire Sub", "Sprinkler Sub"];
 
@@ -145,6 +147,12 @@ export default function FieldTaskDetail() {
           {submitting ? "Sending…" : "Submit"}
         </button>
       </div>
+
+      {/* Email an update (threads to the task) */}
+      <FieldEmail taskCode={code} />
+
+      {/* Capture funnel — share the task's inbound address */}
+      <ShareTaskButton taskCode={code} full />
 
       {/* Internal team note */}
       <NoteComposer taskCode={code} onPosted={() => void load()} />

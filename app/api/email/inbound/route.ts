@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseThreadAddress } from "@/lib/email/task-email";
 import { verifyResendWebhook } from "@/lib/email/svix";
-import { bestInboundBody } from "@/lib/email/strip-quote";
+import { bestInboundBody, htmlToText } from "@/lib/email/strip-quote";
 import { attachmentAllowed, storeEmailAttachment } from "@/lib/email/attachments";
 import { pauseSequenceForTask } from "@/lib/sequences/engine";
 import {
@@ -81,11 +81,21 @@ export async function POST(request: NextRequest) {
   let cleanText = "";
   let html: string | null = null;
   let fetchError: string | null = null;
+  // A forward pulls an off-Keldra thread onto the record — we KEEP the full
+  // content (incl. the original sender block), not strip it like a reply.
+  let isForward = /^\s*(fwd|fw):/i.test(subject);
   if (emailId) {
     try {
       const full = await getReceivedEmail(emailId);
       html = full.html ?? null;
-      cleanText = bestInboundBody(full.text, full.html);
+      const rawText = full.text ?? "";
+      const blob = `${rawText}\n${htmlToText(full.html ?? "")}`;
+      if (!isForward && /-{2,}\s*forwarded message|forwarded message:|begin forwarded message/i.test(blob)) {
+        isForward = true;
+      }
+      cleanText = isForward
+        ? rawText.trim() || htmlToText(full.html ?? "")
+        : bestInboundBody(full.text, full.html);
     } catch (err) {
       fetchError = (err as Error).message;
       console.error("[inbound] body fetch failed:", fetchError);
@@ -94,7 +104,18 @@ export async function POST(request: NextRequest) {
     fetchError = "no email_id in webhook payload";
     console.error("[inbound]", fetchError);
   }
-  if (!cleanText) cleanText = fetchError ? `(couldn't load message body: ${fetchError})` : "(no message body)";
+  // Image/attachment-only emails (e.g. a WhatsApp screenshot forwarded in) carry
+  // no body — note that an attachment is attached rather than "(no message body)".
+  const attachmentMeta = Array.isArray((data as { attachments?: unknown[] }).attachments)
+    ? ((data as { attachments?: unknown[] }).attachments?.length ?? 0)
+    : 0;
+  if (!cleanText) {
+    cleanText = fetchError
+      ? `(couldn't load message body: ${fetchError})`
+      : attachmentMeta > 0
+        ? "(photo / attachment — see below)"
+        : "(no message body)";
+  }
 
   let actorUserId: string | null = null;
   if (fromEmail) {

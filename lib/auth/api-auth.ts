@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 export type ApiActor = {
   userId: string;
   orgId: string;
+  orgName: string | null;
   role: string;
   fullName: string | null;
   email: string | null;
@@ -44,10 +45,17 @@ export async function authedActor(request: Request): Promise<ApiActor | null> {
   // Org + role come from the user's profile, keyed by the VERIFIED user id.
   const { data: prof } = await createAdminClient()
     .from("users")
-    .select("org_id, role, full_name")
+    .select("org_id, role, full_name, organisations(name)")
     .eq("id", userId)
-    .maybeSingle<{ org_id: string | null; role: string; full_name: string | null }>();
+    .maybeSingle<{
+      org_id: string | null;
+      role: string;
+      full_name: string | null;
+      organisations: { name?: string } | { name?: string }[] | null;
+    }>();
   if (!prof?.org_id) return null;
 
-  return { userId, orgId: prof.org_id, role: prof.role, fullName: prof.full_name, email };
+  const org = prof.organisations;
+  const orgName = Array.isArray(org) ? org[0]?.name ?? null : org?.name ?? null;
+  return { userId, orgId: prof.org_id, orgName, role: prof.role, fullName: prof.full_name, email };
 }
