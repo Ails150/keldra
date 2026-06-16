@@ -42,14 +42,18 @@ export default async function Dashboard() {
     if (dbDashboard?.hasData) {
       return <DashboardShell {...common} showDemo={false} dbDashboard={dbDashboard} />;
     }
-    if (dbDashboard && !dbDashboard.hasData) {
-      // Migrated, but the org has no data yet → empty state + sample button.
-      return <DashboardShell {...common} showDemo={false} />;
-    }
-    // Pre-migration fallback only: keep the org working on the demo seed.
-    return <DashboardShell {...common} showDemo />;
+    // A logged-in org NEVER rides the synthetic demo: with data it renders the
+    // DB path above; without data (or a pre-migration error) it gets the clean
+    // empty state + "Start with sample data". showDemo is anonymous-only.
+    return <DashboardShell {...common} showDemo={false} />;
   }
 
-  const emailFallback = state.status === "unverified" ? state.email : "demo@keldra.io";
-  return <DashboardShell userEmail={emailFallback} orgBadge={null} showDemo canInvite={false} />;
+  // Logged-in but profile unresolved (pre-migration / transient) → keep the demo
+  // as a safety net so a half-set-up session never crashes.
+  if (state.status === "unverified") {
+    return <DashboardShell userEmail={state.email} orgBadge={null} showDemo canInvite={false} />;
+  }
+
+  // Anonymous (logged-out) visitor → the public synthetic demo.
+  return <DashboardShell userEmail="demo@keldra.io" orgBadge={null} showDemo canInvite={false} />;
 }

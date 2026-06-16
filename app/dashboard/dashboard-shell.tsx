@@ -116,10 +116,9 @@ export default function DashboardShell({
   // When present, the dashboard renders from the org's DB rows (built server-
   // side) instead of the synthetic demo seed.
   dbDashboard?: LoadedDashboard;
-  // The whole dashboard is a synthetic demo seeded client-side. Real orgs that
-  // aren't the demo org (Ardmac) must NOT see it — they get a clean empty state.
-  // Anonymous/demo visitors and Ardmac keep showDemo = true (public demo path
-  // stays untouched).
+  // The synthetic demo is the ANONYMOUS (logged-out) path only. Every logged-in
+  // org renders from its own DB (dbDashboard) or, with no data yet, a clean
+  // empty state — never this seed.
   showDemo?: boolean;
   // org_admin / superadmin → can open the "Invite people" panel.
   canInvite?: boolean;
