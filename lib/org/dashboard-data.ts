@@ -9,6 +9,7 @@ import {
   type BaselineTask,
   type TaskStatus,
 } from "@/app/dashboard/lib/baseline-seed";
+import { computeGateImpacts, impactBadge, impactNarrative, type Milestone } from "@/lib/gates/impact";
 
 export type DbGate = {
   code: string;
@@ -18,6 +19,15 @@ export type DbGate = {
   openBlockers: number;
   burnPerDay: number;
   status: "cleared" | "blocked" | "waiting";
+  // Deadline impact chain (computed from real milestones + gate dependencies).
+  daysBlocked: number;
+  blocksGates: string[];
+  milestoneName: string | null;
+  milestoneTarget: string | null;
+  milestoneProjected: string | null;
+  milestoneSlipDays: number;
+  impactBadge: string;
+  impactNarrative: string | null;
 };
 
 export type LoadedDashboard = {
@@ -108,9 +118,18 @@ export async function loadOrgDashboard(
     supabase.from("blockers").select("*").eq("org_id", orgId),
     supabase.from("blocker_events").select("*").eq("org_id", orgId),
     supabase.from("roster").select("*").eq("org_id", orgId),
-    supabase.from("gates").select("code,name,target_date,sort").eq("org_id", orgId),
+    supabase.from("gates").select("*").eq("org_id", orgId),
     supabase.from("projects").select("name,baseline_revision_date").eq("org_id", orgId).limit(1),
   ]);
+
+  // Milestones are optional (pre-migration → table absent); tolerate gracefully.
+  let milestones: Milestone[] = [];
+  try {
+    const { data: ms } = await supabase.from("milestones").select("code,name,target_date").eq("org_id", orgId);
+    milestones = (ms ?? []).map((m: any) => ({ code: s(m.code), name: m.name ?? null, target_date: m.target_date ?? null }));
+  } catch {
+    /* milestones table not migrated yet */
+  }
 
   // A missing table (pre-migration) surfaces as an error → let the caller fall back.
   for (const r of [tasksR, blockersR, eventsR, rosterR, gatesR, projectsR]) {
@@ -199,13 +218,17 @@ export async function loadOrgDashboard(
     viewingAs: { orgName, orgType: "main-contractor", role: "main-contractor" },
   };
 
-  // Per-gate open-blocker counts + burn, from the blockers' gate column.
-  const gateStats = new Map<string, { open: number; burn: number }>();
+  // Per-gate open-blocker counts + burn + days-blocked (from the oldest open
+  // blocker on the gate), from the blockers' gate column.
+  const now = Date.now();
+  const gateStats = new Map<string, { open: number; burn: number; oldest: number }>();
   for (const b of blockersR.data ?? []) {
     if (s(b.state) === "closed" || !b.gate) continue;
-    const cur = gateStats.get(s(b.gate)) ?? { open: 0, burn: 0 };
+    const cur = gateStats.get(s(b.gate)) ?? { open: 0, burn: 0, oldest: now };
     cur.open += 1;
     cur.burn += effCost(b.cost_per_day, s(b.gate));
+    const since = new Date(s(b.since_timestamp) || s(b.raised_date)).getTime();
+    if (!Number.isNaN(since)) cur.oldest = Math.min(cur.oldest, since);
     gateStats.set(s(b.gate), cur);
   }
   // One card per DISTINCT gate code. The query is already org-scoped (and the
@@ -213,15 +236,57 @@ export async function loadOrgDashboard(
   // duplicate row can never render a second card for the same gate.
   const seenGate = new Set<string>();
   const ordered = (gatesR.data ?? [])
-    .map((g: any) => ({ code: s(g.code), name: g.name ?? null, target_date: g.target_date ?? null, sort: n(g.sort) }))
+    .map((g: any) => ({
+      code: s(g.code),
+      name: g.name ?? null,
+      target_date: g.target_date ?? null,
+      sort: n(g.sort),
+      milestone_code: g.milestone_code ?? null,
+      depends_on: Array.isArray(g.depends_on) ? (g.depends_on as string[]) : [],
+    }))
     .filter((g) => (seenGate.has(g.code) ? false : (seenGate.add(g.code), true)))
     .sort((a, b) => a.sort - b.sort || a.code.localeCompare(b.code));
+
+  // Impact chain: slip per blocked gate, propagated to dependents + milestone.
+  const impacts = computeGateImpacts(
+    ordered.map((g) => {
+      const st = gateStats.get(g.code);
+      return {
+        code: g.code,
+        target_date: g.target_date,
+        milestone_code: g.milestone_code,
+        depends_on: g.depends_on,
+        blocked: !!st && st.open > 0,
+        daysBlocked: st && st.open > 0 ? Math.max(0, Math.floor((now - st.oldest) / 86_400_000)) : 0,
+      };
+    }),
+    milestones,
+    now,
+  );
+
   let priorBlocked = false;
   const gates: DbGate[] = ordered.map((g) => {
-    const st = gateStats.get(g.code) ?? { open: 0, burn: 0 };
+    const st = gateStats.get(g.code) ?? { open: 0, burn: 0, oldest: now };
     const status: DbGate["status"] = st.open > 0 ? "blocked" : priorBlocked ? "waiting" : "cleared";
     if (st.open > 0) priorBlocked = true;
-    return { ...g, openBlockers: st.open, burnPerDay: st.burn, status };
+    const imp = impacts.get(g.code);
+    return {
+      code: g.code,
+      name: g.name,
+      target_date: g.target_date,
+      sort: g.sort,
+      openBlockers: st.open,
+      burnPerDay: st.burn,
+      status,
+      daysBlocked: imp?.daysBlocked ?? 0,
+      blocksGates: imp?.blocksGates ?? [],
+      milestoneName: imp?.milestoneName ?? null,
+      milestoneTarget: imp?.milestoneTarget ?? null,
+      milestoneProjected: imp?.milestoneProjected ?? null,
+      milestoneSlipDays: imp?.milestoneSlipDays ?? 0,
+      impactBadge: impactBadge(imp, st.burn),
+      impactNarrative: status === "blocked" ? impactNarrative(imp, g.code) : null,
+    };
   });
 
   return { hasData: true, project, blockerMap, baseline, gates };

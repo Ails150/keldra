@@ -1,6 +1,7 @@
 import "server-only";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { gateImpactNarrativeForTask } from "@/lib/gates/gate-impact-db";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -46,8 +47,9 @@ async function gatherTrail(admin: Admin, orgId: string, taskCode: string) {
   const task = taskR.data as any;
   const newestAt = events.length ? events[events.length - 1].ts : null;
   const daysOpen = task?.planned_start ? Math.max(0, Math.floor((Date.now() - new Date(task.planned_start).getTime()) / DAY)) : null;
+  const impact = await gateImpactNarrativeForTask(admin, orgId, taskCode);
 
-  return { events, count: events.length, newestAt, task, daysOpen };
+  return { events, count: events.length, newestAt, task, daysOpen, impact };
 }
 
 async function generate(
@@ -62,6 +64,7 @@ async function generate(
     `Cost of delay: £${t.cost_per_day ?? 0}/day`,
     trail.daysOpen != null ? `Days open: ${trail.daysOpen}` : "",
     t.blocking_company ? `Held by: ${t.blocking_company}` : "",
+    trail.impact ? `DEADLINE IMPACT: ${trail.impact}` : "",
   ].filter(Boolean).join("\n");
   const trailText = trail.events.map((e) => `- ${e.ts.slice(0, 16)} ${e.line}`).join("\n") || "(no trail entries yet)";
 
@@ -83,7 +86,7 @@ Return JSON exactly:
 {
   "where": "2-3 plain sentences on where this task stands right now",
   "changed": "what changed most recently and what it means — cite the latest email/field/note (who, when, and whether it included a date/commitment). If nothing changed recently, say so.",
-  "insight": "ONE sharp line: the next move the data implies (escalate to a named person, hold, chase X, re-baseline)"
+  "insight": "ONE sharp line: the next move the data implies. If a DEADLINE IMPACT is given, NAME the milestone/gate at risk and the days late — the deadline is the point, not the daily burn."
 }
 Cite real names, dates and £ from the data. Do not invent.`;
       const result = (await Promise.race([
@@ -104,7 +107,11 @@ Cite real names, dates and £ from the data. Do not invent.`;
   return {
     where: `${taskCode} is ${t.status ?? "open"}${trail.daysOpen != null ? `, ${trail.daysOpen} days open` : ""}${t.cost_per_day ? `, costing £${t.cost_per_day}/day` : ""}. ${t.blocked_reason ?? ""}`.trim(),
     changed: last ? `Latest: ${last.line}` : "No trail activity yet.",
-    insight: t.cost_per_day >= 18000 ? "High exposure — escalate director-to-director." : "Chase the responsible party for a dated commitment.",
+    insight: trail.impact
+      ? trail.impact
+      : t.cost_per_day >= 18000
+        ? "High exposure — escalate director-to-director."
+        : "Chase the responsible party for a dated commitment.",
     source: "rules",
   };
 }

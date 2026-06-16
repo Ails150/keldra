@@ -1,11 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { BRAND } from "@/lib/brand";
 import { useDemo, type LiveBlocker, type GateView } from "../demo-store";
 import type { BlockerMap } from "../lib/blocker-state";
 import type { DbGate } from "@/lib/org/dashboard-data";
 import { loadBaseline, companyName } from "../lib/baseline-seed";
+import { GateSignoffPanel, type GateSignoffData } from "./gate-signoffs";
 
 /* Commissioning gate ladder. Gate C is derived live from the demo store: its
    tag count, status and £/day burn come from the active blocker set, so
@@ -244,7 +246,16 @@ function BlockerRow({
   );
 }
 
-// Real org gate ladder, computed from DB gates + the open blockers on each.
+// Effective gate status once real sign-off rows are folded in: a gate with
+// outstanding commissioning items is NOT cleared, even with no open blockers.
+function effectiveStatus(g: DbGate, s: GateSignoffData | undefined): GateStatus {
+  if (g.status === "blocked") return "blocked";
+  if (s && s.summary.total > 0 && !s.summary.cleared) return "blocked";
+  return g.status;
+}
+
+// Real org gate ladder, computed from DB gates + the open blockers on each +
+// the real commissioning sign-off rows (X/Y + cleared recomputed from them).
 function DbGatesView({
   gates,
   blockerMap,
@@ -258,9 +269,25 @@ function DbGatesView({
 }) {
   const router = useRouter();
   const baseline = loadBaseline();
+
+  const [signoffs, setSignoffs] = useState<Record<string, GateSignoffData>>({});
+  const [canSign, setCanSign] = useState(false);
+  const refetch = () =>
+    fetch("/api/gates/signoff")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!j) return;
+        setSignoffs(j.gates ?? {});
+        setCanSign(!!j.canSignOff);
+      })
+      .catch(() => {});
+  useEffect(() => {
+    refetch();
+  }, []);
+
   const sel =
     gates.find((g) => g.code === selectedGate) ??
-    gates.find((g) => g.status === "blocked") ??
+    gates.find((g) => effectiveStatus(g, signoffs[g.code]) === "blocked") ??
     gates[0];
   const openBlockers = blockerMap
     ? Object.values(blockerMap)
@@ -268,8 +295,8 @@ function DbGatesView({
         .sort((a, b) => b.cost_per_day - a.cost_per_day)
     : [];
   const k = (v: number) => `£${Math.round(v / 1000)}k`;
-  const blockedCount = gates.filter((g) => g.status === "blocked").length;
-  const clearedCount = gates.filter((g) => g.status === "cleared").length;
+  const blockedCount = gates.filter((g) => effectiveStatus(g, signoffs[g.code]) === "blocked").length;
+  const clearedCount = gates.filter((g) => effectiveStatus(g, signoffs[g.code]) === "cleared").length;
 
   if (!sel) {
     return (
@@ -278,7 +305,9 @@ function DbGatesView({
       </section>
     );
   }
-  const selP = palette(sel.status);
+  const selStatus = effectiveStatus(sel, signoffs[sel.code]);
+  const selP = palette(selStatus);
+  const selSum = signoffs[sel.code]?.summary;
 
   return (
     <section className="mx-auto max-w-4xl px-8 space-y-9">
@@ -297,11 +326,23 @@ function DbGatesView({
             "."
           )}
         </h1>
+        {(() => {
+          const worst = gates
+            .filter((g) => g.status === "blocked" && g.milestoneName && g.milestoneSlipDays > 0)
+            .sort((a, b) => b.milestoneSlipDays - a.milestoneSlipDays)[0];
+          if (!worst) return null;
+          return (
+            <p style={{ fontSize: 13.5, color: BRAND.dangerInk, marginTop: 8, lineHeight: 1.5 }}>
+              Gate {worst.code} {worst.impactBadge}
+            </p>
+          );
+        })()}
       </div>
 
       <div className="flex flex-wrap gap-2">
         {gates.map((g) => {
-          const p = palette(g.status);
+          const sum = signoffs[g.code]?.summary;
+          const p = palette(effectiveStatus(g, signoffs[g.code]));
           const isSel = g.code === sel.code;
           return (
             <button
@@ -318,7 +359,7 @@ function DbGatesView({
               <p style={{ fontSize: 12.5, color: BRAND.ink, marginTop: 6, lineHeight: 1.3 }}>{g.name ?? `Gate ${g.code}`}</p>
               <p style={{ ...eyebrow, color: p.ink, marginTop: 8 }}>
                 {p.label}
-                {g.openBlockers > 0 ? ` · ${g.openBlockers} open` : ""}
+                {sum && sum.total > 0 ? ` · ${sum.signed}/${sum.total} signed` : g.openBlockers > 0 ? ` · ${g.openBlockers} open` : ""}
               </p>
             </button>
           );
@@ -329,21 +370,48 @@ function DbGatesView({
         <p style={{ ...eyebrow, color: selP.ink }}>
           Gate {sel.code} · {sel.name ?? ""}
         </p>
-        {sel.status === "blocked" ? (
+        {selStatus === "blocked" ? (
           <h2 className="font-[family-name:var(--font-fraunces)]" style={{ fontSize: 20, lineHeight: 1.35, color: BRAND.ink, marginTop: 8 }}>
-            Blocked · <span style={{ color: BRAND.dangerInk, fontWeight: 600 }}>{k(sel.burnPerDay)}/day exposed</span> · {sel.openBlockers} open
+            {sel.openBlockers > 0 ? (
+              <>Blocked · <span style={{ color: BRAND.dangerInk, fontWeight: 600 }}>{k(sel.burnPerDay)}/day exposed</span> · {sel.openBlockers} open</>
+            ) : (
+              <>Not cleared · <span style={{ color: BRAND.dangerInk, fontWeight: 600 }}>{selSum ? selSum.total - selSum.signed : 0} item(s) outstanding</span></>
+            )}
           </h2>
-        ) : sel.status === "waiting" ? (
+        ) : selStatus === "waiting" ? (
           <h2 className="font-[family-name:var(--font-fraunces)]" style={{ fontSize: 20, lineHeight: 1.35, color: BRAND.inkMuted, marginTop: 8 }}>
             Waiting on an earlier gate{sel.target_date ? ` · target ${sel.target_date}` : ""}
           </h2>
         ) : (
           <h2 className="font-[family-name:var(--font-fraunces)]" style={{ fontSize: 20, lineHeight: 1.35, color: BRAND.successInk, marginTop: 8 }}>
-            Cleared
+            Cleared{selSum && selSum.total > 0 ? ` · all ${selSum.total} items signed off` : ""}
           </h2>
         )}
 
-        {sel.status === "blocked" && openBlockers.length > 0 && (
+        {sel.impactNarrative && (
+          <div style={{ marginTop: 14, padding: "12px 14px", borderRadius: 10, background: BRAND.dangerSoft, border: `0.5px solid ${BRAND.dangerInk}` }}>
+            <p style={{ ...eyebrow, color: BRAND.dangerInk }}>Deadline impact</p>
+            <p style={{ fontSize: 13.5, color: BRAND.ink, marginTop: 6, lineHeight: 1.5 }}>{sel.impactNarrative}</p>
+            {sel.impactBadge && <p style={{ fontSize: 12, color: BRAND.inkMuted, marginTop: 6 }}>{sel.impactBadge}</p>}
+          </div>
+        )}
+
+        {selSum && selSum.total > 0 && (
+          <div className="flex justify-end" style={{ marginTop: 14 }}>
+            <button
+              type="button"
+              onClick={() => window.open(`/api/gates/export?gateCode=${encodeURIComponent(sel.code)}`, "_blank")}
+              style={{ fontSize: 12, fontWeight: 500, color: BRAND.inkMuted, border: `0.5px solid ${BRAND.border}`, borderRadius: 8, padding: "5px 10px" }}
+              className="hover:text-ink"
+            >
+              Export sign-off record (PDF)
+            </button>
+          </div>
+        )}
+
+        <GateSignoffPanel gateCode={sel.code} data={signoffs[sel.code]} canSign={canSign} onSigned={refetch} />
+
+        {selStatus === "blocked" && sel.openBlockers > 0 && openBlockers.length > 0 && (
           <div style={{ marginTop: 22 }}>
             <p style={eyebrow}>What&apos;s blocking it · {openBlockers.length} open</p>
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { authedActor } from "@/lib/auth/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { gateImpactNarrativeForTask } from "@/lib/gates/gate-impact-db";
 
 // Trail export. INTERNAL NOTES ARE EXCLUDED BY DEFAULT — enforced HERE, server-
 // side, by only fetching task_notes when includeInternal === "1". A tampered UI
@@ -30,6 +31,28 @@ export async function GET(request: NextRequest) {
     items.push({ ts: f.created_at, kind: `Field ${f.kind}`, internal: false, text: `${f.actor}: ${f.comment ?? ""}` });
   }
 
+  // Gate sign-offs for any gate this task's blockers are tied to — the formal
+  // commissioning record, part of the dispute artifact.
+  const { data: tBlk } = await admin.from("blockers").select("gate").eq("org_id", actor.orgId).eq("task_code", taskCode);
+  const gateCodes = Array.from(new Set((tBlk ?? []).map((b) => (b as { gate: string | null }).gate).filter(Boolean) as string[]));
+  if (gateCodes.length) {
+    const { data: sos } = await admin
+      .from("gate_signoffs")
+      .select("gate_code, item_label, status, signed_by_name, signed_by_role, signed_at, signature_kind")
+      .eq("org_id", actor.orgId)
+      .in("gate_code", gateCodes)
+      .eq("status", "signed");
+    for (const so of sos ?? []) {
+      const s = so as { gate_code: string; item_label: string; signed_by_name: string | null; signed_by_role: string | null; signed_at: string; signature_kind: string };
+      items.push({
+        ts: s.signed_at,
+        kind: `Gate ${s.gate_code} sign-off`,
+        internal: false,
+        text: `${s.item_label} — signed off by ${s.signed_by_name ?? "—"}${s.signed_by_role ? ` (${s.signed_by_role})` : ""} [${s.signature_kind} signature]`,
+      });
+    }
+  }
+
   // Internal notes — gathered ONLY when explicitly opted in (default: excluded).
   let internalIncluded = 0;
   if (includeInternal) {
@@ -45,8 +68,12 @@ export async function GET(request: NextRequest) {
   }
   items.sort((a, b) => (a.ts < b.ts ? -1 : 1));
 
+  // Deadline impact chain — the slip + milestone-at-risk that IS the escalation
+  // argument. Shown prominently at the head of the export.
+  const impact = await gateImpactNarrativeForTask(admin, actor.orgId, taskCode);
+
   if (format === "json") {
-    return NextResponse.json({ taskCode, includeInternal, internalIncluded, items });
+    return NextResponse.json({ taskCode, includeInternal, internalIncluded, impact, items });
   }
 
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -64,6 +91,7 @@ export async function GET(request: NextRequest) {
   .meta{color:#5a4a72;font-size:12px;margin-bottom:16px;}</style></head>
   <body onload="window.print()">
     <h1>${taskCode} — activity trail</h1>
+    ${impact ? `<p style="font-size:13px;color:#a01f3c;font-weight:600;margin:0 0 8px;">Deadline impact — ${esc(impact)}</p>` : ""}
     <p class="meta">${items.length} entries · ${includeInternal ? `includes ${internalIncluded} internal note(s) — INTERNAL USE ONLY` : "internal notes excluded"}</p>
     <table>${rows}</table>
   </body></html>`;
