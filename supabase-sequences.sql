@@ -70,21 +70,29 @@ create policy sequence_audit_select on public.sequence_audit for select to authe
 --    backfill existing org_config rows that don't have one yet.
 create or replace function public.sequence_default_config()
 returns jsonb language sql immutable as $$
+  -- ESCALATING cadence (tighter early, widening, then escalate). gap_days = days
+  -- of silence to wait AFTER the previous step (after start/original silence for
+  -- step 1) before this chase fires. Editable per org in org_config — the engine
+  -- never hardcodes these. After the final step + escalate_after_days grace with
+  -- no reply from the awaited party, the engine ESCALATES (stops chasing, sets the
+  -- blocker to 'escalated', notifies escalation_owner_email if the org set one).
   select jsonb_build_object(
     'enabled', false,                       -- OFF by default (per-org opt-in)
     'daily_send_cap', 50,
     'timezone', 'Europe/Dublin',
     'working_hours', jsonb_build_object('start','08:00','end','18:00','days', jsonb_build_array(1,2,3,4,5)),
+    'escalate_after_days', 7,               -- grace after final chase before escalation
+    'escalation_owner_email', null,         -- who escalation notifies; NEVER guessed
     'steps', jsonb_build_array(
-      jsonb_build_object('n',1,'offset_days',2,'cc_escalation',false,
+      jsonb_build_object('n',1,'gap_days',3,'cc_escalation',false,
         'subject','Following up — {task_code}',
         'body','Hi, following up on {task_code}. You mentioned: "{commitment_quote}". That was {days_silent} days ago — could you share an update? Thanks.'),
-      jsonb_build_object('n',2,'offset_days',4,'cc_escalation',true,
+      jsonb_build_object('n',2,'gap_days',7,'cc_escalation',true,
         'subject','Action needed — {task_code} ({gate_code})',
         'body','{task_code} is now holding {gate_code} (due {gate_date}). "{commitment_quote}" was {days_silent} days ago with no movement. Please advise today.'),
-      jsonb_build_object('n',3,'offset_days',7,'cc_escalation',false,'flag_to_report',true,
-        'subject','Escalation — {task_code} unresolved',
-        'body','{task_code} remains unresolved after {days_silent} days and is now flagged to the project report. An immediate response is required.')
+      jsonb_build_object('n',3,'gap_days',14,'cc_escalation',false,'flag_to_report',true,
+        'subject','Final notice — {task_code} unresolved',
+        'body','{task_code} remains unresolved after {days_silent} days and is now flagged to the project report. This is a final notice before escalation. An immediate response is required.')
     )
   )
 $$;
@@ -125,6 +133,26 @@ update public.org_config
    set config = jsonb_set(config, '{sequence}', public.sequence_default_config(), true),
        updated_at = now()
  where not (config ? 'sequence');
+
+-- Migrate the OLD shape (offset_days, no gap_days / escalate_after_days /
+-- escalation_owner_email) to the new escalating-cadence shape the engine reads.
+-- Re-seed steps + escalation knobs from the default, but PRESERVE each org's own
+-- enabled flag and any escalation_owner_email they've set (never clobber opt-in
+-- or a configured owner). Targets rows whose first step still lacks gap_days.
+update public.org_config
+   set config = jsonb_set(
+                  config,
+                  '{sequence}',
+                  public.sequence_default_config()
+                    || jsonb_build_object('enabled', coalesce(config #> '{sequence,enabled}', 'false'::jsonb))
+                    || (case when (config #> '{sequence,escalation_owner_email}') is not null
+                              and config #>> '{sequence,escalation_owner_email}' <> ''
+                             then jsonb_build_object('escalation_owner_email', config #> '{sequence,escalation_owner_email}')
+                             else '{}'::jsonb end),
+                  true),
+       updated_at = now()
+ where (config #> '{sequence,steps,0}') is not null
+   and not (config #> '{sequence,steps,0}' ? 'gap_days');
 
 -- 5. SANITY -------------------------------------------------------------------
 select 'task_sequences' as table, count(*)::text as rows from public.task_sequences

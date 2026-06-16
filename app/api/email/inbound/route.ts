@@ -152,7 +152,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "logged-error" }, { status: 202 });
   }
 
-  await pauseSequenceForTask(admin, matched.orgId, matched.taskCode, "inbound reply").catch(() => {});
+  // Pause the chase ONLY if this inbound is from the awaited party (the chased
+  // recipient or its domain) — an unrelated reply must not silence it. The
+  // sender match is enforced inside pauseSequenceForTask via isAwaitedParty.
+  await pauseSequenceForTask(admin, matched.orgId, matched.taskCode, "awaited party replied", fromEmail).catch(() => {});
 
   // Attachments (list → download → store) after the 200, logging failures.
   if (emailId) {
