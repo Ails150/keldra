@@ -116,6 +116,8 @@ type Props = {
   onAction: (actionId: string, payload?: ActionPayload) => Promise<void> | void;
   onToggleSit: (next: boolean) => void;
   onJumpToAssets: (ids: string[]) => void;
+  canWrite?: boolean;
+  onSetVisibility?: (v: "shared" | "org_private") => void | Promise<void>;
 };
 
 export default function BlockerDetailPanel({
@@ -126,7 +128,11 @@ export default function BlockerDetailPanel({
   onAction,
   onToggleSit,
   onJumpToAssets,
+  canWrite = true,
+  onSetVisibility,
 }: Props) {
+  const ownerOrgName = viewingAs?.orgName ?? "your org";
+  const isPrivate = blocker.visibility === "org_private";
   const actions = useMemo(() => getAvailableActions(blocker), [blocker]);
   const [activePrompt, setActivePrompt] = useState<{
     action: ActionDef;
@@ -211,9 +217,55 @@ export default function BlockerDetailPanel({
               ))}
             </div>
           )}
+
+          {isPrivate && (
+            <div className="mt-3">
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: BRAND.paperWarm, color: BRAND.purpleDeep, border: `0.5px solid ${BRAND.border}` }}
+              >
+                🔒 Private to {ownerOrgName}
+              </span>
+            </div>
+          )}
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+          {/* Privacy toggle — owner-only. Hidden for read-only roles. */}
+          {canWrite && onSetVisibility && (
+            <section>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-ink">Visibility</p>
+                  <p className="mt-0.5 text-[11px] text-ink-mid">
+                    {isPrivate
+                      ? `Hidden from other orgs — only ${ownerOrgName} can see it.`
+                      : "Shared — visible to other orgs in the project."}
+                  </p>
+                </div>
+                <div className="flex flex-shrink-0 rounded-lg border border-paper-line p-0.5">
+                  {(["shared", "org_private"] as const).map((v) => {
+                    const on = blocker.visibility === v;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => !on && onSetVisibility(v)}
+                        className="rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors"
+                        style={{
+                          background: on ? BRAND.purpleDeep : "transparent",
+                          color: on ? BRAND.paperWhite : BRAND.inkMuted,
+                        }}
+                      >
+                        {v === "shared" ? "Shared" : "Private"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* State pill */}
           <section>
             <div className="flex items-center gap-3">

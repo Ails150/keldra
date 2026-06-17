@@ -273,6 +273,18 @@ export default function DashboardShell({
     });
   }, []);
 
+  // Owner-only privacy toggle. Persists to the DB (server asserts the blocker
+  // belongs to the caller's org), then reflects it locally for the badge/toggle.
+  const setBlockerVisibility = useCallback(async (id: string, visibility: "shared" | "org_private") => {
+    const res = await fetch("/api/blockers/visibility", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ blockerId: id, visibility }),
+    });
+    if (!res.ok) return;
+    setBlockerMap((current) => (current && current[id] ? { ...current, [id]: { ...current[id], visibility } } : current));
+  }, []);
+
   const resetBlockers = useCallback(async () => {
     if (!project) return;
     const fresh = await hydrateFromProject(project);
@@ -673,6 +685,8 @@ export default function DashboardShell({
           }
           onToggleSit={(on) => toggleSit(activeBlockerId, on)}
           onJumpToAssets={jumpToAssets}
+          canWrite={canWrite}
+          onSetVisibility={(v) => setBlockerVisibility(activeBlockerId, v)}
         />
       )}
 
