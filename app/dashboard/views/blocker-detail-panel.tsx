@@ -83,6 +83,8 @@ function fmtEventVerb(evtType: string): string {
     start: "marked working",
     block: "marked blocked",
     chase: "chased",
+    respond: "replied",
+    "cost-raise": "set the cost of delay",
     unblock: "marked unblocked",
     escalate: "escalated",
     "accept-pm": "PM accepted",

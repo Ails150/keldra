@@ -1,5 +1,5 @@
 import "server-only";
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { BASELINE_TASKS, COMPANIES } from "@/app/dashboard/lib/baseline-seed";
 
@@ -45,6 +45,54 @@ const BLOCKERS: { code: string; since: number; state: string }[] = [
 // These are seed/template artifacts — never a real customer's own data.
 const SEED_GATE_CODES = [...GATES.map((g) => g.code), "BU"];
 const ALL_BASELINE_CODES = BASELINE_TASKS.map((t) => t.activity_id);
+
+// ---- blocker audit trail (dated, hash-chained) -------------------------------
+// Every blocker gets a real back-and-forth in the History panel — dated across
+// its open period, NOT all "today". The hero (ELE-COLO-1030) carries the full
+// documented story: 8 outbound chases, MEP Sub's replies, the unopened formal
+// escalation, and the cost-of-delay raise. seq + prev_hash/hash are chained.
+type SeedEvent = { ago: number; type: string; actor: string; note?: string };
+
+const compName = (slug: string | null): string =>
+  COMPANIES.find((c) => c.slug === slug)?.name ?? (slug || "the responsible party");
+
+const HERO_EVENTS: SeedEvent[] = [
+  { ago: 90, type: "raised",     actor: "Commissioning Lead", note: "Brackets not installed by MEP Sub — Telecoms Sub can't run fibre." },
+  { ago: 88, type: "chase",      actor: "Commissioning Lead", note: "Chased MEP Sub for a bracket install date." },
+  { ago: 85, type: "respond",    actor: "MEP Sub",            note: "Will have lads on it next week, chasing materials." },
+  { ago: 74, type: "chase",      actor: "Commissioning Lead", note: "Chase 2 — still no brackets on site." },
+  { ago: 66, type: "chase",      actor: "Commissioning Lead", note: "Chase 3 — now on the critical path for Gate C." },
+  { ago: 60, type: "chase",      actor: "Commissioning Lead", note: "Chase 4 — please confirm a firm date today." },
+  { ago: 53, type: "respond",    actor: "MEP Sub",            note: "Brackets arrived — but the crew was moved to Project Brown." },
+  { ago: 47, type: "chase",      actor: "Commissioning Lead", note: "Chase 5 — crew diverted off MER, need them back." },
+  { ago: 44, type: "respond",    actor: "MEP Sub",            note: "Friday for definite, 2 lads allocated." },
+  { ago: 37, type: "chase",      actor: "Commissioning Lead", note: "Chase 6 — Friday came and went, no show." },
+  { ago: 28, type: "chase",      actor: "Commissioning Lead", note: "Chase 7 — fourth broken commitment." },
+  { ago: 19, type: "escalate",   actor: "Commissioning Lead", note: "Formal escalation to MEP Sub Operations Manager — still unopened." },
+  { ago: 12, type: "chase",      actor: "Commissioning Lead", note: "Chase 8 — FORMAL notice: programme delay & cost recovery." },
+  { ago: 10, type: "cost-raise", actor: "Commissioning Lead", note: "£20,000/day" },
+];
+
+function genBlockerEvents(
+  b: { code: string; since: number; state: string },
+  t: { blocked_reason: string | null; blocking_company: string | null },
+): SeedEvent[] {
+  if (b.code === "ELE-COLO-1030") return HERO_EVENTS;
+  const held = compName(t.blocking_company);
+  const evs: SeedEvent[] = [
+    { ago: b.since, type: "raised", actor: "Commissioning Lead", note: t.blocked_reason ?? undefined },
+    { ago: Math.max(2, Math.round(b.since * 0.75)), type: "chase", actor: "Commissioning Lead", note: `Chased ${held} for a date.` },
+  ];
+  if (b.since >= 30) evs.push({ ago: Math.round(b.since * 0.5), type: "respond", actor: held, note: "Looking into it — will revert." });
+  evs.push({ ago: Math.max(2, Math.round(b.since * 0.25)), type: "chase", actor: "Commissioning Lead", note: "Chase 2 — still open, please confirm a date." });
+  if (b.state === "awaiting-input" || b.state === "escalated")
+    evs.push({ ago: Math.max(1, Math.round(b.since * 0.1)), type: "escalate", actor: "Commissioning Lead", note: `Escalated — no movement from ${held}.` });
+  return evs;
+}
+
+function chainHash(prev: string | null, seq: number, type: string, actor: string, ts: string, payload: unknown): string {
+  return createHash("sha256").update(`${prev ?? ""}|${seq}|${type}|${actor}|${ts}|${JSON.stringify(payload)}`).digest("hex");
+}
 
 const SIGNERS = [
   { name: "Aoife Byrne", role: "Commissioning Lead" },
@@ -188,7 +236,18 @@ export async function seedSampleData(orgId: string): Promise<SeedResult> {
       linked_assets: [b.code],
     }).select("id").single<{ id: string }>();
     if (row) {
-      await admin.from("blocker_events").insert({ blocker_id: row.id, org_id: orgId, seq: 0, event_type: "raised", actor: "Commissioning Lead", payload: { description: t.blocked_reason, priority } });
+      // Full dated, hash-chained chase trail (raised → chases ↔ responses →
+      // escalation → cost-raise), oldest first. Hero gets the documented story.
+      let prev: string | null = null;
+      const eventRows = genBlockerEvents(b, t).map((e, seq) => {
+        const ts = isoDaysAgo(e.ago);
+        const payload = e.type === "raised" ? { description: t.blocked_reason, priority } : e.note ? { note: e.note } : {};
+        const hash = chainHash(prev, seq, e.type, e.actor, ts, payload);
+        const eventRow = { blocker_id: row.id, org_id: orgId, seq, event_type: e.type, actor: e.actor, ts, payload, prev_hash: prev, hash };
+        prev = hash;
+        return eventRow;
+      });
+      await admin.from("blocker_events").insert(eventRows);
       result.blockers++;
     }
   }
