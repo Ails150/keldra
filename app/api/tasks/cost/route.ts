@@ -40,5 +40,18 @@ export async function POST(request: NextRequest) {
     .eq("org_id", state.profile.org_id)
     .eq("task_code", taskCode)
     .neq("state", "closed");
+  // Bust the AI summary cache for this task. The summary embeds the £/day rate
+  // but is only regenerated when the TRAIL changes (entry_count / newest_at) — a
+  // cost edit doesn't touch the trail, so without this the panel keeps showing
+  // the old rate. Deleting the row forces a fresh regen on next load.
+  try {
+    await admin
+      .from("task_summaries")
+      .delete()
+      .eq("org_id", state.profile.org_id)
+      .eq("task_code", taskCode);
+  } catch {
+    /* task_summaries not migrated — nothing to invalidate */
+  }
   return NextResponse.json({ ok: true, costPerDay: cost });
 }

@@ -210,13 +210,19 @@ function SeededTaskPage({ activityId }: { activityId: string }) {
           data: { user },
         } = await supabase.auth.getUser();
         if (!user) return; // anon/demo → seed only
-        const { data } = await supabase
+        // Scope to the viewer's org. The same task code exists across orgs, so an
+        // unscoped maybeSingle() returns >1 row for a superadmin → it errors and
+        // we'd silently fall back to the stale localStorage seed. Filtering by the
+        // viewer's org_id keeps the box reading the right row (and reflecting saves).
+        const { data: prof } = await supabase.from("users").select("org_id").eq("id", user.id).maybeSingle();
+        let q = supabase
           .from("tasks")
           .select(
             "code,name,wbs_path,responsible_company,blocking_company,status,blocked_reason,affects_room,planned_start,planned_end,planned_manpower,actual_manpower,cost_per_day",
           )
-          .eq("code", activityId)
-          .maybeSingle();
+          .eq("code", activityId);
+        if (prof?.org_id) q = q.eq("org_id", prof.org_id);
+        const { data } = await q.limit(1).maybeSingle();
         if (!cancelled && data) setDbTask(dbRowToTask(data));
       } catch {
         /* fall back to seed */
