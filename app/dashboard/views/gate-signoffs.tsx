@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BRAND } from "@/lib/brand";
 
 // Evidence-grade gate sign-off UI: the per-gate item breakdown (what was signed,
@@ -54,6 +54,7 @@ export function GateSignoffPanel({
   onSigned: () => void;
 }) {
   const [signing, setSigning] = useState<string | null>(null); // item_label being signed
+  const [history, setHistory] = useState<SignoffItem | null>(null); // item whose trail is open
 
   if (!data || data.items.length === 0) {
     return (
@@ -89,7 +90,12 @@ export function GateSignoffPanel({
               }}
             >
               <div className="flex items-start justify-between" style={{ gap: 16 }}>
-                <div className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setHistory(it)}
+                  className="min-w-0 text-left"
+                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                >
                   <span style={{ fontSize: 14, color: BRAND.ink, lineHeight: 1.4 }}>{it.item_label}</span>
                   {signed ? (
                     <span className="block" style={{ fontSize: 11.5, color: BRAND.inkMuted, marginTop: 4 }}>
@@ -115,7 +121,10 @@ export function GateSignoffPanel({
                       style={{ marginTop: 6, height: 44, background: "#fff", border: `0.5px solid ${BRAND.border}`, borderRadius: 6 }}
                     />
                   )}
-                </div>
+                  <span className="block" style={{ fontSize: 11, color: BRAND.purpleDeep, marginTop: 6 }}>
+                    {signed ? "View trail →" : "What's blocking it →"}
+                  </span>
+                </button>
                 <div className="flex-shrink-0">
                   {signed ? (
                     <span style={{ ...eyebrow, color: BRAND.successInk }}>Signed</span>
@@ -149,6 +158,117 @@ export function GateSignoffPanel({
           }}
         />
       )}
+
+      {history && <ItemHistoryModal item={history} onClose={() => setHistory(null)} />}
+    </div>
+  );
+}
+
+type HistoryEntry = { ts: string; kind: string; text: string };
+type HistoryBlocking = { id: string; title: string; state: string; held_by_company: string | null; cost_per_day: number; task_code: string | null };
+type HistoryResponse = {
+  item: { gate_code: string; item_label: string; status: string; signed_by_name: string | null; signed_by_role: string | null; signed_at: string | null; task_code: string | null };
+  timeline: HistoryEntry[];
+  blocking: HistoryBlocking[];
+};
+
+// The full story behind one commissioning item: for a signed item, the trail of
+// chases/comms/commitments ending in the sign-off; for an outstanding one, the
+// open blockers holding its gate. Read live from /api/gates/signoff/history.
+function ItemHistoryModal({ item, onClose }: { item: SignoffItem; onClose: () => void }) {
+  const [data, setData] = useState<HistoryResponse | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/gates/signoff/history?id=${encodeURIComponent(item.id)}`)
+      .then((r) => (r.ok ? r.json() : r.json().then((j) => Promise.reject(new Error(j.error ?? `Failed (${r.status}).`)))))
+      .then((j) => live && setData(j))
+      .catch((e) => live && setErr((e as Error).message));
+    return () => {
+      live = false;
+    };
+  }, [item.id]);
+
+  const signed = item.status === "signed";
+  const k = (v: number) => `£${Math.round(v / 1000)}k`;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(26,15,43,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: BRAND.paperWhite, borderRadius: 14, padding: 22, width: "100%", maxWidth: 560, maxHeight: "80vh", overflowY: "auto", border: `0.5px solid ${BRAND.border}` }}
+      >
+        <p style={eyebrow}>Gate {item.gate_code} · {signed ? "how it got signed" : "what's blocking it"}</p>
+        <h3 className="font-[family-name:var(--font-fraunces)]" style={{ fontSize: 17, color: BRAND.ink, marginTop: 6, lineHeight: 1.35 }}>
+          {item.item_label}
+        </h3>
+
+        {err && <p style={{ fontSize: 12.5, color: BRAND.dangerInk, marginTop: 14 }}>{err}</p>}
+        {!err && !data && <p style={{ fontSize: 12.5, color: BRAND.inkMuted, marginTop: 14 }}>Loading trail…</p>}
+
+        {data && signed && (
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 0 }}>
+            {data.timeline.length === 0 ? (
+              <p style={{ fontSize: 12.5, color: BRAND.inkMuted }}>No trail recorded — the sign-off was captured directly.</p>
+            ) : (
+              data.timeline.map((e, i) => {
+                const isSignoff = e.kind === "Signed off";
+                return (
+                  <div key={i} style={{ display: "flex", gap: 12, paddingBottom: i === data.timeline.length - 1 ? 0 : 14 }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                      <span style={{ width: 9, height: 9, borderRadius: 9999, background: isSignoff ? BRAND.successInk : BRAND.purpleDeep, flexShrink: 0, marginTop: 4 }} />
+                      {i < data.timeline.length - 1 && <span style={{ width: 1, flex: 1, background: BRAND.border, marginTop: 2 }} />}
+                    </div>
+                    <div className="min-w-0" style={{ flex: 1 }}>
+                      <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                        <span style={{ ...eyebrow, color: isSignoff ? BRAND.successInk : BRAND.inkMuted }}>{e.kind}</span>
+                        <span className="font-mono" style={{ fontSize: 10.5, color: BRAND.inkMuted, whiteSpace: "nowrap" }}>{fmt(e.ts)}</span>
+                      </div>
+                      <p style={{ fontSize: 13, color: BRAND.ink, marginTop: 4, lineHeight: 1.5 }}>{e.text}</p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {data && !signed && (
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+            {data.blocking.length === 0 ? (
+              <p style={{ fontSize: 12.5, color: BRAND.inkMuted }}>No open blockers recorded on this gate — it's waiting on an earlier gate.</p>
+            ) : (
+              data.blocking.map((b) => (
+                <div key={b.id} style={{ background: BRAND.paperWhite, border: `0.5px solid ${BRAND.border}`, borderRadius: 10, padding: "12px 14px" }}>
+                  <div className="flex items-start justify-between" style={{ gap: 16 }}>
+                    <span className="min-w-0">
+                      <span className="block" style={{ fontSize: 13.5, color: BRAND.ink, lineHeight: 1.45 }}>{b.title}</span>
+                      <span style={{ fontSize: 11.5, color: BRAND.inkMuted }}>
+                        {b.held_by_company ? `with ${b.held_by_company}` : "unassigned"} · {b.state}
+                      </span>
+                    </span>
+                    {b.cost_per_day > 0 && (
+                      <span className="font-[family-name:var(--font-fraunces)] font-semibold flex-shrink-0" style={{ fontSize: 16, lineHeight: 1, color: BRAND.dangerInk, whiteSpace: "nowrap" }}>
+                        {k(b.cost_per_day)}/day
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center justify-end" style={{ marginTop: 18 }}>
+          <button type="button" onClick={onClose} style={{ fontSize: 13, color: BRAND.inkMuted }} className="hover:text-ink">
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

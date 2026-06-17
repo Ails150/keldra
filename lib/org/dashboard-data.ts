@@ -84,6 +84,7 @@ function blockerFromRow(b: any, events: any[]): Blocker {
     raised_by: s(b.raised_by) || "—",
     state: (s(b.state) || "unowned") as BlockerStateName,
     current_owner: b.current_owner ?? null,
+    gate: b.gate ?? null,
     // Surface "who's holding it" (held_by_company) as the org when no explicit
     // owner is set, so rollups/overview have something to group by.
     current_owner_org: b.current_owner_org ?? b.held_by_company ?? null,

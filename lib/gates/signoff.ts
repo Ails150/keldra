@@ -21,12 +21,13 @@ export type GateSignoff = {
   signature_text: string | null;
   signature_path: string | null;
   signed_at: string | null;
+  task_code: string | null;
 };
 
 export type GateSignoffSummary = { signed: number; total: number; cleared: boolean };
 
 const BUCKET = "gate-signatures";
-const SELECT = "id, gate_code, item_label, status, signed_by_user_id, signed_by_name, signed_by_role, signature_kind, signature_text, signature_path, signed_at";
+const SELECT = "id, gate_code, item_label, status, signed_by_user_id, signed_by_name, signed_by_role, signature_kind, signature_text, signature_path, signed_at, task_code";
 
 // All signoff rows for an org, grouped by gate_code (oldest item label first).
 export async function loadGateSignoffs(admin: Admin, orgId: string): Promise<Map<string, GateSignoff[]>> {

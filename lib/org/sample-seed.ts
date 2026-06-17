@@ -66,6 +66,47 @@ const SIGNOFFS: { gate: string; item: string; signed: boolean }[] = [
   ...["Integrated systems test", "Client witness test", "Handover pack"].map((item) => ({ gate: "E", item, signed: false })),
 ];
 
+// A few CLEARED Gate A/B items carry a short anonymised trail — a chase or two,
+// a commitment, then completion — so the commissioning-item drilldown shows HOW
+// each got signed (the sign-off event itself comes from the gate_signoffs row).
+// Each links to a real baseline task_code so its task_emails/notes resolve.
+const SIGNOFF_TRAILS: {
+  gate: string;
+  item: string;
+  taskCode: string;
+  trail: { dir: "outbound" | "inbound"; ago: number; subject: string; body: string }[];
+  note?: string;
+}[] = [
+  {
+    gate: "A", item: "First-fix tray runs", taskCode: "ELE-COLO-1010",
+    trail: [
+      { dir: "outbound", ago: 150, subject: "Tray runs COLO 1-4 — programme", body: "First-fix containment due to start Monday. Confirm crew and materials on site." },
+      { dir: "inbound", ago: 148, subject: "RE: Tray runs COLO 1-4", body: "Crew booked, tray delivered Friday. Starting Monday as planned." },
+      { dir: "inbound", ago: 96, subject: "RE: Tray runs COLO 1-4 — complete", body: "All first-fix tray runs in across COLO 1-4. Ready for inspection." },
+    ],
+    note: "Walked the tray runs with the M&E lead — clean install, ready to sign.",
+  },
+  {
+    gate: "A", item: "LV containment COLO 1-2", taskCode: "ELE-COLO-1020",
+    trail: [
+      { dir: "outbound", ago: 145, subject: "LV containment COLO 1-2 — chase", body: "Module 2 containment slipped a week. What's the new finish date?" },
+      { dir: "inbound", ago: 143, subject: "RE: LV containment COLO 1-2", body: "Extra pair on it this week, done by Friday." },
+      { dir: "inbound", ago: 100, subject: "RE: LV containment COLO 1-2 — done", body: "COLO 1-2 containment complete and snagged." },
+    ],
+  },
+  {
+    gate: "B", item: "LV terminations", taskCode: "ELE-COLO-1060",
+    trail: [
+      { dir: "outbound", ago: 120, subject: "LV terminations Module 4 — readiness", body: "Boards due to be terminated next week. Confirm cables pulled and tested." },
+      { dir: "inbound", ago: 118, subject: "RE: LV terminations Module 4", body: "Cables pulled and meggered. Terminations start Monday." },
+      { dir: "inbound", ago: 80, subject: "RE: LV terminations Module 4 — complete", body: "All terminations made off and torqued to spec. Ready for power-on checks." },
+    ],
+    note: "Torque records filed. Good to energise.",
+  },
+];
+const TRAIL_BY_ITEM = new Map(SIGNOFF_TRAILS.map((t) => [`${t.gate}::${t.item}`, t.taskCode]));
+const TRAIL_TASK_CODES = SIGNOFF_TRAILS.map((t) => t.taskCode);
+
 // The ELE-COLO-1030 trail (chases out / responses in) so the activity trail +
 // AI root-cause render from the DB, not a hardcoded array.
 const HERO = "ELE-COLO-1030";
@@ -101,8 +142,8 @@ export async function seedSampleData(orgId: string): Promise<SeedResult> {
   await admin.from("blockers").delete().eq("org_id", orgId).in("task_code", ALL_BASELINE_CODES); // cascades blocker_events
   await del(admin, "gate_signoffs", (q) => q.eq("org_id", orgId).in("gate_code", SEED_GATE_CODES));
   await del(admin, "milestones", (q) => q.eq("org_id", orgId)); // milestones are a seed-only concept
-  await admin.from("task_threads").delete().eq("org_id", orgId).eq("task_code", HERO); // cascades task_emails
-  await del(admin, "task_notes", (q) => q.eq("org_id", orgId).eq("task_code", HERO));
+  await admin.from("task_threads").delete().eq("org_id", orgId).in("task_code", [HERO, ...TRAIL_TASK_CODES]); // cascades task_emails
+  await del(admin, "task_notes", (q) => q.eq("org_id", orgId).in("task_code", [HERO, ...TRAIL_TASK_CODES]));
   await admin.from("gates").delete().eq("org_id", orgId).in("code", SEED_GATE_CODES);
   await del(admin, "roster", (q) => q.eq("org_id", orgId).like("email", "%.example"));
 
@@ -157,6 +198,7 @@ export async function seedSampleData(orgId: string): Promise<SeedResult> {
         signed_by_user_id: null, signed_by_name: s.signed ? signer.name : null, signed_by_role: s.signed ? signer.role : null,
         signature_kind: s.signed ? "typed" : null, signature_text: s.signed ? signer.name : null,
         signed_at: s.signed ? isoDaysAgo(70 - i) : null,
+        task_code: TRAIL_BY_ITEM.get(`${s.gate}::${s.item}`) ?? null,
       };
     });
     await admin.from("gate_signoffs").insert(rows);
@@ -185,6 +227,28 @@ export async function seedSampleData(orgId: string): Promise<SeedResult> {
       result.emails = emails.length;
     }
     await admin.from("task_notes").insert({ org_id: orgId, task_code: HERO, body: "MEP Sub have promised a start date three times with no movement. Recommend director-to-director escalation — £20k/day and holding Gate C.", author_name: "Commissioning Lead", author_id: null, mentions: [] });
+  } catch { /* email/notes tables not migrated */ }
+
+  // --- gate sign-off trails: the chase→commit→done story behind a few signed
+  //     A/B items, so the commissioning-item drilldown has real history. ---
+  try {
+    for (const t of SIGNOFF_TRAILS) {
+      const token = randomBytes(8).toString("hex");
+      const { data: thread } = await admin.from("task_threads").insert({ org_id: orgId, task_code: t.taskCode, task_id: idByCode.get(t.taskCode) ?? null, email_token: token }).select("id").single<{ id: string }>();
+      if (thread) {
+        const emails = t.trail.map((e) => ({
+          thread_id: thread.id, org_id: orgId, task_code: t.taskCode, direction: e.dir,
+          from_email: e.dir === "outbound" ? "commissioning@maincontractor.example" : "ops@subcontractor.example",
+          to_email: e.dir === "outbound" ? "ops@subcontractor.example" : "commissioning@maincontractor.example",
+          subject: e.subject, body_text: e.body, created_at: isoDaysAgo(e.ago),
+        }));
+        await admin.from("task_emails").insert(emails);
+        result.emails += emails.length;
+      }
+      if (t.note) {
+        await admin.from("task_notes").insert({ org_id: orgId, task_code: t.taskCode, body: t.note, author_name: "Commissioning Lead", author_id: null, mentions: [] });
+      }
+    }
   } catch { /* email/notes tables not migrated */ }
 
   // --- task assignments (assign the heroes to the org's real users) ---

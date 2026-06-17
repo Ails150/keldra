@@ -289,9 +289,11 @@ function DbGatesView({
     gates.find((g) => g.code === selectedGate) ??
     gates.find((g) => effectiveStatus(g, signoffs[g.code]) === "blocked") ??
     gates[0];
+  // Scope to the SELECTED gate — each gate shows only the blockers holding IT,
+  // not every open blocker in the project.
   const openBlockers = blockerMap
     ? Object.values(blockerMap)
-        .filter((b) => b.state !== "closed")
+        .filter((b) => b.state !== "closed" && b.gate === sel.code)
         .sort((a, b) => b.cost_per_day - a.cost_per_day)
     : [];
   const k = (v: number) => `£${Math.round(v / 1000)}k`;

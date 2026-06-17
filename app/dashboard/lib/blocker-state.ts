@@ -31,6 +31,7 @@ export type Blocker = {
   state: BlockerStateName;
   current_owner: string | null;
   current_owner_org: string | null;
+  gate: string | null;
   waiting_on_person: string | null;
   waiting_on_org: string | null;
   since_timestamp: string;
@@ -230,6 +231,7 @@ export async function hydrateFromProject(
       state: initialStateFromCsv(row),
       current_owner: ownerName,
       current_owner_org: ownerOrg,
+      gate: null,
       waiting_on_person: null,
       waiting_on_org: null,
       since_timestamp: raisedDate,
@@ -299,6 +301,7 @@ export async function createCapturedBlocker(
     state: "unowned",
     current_owner: null,
     current_owner_org: null,
+    gate: null,
     waiting_on_person: null,
     waiting_on_org: null,
     since_timestamp: nowIso,
