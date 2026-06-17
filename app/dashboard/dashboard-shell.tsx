@@ -568,6 +568,7 @@ export default function DashboardShell({
             fromDb={fromDb}
             dbGates={dbDashboard?.gates}
             blockerMap={blockerMap}
+            onOpenBlocker={openBlocker}
           />
         )}
         {tab === "overview" && (

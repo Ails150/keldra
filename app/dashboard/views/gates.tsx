@@ -66,6 +66,7 @@ export default function GatesView(props: {
   fromDb?: boolean;
   dbGates?: DbGate[];
   blockerMap?: BlockerMap | null;
+  onOpenBlocker?: (id: string) => void;
 }) {
   // Real org → DB gate ladder; anon demo → the existing live demo gates.
   if (props.fromDb && props.dbGates) {
@@ -75,6 +76,7 @@ export default function GatesView(props: {
         blockerMap={props.blockerMap ?? null}
         selectedGate={props.selectedGate}
         onSelectGate={props.onSelectGate}
+        onOpenBlocker={props.onOpenBlocker}
       />
     );
   }
@@ -261,11 +263,13 @@ function DbGatesView({
   blockerMap,
   selectedGate,
   onSelectGate,
+  onOpenBlocker,
 }: {
   gates: DbGate[];
   blockerMap: BlockerMap | null;
   selectedGate: string;
   onSelectGate: (id: string) => void;
+  onOpenBlocker?: (id: string) => void;
 }) {
   const router = useRouter();
   const baseline = loadBaseline();
@@ -411,7 +415,7 @@ function DbGatesView({
           </div>
         )}
 
-        <GateSignoffPanel gateCode={sel.code} data={signoffs[sel.code]} canSign={canSign} onSigned={refetch} />
+        <GateSignoffPanel gateCode={sel.code} data={signoffs[sel.code]} canSign={canSign} onSigned={refetch} onOpenBlocker={onOpenBlocker} />
 
         {selStatus === "blocked" && sel.openBlockers > 0 && openBlockers.length > 0 && (
           <div style={{ marginTop: 22 }}>
@@ -423,9 +427,9 @@ function DbGatesView({
                   <button
                     key={b.id}
                     type="button"
-                    onClick={() => code && router.push(`/dashboard/tasks/${encodeURIComponent(code)}`)}
+                    onClick={() => (onOpenBlocker ? onOpenBlocker(b.id) : code && router.push(`/dashboard/tasks/${encodeURIComponent(code)}`))}
                     className="w-full text-left"
-                    style={{ background: BRAND.paperWhite, border: `0.5px solid ${BRAND.border}`, borderRadius: 10, padding: "14px 16px", cursor: code ? "pointer" : "default" }}
+                    style={{ background: BRAND.paperWhite, border: `0.5px solid ${BRAND.border}`, borderRadius: 10, padding: "14px 16px", cursor: "pointer" }}
                   >
                     <div className="flex items-start justify-between" style={{ gap: 16 }}>
                       <span className="min-w-0">

@@ -66,45 +66,49 @@ const SIGNOFFS: { gate: string; item: string; signed: boolean }[] = [
   ...["Integrated systems test", "Client witness test", "Handover pack"].map((item) => ({ gate: "E", item, signed: false })),
 ];
 
-// A few CLEARED Gate A/B items carry a short anonymised trail — a chase or two,
-// a commitment, then completion — so the commissioning-item drilldown shows HOW
-// each got signed (the sign-off event itself comes from the gate_signoffs row).
-// Each links to a real baseline task_code so its task_emails/notes resolve.
+// EVERY signed commissioning item carries a full anonymised trail — chase out →
+// commitment in → progress → completion — so the item drilldown always shows a
+// real evidence breakdown, not a one-line "signed off by X". The sign-off event
+// itself comes from the gate_signoffs row and closes the timeline. Each signed
+// item links to a unique synthetic task_code that hosts its task_emails/notes.
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+function buildSignoffTrail(item: string): { dir: "outbound" | "inbound"; ago: number; subject: string; body: string }[] {
+  return [
+    { dir: "outbound", ago: 132, subject: `${item} — readiness check`, body: `${item} is coming up on the commissioning programme. Confirm crew, materials and access so we can schedule the witness and sign-off.` },
+    { dir: "inbound", ago: 129, subject: `RE: ${item} — readiness check`, body: `Crew booked and materials on site. Starting this week — will flag when it's ready for witness.` },
+    { dir: "inbound", ago: 110, subject: `RE: ${item} — progress`, body: `${item} largely complete, snagging the last items now. Should be ready to witness in a few days.` },
+    { dir: "inbound", ago: 96, subject: `RE: ${item} — complete`, body: `${item} finished, tested and snagged. Ready for commissioning sign-off.` },
+  ];
+}
+const signoffNote = (item: string) => `Witnessed ${item} on site — works to spec, records filed. Cleared to sign.`;
+
 const SIGNOFF_TRAILS: {
   gate: string;
   item: string;
   taskCode: string;
   trail: { dir: "outbound" | "inbound"; ago: number; subject: string; body: string }[];
   note?: string;
-}[] = [
-  {
-    gate: "A", item: "First-fix tray runs", taskCode: "ELE-COLO-1010",
-    trail: [
-      { dir: "outbound", ago: 150, subject: "Tray runs COLO 1-4 — programme", body: "First-fix containment due to start Monday. Confirm crew and materials on site." },
-      { dir: "inbound", ago: 148, subject: "RE: Tray runs COLO 1-4", body: "Crew booked, tray delivered Friday. Starting Monday as planned." },
-      { dir: "inbound", ago: 96, subject: "RE: Tray runs COLO 1-4 — complete", body: "All first-fix tray runs in across COLO 1-4. Ready for inspection." },
-    ],
-    note: "Walked the tray runs with the M&E lead — clean install, ready to sign.",
-  },
-  {
-    gate: "A", item: "LV containment COLO 1-2", taskCode: "ELE-COLO-1020",
-    trail: [
-      { dir: "outbound", ago: 145, subject: "LV containment COLO 1-2 — chase", body: "Module 2 containment slipped a week. What's the new finish date?" },
-      { dir: "inbound", ago: 143, subject: "RE: LV containment COLO 1-2", body: "Extra pair on it this week, done by Friday." },
-      { dir: "inbound", ago: 100, subject: "RE: LV containment COLO 1-2 — done", body: "COLO 1-2 containment complete and snagged." },
-    ],
-  },
-  {
-    gate: "B", item: "LV terminations", taskCode: "ELE-COLO-1060",
-    trail: [
-      { dir: "outbound", ago: 120, subject: "LV terminations Module 4 — readiness", body: "Boards due to be terminated next week. Confirm cables pulled and tested." },
-      { dir: "inbound", ago: 118, subject: "RE: LV terminations Module 4", body: "Cables pulled and meggered. Terminations start Monday." },
-      { dir: "inbound", ago: 80, subject: "RE: LV terminations Module 4 — complete", body: "All terminations made off and torqued to spec. Ready for power-on checks." },
-    ],
-    note: "Torque records filed. Good to energise.",
-  },
+}[] = SIGNOFFS.filter((s) => s.signed).map((s) => ({
+  gate: s.gate,
+  item: s.item,
+  taskCode: `SO-${s.gate}-${slug(s.item)}`,
+  trail: buildSignoffTrail(s.item),
+  note: signoffNote(s.item),
+}));
+
+// OUTSTANDING items link to the SPECIFIC blocker(s) holding them (by shared
+// task_code) so the drilldown shows that item's real blocker — not the whole
+// gate's pile. ELE-COLO-1030 is the hero, so "BMS integration" opens its story.
+const OUTSTANDING_LINKS: { gate: string; item: string; taskCode: string }[] = [
+  { gate: "C", item: "Leak detection", taskCode: "MEC-COLO-1040" },
+  { gate: "C", item: "BMS integration", taskCode: "ELE-COLO-1030" },
 ];
-const TRAIL_BY_ITEM = new Map(SIGNOFF_TRAILS.map((t) => [`${t.gate}::${t.item}`, t.taskCode]));
+
+const TASK_CODE_BY_ITEM = new Map<string, string>([
+  ...SIGNOFF_TRAILS.map((t) => [`${t.gate}::${t.item}`, t.taskCode] as [string, string]),
+  ...OUTSTANDING_LINKS.map((o) => [`${o.gate}::${o.item}`, o.taskCode] as [string, string]),
+]);
 const TRAIL_TASK_CODES = SIGNOFF_TRAILS.map((t) => t.taskCode);
 
 // The ELE-COLO-1030 trail (chases out / responses in) so the activity trail +
@@ -198,7 +202,7 @@ export async function seedSampleData(orgId: string): Promise<SeedResult> {
         signed_by_user_id: null, signed_by_name: s.signed ? signer.name : null, signed_by_role: s.signed ? signer.role : null,
         signature_kind: s.signed ? "typed" : null, signature_text: s.signed ? signer.name : null,
         signed_at: s.signed ? isoDaysAgo(70 - i) : null,
-        task_code: TRAIL_BY_ITEM.get(`${s.gate}::${s.item}`) ?? null,
+        task_code: TASK_CODE_BY_ITEM.get(`${s.gate}::${s.item}`) ?? null,
       };
     });
     await admin.from("gate_signoffs").insert(rows);

@@ -70,12 +70,15 @@ export async function GET(request: NextRequest) {
       });
     }
   } else {
-    const { data: gblk } = await admin
+    // The blocker(s) holding THIS item: prefer the specific link (shared
+    // task_code); fall back to gate-wide only when the item isn't linked.
+    let q = admin
       .from("blockers")
       .select("id, title, description, state, held_by_company, cost_per_day, task_code")
       .eq("org_id", actor.orgId)
-      .eq("gate", row.gate_code)
       .neq("state", "closed");
+    q = row.task_code ? q.eq("task_code", row.task_code) : q.eq("gate", row.gate_code);
+    const { data: gblk } = await q;
     blocking = (gblk ?? []).map((b) => {
       const m = b as { id: string; title: string | null; description: string | null; state: string; held_by_company: string | null; cost_per_day: number | null; task_code: string | null };
       return { id: m.id, title: m.description || m.title || m.id, state: m.state, held_by_company: m.held_by_company, cost_per_day: Number(m.cost_per_day ?? 0), task_code: m.task_code };

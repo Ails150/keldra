@@ -47,11 +47,13 @@ export function GateSignoffPanel({
   data,
   canSign,
   onSigned,
+  onOpenBlocker,
 }: {
   gateCode: string;
   data: GateSignoffData | undefined;
   canSign: boolean;
   onSigned: () => void;
+  onOpenBlocker?: (id: string) => void;
 }) {
   const [signing, setSigning] = useState<string | null>(null); // item_label being signed
   const [history, setHistory] = useState<SignoffItem | null>(null); // item whose trail is open
@@ -159,7 +161,7 @@ export function GateSignoffPanel({
         />
       )}
 
-      {history && <ItemHistoryModal item={history} onClose={() => setHistory(null)} />}
+      {history && <ItemHistoryModal item={history} onClose={() => setHistory(null)} onOpenBlocker={onOpenBlocker} />}
     </div>
   );
 }
@@ -175,7 +177,7 @@ type HistoryResponse = {
 // The full story behind one commissioning item: for a signed item, the trail of
 // chases/comms/commitments ending in the sign-off; for an outstanding one, the
 // open blockers holding its gate. Read live from /api/gates/signoff/history.
-function ItemHistoryModal({ item, onClose }: { item: SignoffItem; onClose: () => void }) {
+function ItemHistoryModal({ item, onClose, onOpenBlocker }: { item: SignoffItem; onClose: () => void; onOpenBlocker?: (id: string) => void }) {
   const [data, setData] = useState<HistoryResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -243,12 +245,19 @@ function ItemHistoryModal({ item, onClose }: { item: SignoffItem; onClose: () =>
               <p style={{ fontSize: 12.5, color: BRAND.inkMuted }}>No open blockers recorded on this gate — it's waiting on an earlier gate.</p>
             ) : (
               data.blocking.map((b) => (
-                <div key={b.id} style={{ background: BRAND.paperWhite, border: `0.5px solid ${BRAND.border}`, borderRadius: 10, padding: "12px 14px" }}>
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => { if (onOpenBlocker) { onClose(); onOpenBlocker(b.id); } }}
+                  className="w-full text-left"
+                  style={{ background: BRAND.paperWhite, border: `0.5px solid ${BRAND.border}`, borderRadius: 10, padding: "12px 14px", cursor: onOpenBlocker ? "pointer" : "default" }}
+                >
                   <div className="flex items-start justify-between" style={{ gap: 16 }}>
                     <span className="min-w-0">
                       <span className="block" style={{ fontSize: 13.5, color: BRAND.ink, lineHeight: 1.45 }}>{b.title}</span>
                       <span style={{ fontSize: 11.5, color: BRAND.inkMuted }}>
                         {b.held_by_company ? `with ${b.held_by_company}` : "unassigned"} · {b.state}
+                        {onOpenBlocker ? " · open →" : ""}
                       </span>
                     </span>
                     {b.cost_per_day > 0 && (
@@ -257,7 +266,7 @@ function ItemHistoryModal({ item, onClose }: { item: SignoffItem; onClose: () =>
                       </span>
                     )}
                   </div>
-                </div>
+                </button>
               ))
             )}
           </div>
