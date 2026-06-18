@@ -183,19 +183,80 @@ function tagFromStage(stage: string): "red" | "yellow" | "green" | null {
   if (stage === "RT") return "red";
   return null;
 }
-const RYG_CHECKLISTS: Record<"red" | "yellow", string[]> = {
-  red: ["Equipment in place", "Documentation loaded for testing", "Cables installed", "Panel terminations complete", "Power-on test complete"],
-  yellow: ["Integrated systems test passed", "Witness sign-off complete", "Snag list closed", "Handover pack uploaded"],
+const RYG_CHECKLISTS: Record<"red" | "yellow", { label: string; owner: string }[]> = {
+  red: [
+    { label: "Equipment in place", owner: "J. Brennan" },
+    { label: "Documentation loaded for testing", owner: "M. Walsh" },
+    { label: "Cables installed", owner: "MEP Sub" },
+    { label: "Panel terminations complete", owner: "MEP Sub" },
+    { label: "Power-on test booked", owner: "Cx Engineer" },
+  ],
+  yellow: [
+    { label: "Integrated systems test passed", owner: "Cx Sub" },
+    { label: "Witness sign-off complete", owner: "Commissioning Lead" },
+    { label: "Snag list closed", owner: "Main Contractor" },
+    { label: "Handover pack uploaded", owner: "Document Control" },
+  ],
 };
-// Checklist to reach the NEXT tag. Deterministic per-asset spread of approved vs
-// outstanding so the demo shows assets at different points (some ready to advance).
-function assetChecklist(tag: "red" | "yellow" | "green", assetId: string): { label: string; status: "approved" | "outstanding" }[] {
+type ChecklistItem = { label: string; status: "approved" | "outstanding"; owner: string };
+function hashStr(s: string): number { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
+
+// Checklist to reach the NEXT tag, each item with its owner. Deterministic
+// approved/outstanding spread so assets sit at different points.
+function assetChecklist(tag: "red" | "yellow" | "green", assetId: string): ChecklistItem[] {
   if (tag === "green") return [];
-  const labels = RYG_CHECKLISTS[tag];
-  let h = 0;
-  for (let i = 0; i < assetId.length; i++) h = (h * 31 + assetId.charCodeAt(i)) >>> 0;
-  const approved = 1 + (h % labels.length);
-  return labels.map((label, i) => ({ label, status: i < approved ? "approved" : "outstanding" }));
+  const items = RYG_CHECKLISTS[tag];
+  const approved = 1 + (hashStr(assetId) % items.length);
+  return items.map((it, i) => ({ label: it.label, owner: it.owner, status: i < approved ? "approved" : "outstanding" }));
+}
+
+// Named owners (polish #1) — a real person + org per asset, deterministic.
+const ASSET_OWNERS: { name: string; org: string }[] = [
+  { name: "Declan Kearney", org: "Main Contractor" },
+  { name: "Aoife Byrne", org: "Main Contractor" },
+  { name: "Tom Hughes", org: "Main Contractor" },
+  { name: "Liam Nolan", org: "MEP Sub" },
+  { name: "Sean Daly", org: "MEP Sub" },
+  { name: "Cathal Ryan", org: "Mech Sub" },
+  { name: "Niamh Power", org: "Controls Sub" },
+  { name: "Eoin Walsh", org: "Fire Sub" },
+  { name: "Mark Fitzgerald", org: "Cx Sub" },
+];
+function ownerFor(assetId: string): { name: string; org: string } {
+  return ASSET_OWNERS[hashStr(assetId + "o") % ASSET_OWNERS.length];
+}
+
+// Status: green = achieved; otherwise a believable spread of in-progress / late /
+// blocked (Step 3 will govern this from real transitions; seeded here for the demo).
+function assetStatus(tag: "red" | "yellow" | "green", assetId: string, checklist: ChecklistItem[]): "achieved" | "in_progress" | "late" | "blocked" {
+  if (tag === "green") return "achieved";
+  const allDone = checklist.length > 0 && checklist.every((i) => i.status === "approved");
+  if (allDone) return "in_progress";
+  const h = hashStr(assetId + "s");
+  if (h % 5 === 0) return "blocked";
+  if (h % 3 === 0) return "late";
+  return "in_progress";
+}
+
+// Per-asset transition history (who/what/where/when/why/how), oldest first.
+// Stuck red assets carry a short chase→reply story like the hero blocker.
+type AssetForEvents = { asset_id: string; location: string; red_tag_date: string; yellow_tag_date: string; green_date: string };
+function assetTagEventSpecs(
+  a: AssetForEvents, tag: "red" | "yellow" | "green",
+  owner: { name: string; org: string }, status: string,
+): { ago: number; type: string; actorName: string; actorOrg: string; payload: Record<string, unknown> }[] {
+  const evs: { ago: number; type: string; actorName: string; actorOrg: string; payload: Record<string, unknown> }[] = [];
+  const daysAgo = (iso: string) => Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / DAY));
+  const where = a.location;
+  if (a.red_tag_date) evs.push({ ago: daysAgo(a.red_tag_date), type: "red_achieved", actorName: owner.name, actorOrg: owner.org, payload: { to_tag: "red", where, what: "Equipment in place, RT checklist approved", why: "Asset ready to be worked on", how: "Physical install + red-tag checklist sign-off" } });
+  if ((tag === "yellow" || tag === "green") && a.yellow_tag_date) evs.push({ ago: daysAgo(a.yellow_tag_date), type: "yellow_achieved", actorName: owner.name, actorOrg: owner.org, payload: { to_tag: "yellow", where, what: "Cables in, panel complete, tested", why: "Ready for power-on", how: "Yellow-tag checklist sign-off" } });
+  if (tag === "green" && a.green_date) evs.push({ ago: daysAgo(a.green_date), type: "green_achieved", actorName: owner.name, actorOrg: owner.org, payload: { to_tag: "green", where, what: "Commissioned, now in operations", why: "Operational", how: "Green-tag handover" } });
+  if (tag === "red" && (status === "blocked" || status === "late") && a.red_tag_date) {
+    const base = daysAgo(a.red_tag_date);
+    evs.push({ ago: Math.max(2, base - 12), type: "chase", actorName: "Commissioning Lead", actorOrg: "Main Contractor", payload: { where, what: "Panel terminations not started — chased for a date", why: "Crew diverted, not a supply issue", how: "Chase the sub for a firm date" } });
+    evs.push({ ago: Math.max(1, base - 25), type: "response", actorName: "MEP Sub", actorOrg: "MEP Sub", payload: { where, what: "Crew moved to another hall, back next week", why: "Resourcing", how: "Awaiting return" } });
+  }
+  return evs.sort((x, y) => y.ago - x.ago); // oldest (largest ago) first
 }
 
 // Seed the calling org's DB with the full worked example. Idempotent: deletes
@@ -222,6 +283,7 @@ export async function seedSampleData(orgId: string): Promise<SeedResult> {
   await admin.from("gates").delete().eq("org_id", orgId).in("code", SEED_GATE_CODES);
   await del(admin, "roster", (q) => q.eq("org_id", orgId).like("email", "%.example"));
   await del(admin, "asset_tags", (q) => q.eq("org_id", orgId));
+  await del(admin, "asset_tag_events", (q) => q.eq("org_id", orgId));
 
   // --- tasks (upsert keeps ids stable for assignments) ---
   const taskRows = BASELINE_TASKS.map((t) => ({
@@ -359,17 +421,33 @@ export async function seedSampleData(orgId: string): Promise<SeedResult> {
   //     Tag derived from each asset's stage so it agrees with the Stage column;
   //     a believable spread of red/yellow/green for the drilldown demo. ---
   try {
-    const rows = generateAssets()
-      .map((a) => {
-        const tag = tagFromStage(a.current_stage);
-        return tag ? { org_id: orgId, asset_id: a.asset_id, tag, next_checklist: assetChecklist(tag, a.asset_id) } : null;
-      })
-      .filter(Boolean) as { org_id: string; asset_id: string; tag: string; next_checklist: unknown }[];
-    if (rows.length) {
-      await admin.from("asset_tags").upsert(rows, { onConflict: "org_id,asset_id" });
-      result.assetTags = rows.length;
+    const tagRows: Record<string, unknown>[] = [];
+    const eventRows: Record<string, unknown>[] = [];
+    for (const a of generateAssets()) {
+      const tag = tagFromStage(a.current_stage);
+      if (!tag) continue;
+      const owner = ownerFor(a.asset_id);
+      const checklist = assetChecklist(tag, a.asset_id);
+      const status = assetStatus(tag, a.asset_id, checklist);
+      const achieved = tag === "green" ? a.green_date : tag === "yellow" ? a.yellow_tag_date : a.red_tag_date;
+      const achievedDate = achieved || null;
+      const targetDate = achievedDate ? new Date(new Date(achievedDate).getTime() + 30 * DAY).toISOString().slice(0, 10) : null;
+      tagRows.push({ org_id: orgId, asset_id: a.asset_id, tag, next_checklist: checklist, owner_name: owner.name, owner_org: owner.org, status, achieved_date: achievedDate, target_date: targetDate });
+      // hash-chained transition history
+      let prev: string | null = null;
+      assetTagEventSpecs(a, tag, owner, status).forEach((e, seq) => {
+        const ts = normalizeTs(isoDaysAgo(e.ago));
+        const hash = hashBlockerEvent({ prevHash: prev, seq, eventType: e.type, actor: e.actorName, ts, payload: e.payload });
+        eventRows.push({ org_id: orgId, asset_id: a.asset_id, seq, event_type: e.type, actor_name: e.actorName, actor_org: e.actorOrg, payload: e.payload, ts, prev_hash: prev, hash });
+        prev = hash;
+      });
     }
-  } catch { /* asset_tags not migrated yet */ }
+    if (tagRows.length) {
+      await admin.from("asset_tags").upsert(tagRows, { onConflict: "org_id,asset_id" });
+      result.assetTags = tagRows.length;
+    }
+    if (eventRows.length) await admin.from("asset_tag_events").insert(eventRows);
+  } catch { /* asset_tags / asset_tag_events not migrated yet */ }
 
   return result;
 }

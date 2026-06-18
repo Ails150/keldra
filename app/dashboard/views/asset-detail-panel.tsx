@@ -54,7 +54,37 @@ const TAG_PILL: Record<"red" | "yellow" | "green", string> = {
   yellow: "bg-yellow-100 text-yellow-800",
   green: "bg-green-100 text-green-800",
 };
-type ChecklistItem = { label: string; status: string };
+type ChecklistItem = { label: string; status: string; owner?: string | null };
+type TagStatus = "achieved" | "in_progress" | "late" | "blocked";
+type HistoryEntry = { seq: number; eventType: string; actorName: string | null; actorOrg: string | null; ts: string; payload: Record<string, unknown> };
+type TagData = {
+  tag: "red" | "yellow" | "green";
+  status: TagStatus;
+  owner: { name: string; org: string } | null;
+  achievedDate: string | null;
+  targetDate: string | null;
+  daysAtTag: number | null;
+  checklist: ChecklistItem[];
+  history: HistoryEntry[];
+};
+const STATUS_PILL: Record<TagStatus, { label: string; classes: string }> = {
+  achieved: { label: "Achieved", classes: "bg-green-100 text-green-800" },
+  in_progress: { label: "In progress", classes: "bg-indigo-100 text-indigo-800" },
+  late: { label: "Late", classes: "bg-amber-100 text-amber-800" },
+  blocked: { label: "Blocked", classes: "bg-red-100 text-red-700" },
+};
+const EVENT_VERB: Record<string, string> = {
+  red_achieved: "Red tag achieved",
+  yellow_achieved: "Yellow tag achieved",
+  green_achieved: "Green tag achieved",
+  chase: "chased",
+  response: "replied",
+};
+function fmtDay(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 const STAGE_BADGE: { match: (s: string) => boolean; classes: string }[] = [
   { match: (s) => s.includes("delivered") && s.includes("not installed"), classes: "bg-zinc-200 text-zinc-700" },
@@ -148,22 +178,17 @@ export default function AssetDetailPanel({
 }: Props) {
   const [lightbox, setLightbox] = useState<FieldCapture | null>(null);
 
-  // Asset-level commissioning tag + next-tag checklist, fetched per org (RLS).
-  // Anon/untagged → tag stays null → the section is hidden (demo unaffected).
-  const [tag, setTag] = useState<"red" | "yellow" | "green" | null>(null);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  // Asset-level commissioning tag + drawer data, fetched per org (RLS).
+  // Anon/untagged → tagData stays null → the section is hidden (demo unaffected).
+  const [tagData, setTagData] = useState<TagData | null>(null);
   const assetIdForTag = (asset?.asset_id ?? "").toString().trim();
   useEffect(() => {
-    if (!assetIdForTag) { setTag(null); setChecklist([]); return; }
+    if (!assetIdForTag) { setTagData(null); return; }
     let live = true;
     fetch(`/api/assets/tag?assetId=${encodeURIComponent(assetIdForTag)}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (!live) return;
-        setTag(j?.tag ?? null);
-        setChecklist(Array.isArray(j?.checklist) ? j.checklist : []);
-      })
-      .catch(() => { if (live) { setTag(null); setChecklist([]); } });
+      .then((j) => { if (live) setTagData(j?.tag ? (j as TagData) : null); })
+      .catch(() => { if (live) setTagData(null); });
     return () => { live = false; };
   }, [assetIdForTag]);
 
@@ -296,58 +321,99 @@ export default function AssetDetailPanel({
             )}
           </section>
 
-          {/* Commissioning tag ladder (R→Y→G) + checklist for the next tag */}
-          {tag && (
-            <section>
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-2">
-                Commissioning tag
-              </p>
-              <div className="flex items-center gap-1.5">
-                {(["red", "yellow", "green"] as const).map((t, i) => (
-                  <Fragment key={t}>
-                    {i > 0 && <span className="text-ink-mid" aria-hidden>→</span>}
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${TAG_PILL[t]} ${tag === t ? "" : "opacity-30"}`}
-                    >
-                      {t}
-                    </span>
-                  </Fragment>
-                ))}
-              </div>
+          {/* Commissioning tag — ladder + strip + status + checklist (Foundation) */}
+          {tagData && (() => {
+            const tag = tagData.tag;
+            const next = tag === "red" ? "Yellow" : tag === "yellow" ? "Green" : null;
+            const st = STATUS_PILL[tagData.status] ?? STATUS_PILL.in_progress;
+            return (
+              <section>
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-2">Commissioning tag</p>
+                <div className="flex items-center gap-1.5">
+                  {(["red", "yellow", "green"] as const).map((t, i) => (
+                    <Fragment key={t}>
+                      {i > 0 && <span className="text-ink-mid" aria-hidden>→</span>}
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${TAG_PILL[t]} ${tag === t ? "" : "opacity-30"}`}>{t}</span>
+                    </Fragment>
+                  ))}
+                  <span className={`ml-auto rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${st.classes}`}>{st.label}</span>
+                </div>
 
-              {tag === "green" ? (
-                <p className="mt-3 text-sm text-green-800">Operational — fully commissioned.</p>
-              ) : (
-                <div className="mt-3">
-                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-mid">
-                    To reach {tag === "red" ? "Yellow" : "Green"}
-                  </p>
-                  {checklist.length === 0 ? (
-                    <p className="text-xs text-ink-mid">No checklist items recorded.</p>
-                  ) : (
-                    <ul className="space-y-1.5">
-                      {checklist.map((it, i) => {
-                        const done = it.status === "approved";
+                {/* dates / days-at-tag strip */}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-paper-line bg-paper-card p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">{tag} delivered</p>
+                    <p className="mt-1 text-sm font-medium text-ink">{fmtDay(tagData.achievedDate)}</p>
+                  </div>
+                  <div className="rounded-xl border border-paper-line bg-paper-card p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">Days at {tag}</p>
+                    <p className="mt-1 text-sm font-medium text-ink">{tagData.daysAtTag == null ? "—" : `${tagData.daysAtTag}d`}</p>
+                  </div>
+                </div>
+
+                {next && (
+                  <div className="mt-4">
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-mid">To reach {next}</p>
+                    {tagData.checklist.length === 0 ? (
+                      <p className="text-xs text-ink-mid">No checklist items recorded.</p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {tagData.checklist.map((it, i) => {
+                          const done = it.status === "approved";
+                          return (
+                            <li key={i} className="flex items-center gap-2 text-sm">
+                              <span className={done ? "text-green-600" : "text-ink-mid"} aria-hidden>{done ? "✓" : "○"}</span>
+                              <span className={done ? "text-ink" : "text-ink-mid"}>{it.label}</span>
+                              {it.owner && <span className="text-[11px] text-ink-mid">· {it.owner}</span>}
+                              <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${done ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>{done ? "Approved" : "Outstanding"}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                )}
+                {tag === "green" && <p className="mt-3 text-sm text-green-800">Operational — fully commissioned.</p>}
+
+                {/* named owner */}
+                {tagData.owner && (
+                  <div className="mt-4 flex items-center gap-3 rounded-xl border border-paper-line bg-paper-card p-3">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold text-paper" style={{ backgroundColor: deriveOrgColour(tagData.owner.org) }}>{getInitials(tagData.owner.name)}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-ink">{tagData.owner.name}</p>
+                      <p className="text-[11px] text-ink-mid">Owner{tagData.achievedDate ? ` · since ${fmtDay(tagData.achievedDate)}` : ""}</p>
+                    </div>
+                    {tagData.owner.org && <span className="ml-auto rounded-full bg-paper-warm px-2.5 py-1 text-[10px] font-semibold text-ink">{tagData.owner.org}</span>}
+                  </div>
+                )}
+
+                {/* history — who / what / where / when / why / how */}
+                {tagData.history.length > 0 && (
+                  <div className="mt-4">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-mid">History · who · what · where · when · why · how</p>
+                    <ul className="space-y-2">
+                      {tagData.history.map((e) => {
+                        const p = e.payload ?? {};
+                        const verb = EVENT_VERB[e.eventType] ?? e.eventType;
                         return (
-                          <li key={i} className="flex items-center gap-2 text-sm">
-                            <span className={done ? "text-green-600" : "text-ink-mid"} aria-hidden>
-                              {done ? "✓" : "○"}
-                            </span>
-                            <span className={done ? "text-ink" : "text-ink-mid"}>{it.label}</span>
-                            <span
-                              className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${done ? "bg-green-100 text-green-800" : "bg-paper-warm text-ink-mid"}`}
-                            >
-                              {done ? "Approved" : "Outstanding"}
-                            </span>
+                          <li key={e.seq} className="rounded-xl border border-paper-line bg-paper-card p-3">
+                            <p className="font-mono text-[10.5px] text-ink-mid">{fmtDay(e.ts)}</p>
+                            <p className="text-[13px] font-medium text-ink">{e.actorName ?? "—"} — {verb}</p>
+                            {typeof p.what === "string" && <p className="mt-0.5 text-xs text-ink-mid">{p.what}</p>}
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {(["where", "why", "how"] as const).map((q) => typeof p[q] === "string" ? (
+                                <span key={q} className="rounded-full bg-paper-warm px-2 py-0.5 text-[10px] text-ink-mid"><span className="font-[family-name:var(--font-fraunces)] italic text-accent-deep">{q}:</span> {p[q] as string}</span>
+                              ) : null)}
+                            </div>
                           </li>
                         );
                       })}
                     </ul>
-                  )}
-                </div>
-              )}
-            </section>
-          )}
+                  </div>
+                )}
+              </section>
+            );
+          })()}
 
           {/* P6 activity (only when an XER is loaded and this asset maps) */}
           {activity && (
