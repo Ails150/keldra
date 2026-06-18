@@ -1,5 +1,6 @@
 import "server-only";
-import { randomBytes, createHash } from "crypto";
+import { randomBytes } from "crypto";
+import { hashBlockerEvent, normalizeTs } from "@/lib/blockers/event-hash";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { BASELINE_TASKS, COMPANIES } from "@/app/dashboard/lib/baseline-seed";
 import { generateAssets } from "@/app/dashboard/lib/demo-assets";
@@ -91,9 +92,6 @@ function genBlockerEvents(
   return evs;
 }
 
-function chainHash(prev: string | null, seq: number, type: string, actor: string, ts: string, payload: unknown): string {
-  return createHash("sha256").update(`${prev ?? ""}|${seq}|${type}|${actor}|${ts}|${JSON.stringify(payload)}`).digest("hex");
-}
 
 const SIGNERS = [
   { name: "Aoife Byrne", role: "Commissioning Lead" },
@@ -266,9 +264,9 @@ export async function seedSampleData(orgId: string): Promise<SeedResult> {
       // escalation → cost-raise), oldest first. Hero gets the documented story.
       let prev: string | null = null;
       const eventRows = genBlockerEvents(b, t).map((e, seq) => {
-        const ts = isoDaysAgo(e.ago);
+        const ts = normalizeTs(isoDaysAgo(e.ago));
         const payload = e.type === "raised" ? { description: t.blocked_reason, priority } : e.note ? { note: e.note } : {};
-        const hash = chainHash(prev, seq, e.type, e.actor, ts, payload);
+        const hash = hashBlockerEvent({ prevHash: prev, seq, eventType: e.type, actor: e.actor, ts, payload });
         const eventRow = { blocker_id: row.id, org_id: orgId, seq, event_type: e.type, actor: e.actor, ts, payload, prev_hash: prev, hash };
         prev = hash;
         return eventRow;

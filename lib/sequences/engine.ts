@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTaskEmail } from "@/lib/email/task-email";
+import { appendBlockerEvent } from "@/lib/blockers/events";
 
 const DAY = 86_400_000;
 
@@ -415,18 +416,10 @@ async function flagTaskToReport(
   const awaited = (seq.to_email as string) ?? "";
   const blks = await openBlockersForTask(admin, orgId, taskCode);
   for (const b of blks) {
-    const { data: last } = await admin
-      .from("blocker_events")
-      .select("seq")
-      .eq("blocker_id", b.id)
-      .order("seq", { ascending: false })
-      .limit(1)
-      .maybeSingle<{ seq: number }>();
-    await admin.from("blocker_events").insert({
-      blocker_id: b.id,
-      org_id: orgId,
-      seq: ((last?.seq ?? -1) as number) + 1,
-      event_type: "flagged_to_report",
+    await appendBlockerEvent(admin, {
+      blockerId: b.id,
+      orgId,
+      eventType: "flagged_to_report",
       actor: "Keldra",
       payload: { step: step.n, awaited_party: awaited, reason: "final-notice chase flagged to project report" },
     });
@@ -475,18 +468,10 @@ async function escalateSequence(
   const nowIso = new Date().toISOString();
   for (const b of blks) {
     await admin.from("blockers").update({ state: "escalated", since_timestamp: nowIso }).eq("id", b.id);
-    const { data: last } = await admin
-      .from("blocker_events")
-      .select("seq")
-      .eq("blocker_id", b.id)
-      .order("seq", { ascending: false })
-      .limit(1)
-      .maybeSingle<{ seq: number }>();
-    await admin.from("blocker_events").insert({
-      blocker_id: b.id,
-      org_id: orgId,
-      seq: ((last?.seq ?? -1) as number) + 1,
-      event_type: "escalated",
+    await appendBlockerEvent(admin, {
+      blockerId: b.id,
+      orgId,
+      eventType: "escalated",
       actor: "Keldra",
       payload: { chases, responses: 0, awaited_party: awaited, flag_to_report: flaggedToReport, reason: "no reply after final chase" },
     });

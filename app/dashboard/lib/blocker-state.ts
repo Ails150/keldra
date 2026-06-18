@@ -45,6 +45,9 @@ export type Blocker = {
   proposed_resolution_note: string | null;
   priority: string;
   raised_date: string;
+  // Hash-chain verification of this blocker's events, computed on read.
+  chainVerified: boolean;
+  chainBrokenAtSeq: number | null;
 };
 
 export type BlockerMap = Record<string, Blocker>;
@@ -246,6 +249,8 @@ export async function hydrateFromProject(
       proposed_resolution_note: null,
       priority,
       raised_date: raisedDate,
+      chainVerified: true,
+      chainBrokenAtSeq: null,
     };
   }
   return map;
@@ -317,6 +322,8 @@ export async function createCapturedBlocker(
     proposed_resolution_note: null,
     priority: "Medium",
     raised_date: nowIso,
+    chainVerified: true,
+    chainBrokenAtSeq: null,
   };
 
   return { map: { ...map, [id]: blocker }, id };

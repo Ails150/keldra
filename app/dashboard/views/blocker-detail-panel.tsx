@@ -441,9 +441,19 @@ export default function BlockerDetailPanel({
 
           {/* History */}
           <section>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-mid">
-              History
-            </h3>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-mid">
+                History
+              </h3>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${blocker.chainVerified ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
+                title={blocker.chainVerified ? "Hash chain walked and verified on load" : "Hash chain failed verification"}
+              >
+                {blocker.chainVerified
+                  ? "✓ Chain verified"
+                  : `⚠ Chain broken at #${blocker.chainBrokenAtSeq ?? "?"}`}
+              </span>
+            </div>
             <ul className="space-y-2">
               {[...blocker.events]
                 .slice()

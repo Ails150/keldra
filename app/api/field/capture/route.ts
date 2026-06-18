@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { randomUUID } from "crypto";
 import { authedActor } from "@/lib/auth/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { appendBlockerEvent } from "@/lib/blockers/events";
 
 const MER_BUCKET = "mer-field-photos";
 
@@ -88,12 +89,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Couldn't save blocker: ${bErr?.message}` }, { status: 500 });
   }
 
-  // 2. Raised event (audit trail for the blocker).
-  await admin.from("blocker_events").insert({
-    blocker_id: blocker.id,
-    org_id: actor.orgId,
-    seq: 0,
-    event_type: "raised",
+  // 2. Raised event (audit trail for the blocker) — server-computed hash chain.
+  await appendBlockerEvent(admin, {
+    blockerId: blocker.id,
+    orgId: actor.orgId,
+    eventType: "raised",
     actor: actor.fullName || actor.email || "Field",
     payload: { description, with_party: withParty || null, has_photo: !!photoPath },
   });

@@ -10,6 +10,7 @@ import {
   type TaskStatus,
 } from "@/app/dashboard/lib/baseline-seed";
 import { computeGateImpacts, impactBadge, impactNarrative, type Milestone } from "@/lib/gates/impact";
+import { verifyBlockerChain } from "@/lib/blockers/event-hash";
 
 export type DbGate = {
   code: string;
@@ -66,8 +67,11 @@ function taskFromRow(r: any): BaselineTask {
 }
 
 function blockerFromRow(b: any, events: any[]): Blocker {
-  const evs = events
-    .filter((e) => e.blocker_id === b.id)
+  const raw = events.filter((e) => e.blocker_id === b.id);
+  // Walk the hash chain on read — the "verified" state in the UI reflects this,
+  // not a hardcoded string.
+  const chain = verifyBlockerChain(raw);
+  const evs = raw
     .sort((x, y) => (x.seq ?? 0) - (y.seq ?? 0))
     .map((e) => ({
       event_type: s(e.event_type),
@@ -99,6 +103,8 @@ function blockerFromRow(b: any, events: any[]): Blocker {
     proposed_resolution_note: b.proposed_resolution_note ?? null,
     priority: s(b.priority),
     raised_date: s(b.raised_date) || s(b.since_timestamp),
+    chainVerified: chain.ok,
+    chainBrokenAtSeq: chain.brokenAtSeq,
   };
 }
 
