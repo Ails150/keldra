@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Keldra — Asset tag model</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  :root{
+    --bg:#f3eefb;--paper:#fbf9fe;--ink:#1c1230;--soft:#6b5d85;
+    --purple:#9d4eff;--purple-ink:#7c2fe0;--lilac:#e7d8ff;--line:#e6ddf3;
+    --red:#b3274d;--red-bg:#fbeef2;--amber:#9a6b00;--amber-bg:#fbf3e3;
+    --green:#2f7d3a;--green-bg:#eef6ee;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;background:radial-gradient(1100px 500px at 50% -10%, #efe2ff 0%, var(--bg) 55%);color:var(--ink);padding:28px 20px;line-height:1.5}
+  .mono{font-family:'JetBrains Mono',monospace}
+  .wrap{max-width:1180px;margin:0 auto}
+  .logo{font-family:'Fraunces',serif;font-weight:600;font-size:20px}.logo .d{color:var(--purple)}
+  .sub{font-size:13px;color:var(--soft);margin-top:2px}
+
+  /* rollup cards */
+  .rollup{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:22px 0}
+  .rc{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+  .rc .l{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--soft);font-weight:600}
+  .rc .v{font-family:'Fraunces',serif;font-size:34px;font-weight:600;margin-top:8px;line-height:1}
+  .rc.green .v{color:var(--green)}.rc.amber .v{color:var(--amber)}.rc.red .v{color:var(--red)}.rc.exp .v{color:var(--red)}
+
+  /* filter chips */
+  .filters{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+  .filters .lab{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--soft);font-weight:600;margin-right:4px}
+  .chip{font-size:12.5px;border:1px solid var(--line);background:var(--paper);border-radius:99px;padding:7px 14px;cursor:pointer;color:var(--soft);transition:.15s}
+  .chip:hover{border-color:var(--purple)}
+  .chip.on{background:var(--purple);color:#fff;border-color:var(--purple);font-weight:600}
+
+  /* table */
+  .panel{background:var(--paper);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--soft);font-weight:600;padding:14px 16px;background:#f6f1fc}
+  th.num,td.num{text-align:right}
+  td{padding:13px 16px;border-top:1px solid var(--line);font-size:13.5px}
+  tr.row{cursor:pointer;transition:.12s}
+  tr.row:hover{background:#f8f4fe}
+  .aid{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--purple-ink);font-weight:500}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:3px 10px;border-radius:99px;text-transform:uppercase}
+  .tag.red{background:var(--red-bg);color:var(--red)}
+  .tag.yellow{background:var(--amber-bg);color:var(--amber)}
+  .tag.green{background:var(--green-bg);color:var(--green)}
+  .prog{font-size:11px;color:var(--soft)}
+  .prog b{color:var(--purple-ink);font-weight:600}
+  .delay{font-weight:600;font-size:12px}
+  .delay.late{color:var(--red)}.delay.ontrack{color:var(--green)}
+  .cost{color:var(--red);font-weight:600;font-size:13px}
+
+  /* detail drawer */
+  .scrim{position:fixed;inset:0;background:rgba(28,18,48,.35);opacity:0;pointer-events:none;transition:.25s;z-index:40}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100vh;width:min(520px,94vw);background:var(--paper);box-shadow:-20px 0 60px rgba(124,47,224,.18);transform:translateX(100%);transition:transform .3s ease;z-index:50;overflow-y:auto;padding:26px 28px}
+  .drawer.on{transform:none}
+  .dclose{position:absolute;top:20px;right:22px;font-size:20px;color:var(--soft);cursor:pointer;background:none;border:none}
+  .dtitle{font-family:'Fraunces',serif;font-size:23px;font-weight:600;padding-right:30px}
+  .dcode{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--soft);margin-top:3px}
+  .sec{margin-top:22px}
+  .sech{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--soft);font-weight:600;margin-bottom:10px}
+
+  /* ladder */
+  .ladder{display:flex;align-items:center;gap:8px}
+  .lt{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:6px 13px;border-radius:99px}
+  .lt.done.red{background:var(--red-bg);color:var(--red)}
+  .lt.done.yellow{background:var(--amber-bg);color:var(--amber)}
+  .lt.cur{outline:2px solid var(--purple);outline-offset:2px}
+  .lt.future{background:#f0ebf7;color:#b8a9d4}
+  .larr{color:var(--purple);font-size:15px}
+
+  /* days/delay strip */
+  .strip{display:flex;gap:12px;margin-top:14px}
+  .sd{flex:1;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .sd .l{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600}
+  .sd .v{font-family:'Fraunces',serif;font-size:22px;font-weight:600;margin-top:5px;line-height:1}
+  .sd .v.late{color:var(--red)}
+
+  /* checklist */
+  .ck{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:13.5px}
+  .ck:first-of-type{border-top:none}
+  .ck .ic{width:18px}.ck .ic.ok{color:var(--green)}.ck .ic.out{color:var(--soft)}
+  .ck .badge{margin-left:auto;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:99px}
+  .ck .badge.ok{background:var(--green-bg);color:var(--green)}
+  .ck .badge.out{background:var(--amber-bg);color:var(--amber)}
+  .ck .owner{font-size:11px;color:var(--soft);margin-left:8px}
+
+  /* forward look */
+  .fwd{background:linear-gradient(120deg,#faf5ff,#fff);border:1px solid var(--lilac);border-radius:14px;padding:16px 18px;margin-top:6px}
+  .fwd .line{font-size:14px;line-height:1.6}.fwd .line b{color:var(--purple-ink)}
+  .fwd .chase{margin-top:12px;display:flex;gap:8px}
+  .btn{font-size:12.5px;font-weight:600;border-radius:10px;padding:9px 16px;border:none;cursor:pointer}
+  .btn.p{background:var(--purple);color:#fff}.btn.s{background:#fff;border:1px solid var(--line);color:var(--ink)}
+
+  /* history (6-question) */
+  .hist{position:relative;padding-left:20px}
+  .hist:before{content:'';position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:var(--lilac)}
+  .he{position:relative;padding:10px 0}
+  .he:before{content:'';position:absolute;left:-18px;top:14px;width:9px;height:9px;border-radius:50%;background:var(--purple);border:2px solid var(--paper)}
+  .he .when{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--soft)}
+  .he .who{font-size:13.5px;font-weight:600;margin-top:2px}
+  .he .what{font-size:12.5px;color:var(--soft);margin-top:2px;line-height:1.5}
+  .six{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px}
+  .sx{background:#fff;border:1px solid var(--line);border-radius:9px;padding:7px 9px}
+  .sx .q{font-family:'Fraunces',serif;font-style:italic;font-size:10.5px;color:var(--purple-ink)}
+  .sx .a{font-size:11px;color:var(--ink);margin-top:2px;line-height:1.35}
+
+  .owner-row{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 15px}
+  .av{width:34px;height:34px;border-radius:50%;background:var(--purple);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:600}
+  .owner-row .nm{font-weight:600;font-size:14px}.owner-row .ro{font-size:11.5px;color:var(--soft)}
+  .owner-row .co{margin-left:auto;font-size:11px;background:var(--lilac);color:var(--purple-ink);padding:4px 11px;border-radius:99px;font-weight:600}
+
+
+  /* status pill */
+  .st{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:99px}
+  .st.achieved{background:var(--green-bg);color:var(--green)}
+  .st.progress{background:#eef0fb;color:#3a4ba8}
+  .st.blocked{background:var(--red-bg);color:var(--red)}
+  .st.late{background:var(--amber-bg);color:var(--amber)}
+  /* date filter popover */
+  .datewrap{position:relative;display:inline-block}
+  .datepop{position:absolute;top:42px;left:0;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 16px 44px rgba(124,47,224,.16);z-index:30;display:none;width:240px}
+  .datepop.on{display:block}
+  .datepop .row{display:flex;gap:8px;margin-bottom:9px}
+  .datepop label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600;display:block;margin-bottom:4px}
+  .datepop input{width:100%;font-size:12px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-family:'JetBrains Mono',monospace}
+  .datepop .qk{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .datepop .qk span{font-size:11px;background:#f0ebf7;color:var(--purple-ink);padding:5px 10px;border-radius:99px;cursor:pointer}
+
+  /* follow-on impact cascade */
+  .impactbar{background:linear-gradient(120deg,#fdeef2,#fff);border:1px solid #eccdd8;border-radius:16px;padding:18px 22px;margin:18px 0}
+  .impactbar .h{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--red);font-weight:700;display:flex;align-items:center;gap:7px}
+  .impactbar .h:before{content:'';width:7px;height:7px;border-radius:50%;background:var(--red)}
+  .impactbar .big{font-family:'Fraunces',serif;font-size:21px;font-weight:600;margin-top:8px;line-height:1.3}
+  .impactbar .big b{color:var(--red)}
+  .casc{display:flex;align-items:stretch;gap:0;margin-top:6px;flex-wrap:wrap}
+  .cnode{flex:1;min-width:120px;background:#fff;border:1px solid var(--line);border-radius:13px;padding:13px 15px;position:relative}
+  .cnode.hot{border-color:#eccdd8;background:linear-gradient(160deg,#fdeef2,#fff)}
+  .cnode .ct{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--soft);font-weight:600}
+  .cnode .cn{font-family:'Fraunces',serif;font-size:15px;font-weight:600;margin-top:4px}
+  .cnode .cd{font-size:11.5px;margin-top:5px;font-weight:600}
+  .cnode .cd.late{color:var(--red)}.cnode .cd.warn{color:var(--amber)}
+  .cgap{display:flex;align-items:center;color:var(--red);font-size:18px;padding:0 9px}
+  @media(max-width:720px){.casc{flex-direction:column}.cgap{transform:rotate(90deg);padding:4px 0}}
+
+  .hint{font-size:11px;color:var(--soft);font-style:italic;margin-top:18px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">Keldra<span class="d">.</span></div>
+  <div class="sub">345 assets across the MER commissioning register · tags are the spine, gates roll up from them</div>
+
+  <div class="rollup">
+    <div class="rc green"><div class="l">Green · operational</div><div class="v">208</div></div>
+    <div class="rc amber"><div class="l">Yellow · at risk</div><div class="v">34</div></div>
+    <div class="rc red"><div class="l">Red · in place</div><div class="v">93</div></div>
+    <div class="rc exp"><div class="l">Live exposure</div><div class="v">£73k<span style="font-size:16px">/day</span></div></div>
+  </div>
+
+  <div class="impactbar">
+    <div class="h">Follow-on impact · live cascade across the register</div>
+    <div class="big">9 blocked Red tags are holding <b>3 gates</b> — and pushing <b>Energisation 60 days late</b>.</div>
+    <div class="casc">
+      <div class="cnode hot"><div class="ct">Tags</div><div class="cn">9 Red stuck</div><div class="cd late">avg +11d late to Yellow</div></div>
+      <div class="cgap">→</div>
+      <div class="cnode hot"><div class="ct">Yellow tags</div><div class="cn">can't start</div><div class="cd late">14 downstream blocked</div></div>
+      <div class="cgap">→</div>
+      <div class="cnode hot"><div class="ct">Gate C</div><div class="cn">Cooling</div><div class="cd late">blocked · £73k/day</div></div>
+      <div class="cgap">→</div>
+      <div class="cnode hot"><div class="ct">Milestone</div><div class="cn">Energisation</div><div class="cd late">60 days late</div></div>
+      <div class="cgap">→</div>
+      <div class="cnode warn"><div class="ct">Gates D & E</div><div class="cn">Beneficial Use</div><div class="cd warn">cannot start behind it</div></div>
+    </div>
+  </div>
+
+  <div class="filters">
+    <span class="lab">Filter</span>
+    <span class="chip on" onclick="setF(this)">All</span>
+    <span class="chip" onclick="setF(this)">🔴 Red achieved → progressing to Yellow</span>
+    <span class="chip" onclick="setF(this)">🟡 Yellow → progressing to Green</span>
+    <span class="chip" onclick="setF(this)">⏱ Delayed vs programme</span>
+    <span class="datewrap"><span class="chip" onclick="toggleDate(event)">By date ▾</span>
+      <div class="datepop" id="datepop">
+        <label>Tag reached between</label>
+        <div class="row"><input type="text" value="01 May 26"><input type="text" value="18 Jun 26"></div>
+        <div class="qk"><span onclick="qk(this)">This week</span><span onclick="qk(this)">Last 30 days</span><span onclick="qk(this)">Overdue only</span></div>
+      </div></span>
+  </div>
+
+  <div class="panel">
+    <table>
+      <thead><tr>
+        <th>Asset</th><th>System</th><th>Tag</th><th>Status</th><th>Progressing to</th>
+        <th>Days at tag</th><th>Delay</th><th class="num">£/day</th>
+      </tr></thead>
+      <tbody>
+        <tr class="row" onclick="openD()">
+          <td><span class="aid">MER-COLO1-CRAC20</span><div class="prog">CRAC Unit · Colo Hall 1</div></td>
+          <td>Cooling</td>
+          <td><span class="tag red">Red</span></td>
+          <td><span class="st blocked">Blocked</span></td>
+          <td class="prog">→ <b>Yellow</b> · 3 of 5 done</td>
+          <td>40d</td>
+          <td><span class="delay late">+9d late</span></td>
+          <td class="num cost">£6k</td>
+        </tr>
+        <tr class="row" onclick="openD()">
+          <td><span class="aid">MER-COLO1-AHU22</span><div class="prog">Air Handling Unit · Colo Hall 1</div></td>
+          <td>Cooling</td>
+          <td><span class="tag red">Red</span></td>
+          <td><span class="st late">Late</span></td>
+          <td class="prog">→ <b>Yellow</b> · 4 of 5 done</td>
+          <td>33d</td>
+          <td><span class="delay late">+5d late</span></td>
+          <td class="num cost">£9k</td>
+        </tr>
+        <tr class="row" onclick="openD()">
+          <td><span class="aid">MER-COLO1-CHWP24</span><div class="prog">Chilled Water Pump · Colo Hall 1</div></td>
+          <td>Cooling</td>
+          <td><span class="tag yellow">Yellow</span></td>
+          <td><span class="st progress">In progress</span></td>
+          <td class="prog">→ <b>Green</b> · 2 of 4 done</td>
+          <td>12d</td>
+          <td><span class="delay ontrack">on track</span></td>
+          <td class="num cost">£15k</td>
+        </tr>
+        <tr class="row" onclick="openD()">
+          <td><span class="aid">MER-COLO1-UPM28</span><div class="prog">UPS Module · Colo Hall 1</div></td>
+          <td>Power</td>
+          <td><span class="tag yellow">Yellow</span></td>
+          <td><span class="st progress">In progress</span></td>
+          <td class="prog">→ <b>Green</b> · 3 of 4 done</td>
+          <td>8d</td>
+          <td><span class="delay ontrack">on track</span></td>
+          <td class="num">—</td>
+        </tr>
+        <tr class="row" onclick="openD()">
+          <td><span class="aid">MER-COLO1-BUS30</span><div class="prog">Busbar Section · Colo Hall 1</div></td>
+          <td>Power</td>
+          <td><span class="tag green">Green</span></td>
+          <td><span class="st achieved">Achieved</span></td>
+          <td class="prog">operational</td>
+          <td>—</td>
+          <td><span class="delay ontrack">done</span></td>
+          <td class="num">—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="hint">Click any asset to open its tag detail — ladder, checklist, owner, history (who/what/where/when/why/how), days &amp; delay, and the forward look + chase.</div>
+</div>
+
+<!-- DETAIL DRAWER -->
+<div class="scrim" id="scrim" onclick="closeD()"></div>
+<aside class="drawer" id="drawer">
+  <button class="dclose" onclick="closeD()">✕</button>
+  <div class="dtitle">CRAC Unit</div>
+  <div class="dcode">MER-COLO1-CRAC20 · Colo Hall 1 · Cooling</div>
+
+  <div class="sec">
+    <div class="sech">Commissioning tag</div>
+    <div class="ladder">
+      <span class="lt done red cur">Red</span>
+      <span class="larr">→</span>
+      <span class="lt future">Yellow</span>
+      <span class="larr">→</span>
+      <span class="lt future">Green</span>
+    </div>
+    <div class="strip">
+      <div class="sd"><div class="l">Red delivered</div><div class="v" style="font-size:15px;padding-top:4px">10 May 2026</div></div>
+      <div class="sd"><div class="l">Days at Red</div><div class="v">40d</div></div>
+      <div class="sd"><div class="l">Yellow forecast</div><div class="v late">+9d late</div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sech">Status</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="st blocked">Blocked</span>
+      <span style="font-size:13px;color:var(--soft)">Red achieved, but Yellow can't start — 2 checklist items outstanding, tracking 9 days late.</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sech">To reach Yellow — checklist</div>
+    <div class="ck"><span class="ic ok">✓</span> Equipment in place <span class="owner">· J. Brennan</span><span class="badge ok">Approved</span></div>
+    <div class="ck"><span class="ic ok">✓</span> Documentation loaded for testing <span class="owner">· M. Walsh</span><span class="badge ok">Approved</span></div>
+    <div class="ck"><span class="ic ok">✓</span> Cables installed <span class="owner">· MEP Sub</span><span class="badge ok">Approved</span></div>
+    <div class="ck"><span class="ic out">○</span> Panel terminations complete <span class="owner">· MEP Sub</span><span class="badge out">Outstanding</span></div>
+    <div class="ck"><span class="ic out">○</span> Power-on test booked <span class="owner">· Cx Engineer</span><span class="badge out">Outstanding</span></div>
+  </div>
+
+  <div class="sec">
+    <div class="sech">Forward look</div>
+    <div class="fwd">
+      <div class="line">Red delivered <b>10 May</b>. To start Yellow, two items remain: <b>panel terminations</b> (MEP Sub) and <b>power-on test booked</b> (Cx Engineer). On the current pattern, Yellow is tracking <b>9 days late</b> vs the baseline programme.</div>
+      <div class="chase">
+        <button class="btn p">Chase MEP Sub →</button>
+        <button class="btn s">Email owner</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sech">Follow-on impact · what this one tag holds up</div>
+    <div class="casc">
+      <div class="cnode hot"><div class="ct">This tag</div><div class="cn">Red → Yellow</div><div class="cd late">+9d late</div></div>
+      <div class="cgap">→</div>
+      <div class="cnode hot"><div class="ct">Then</div><div class="cn">Green slips</div><div class="cd late">+9d knock-on</div></div>
+      <div class="cgap">→</div>
+      <div class="cnode hot"><div class="ct">Rolls into</div><div class="cn">Gate C · Cooling</div><div class="cd late">1 of 9 holding it</div></div>
+      <div class="cgap">→</div>
+      <div class="cnode warn"><div class="ct">Which delays</div><div class="cn">Energisation</div><div class="cd warn">milestone at risk</div></div>
+    </div>
+    <div class="fwd" style="margin-top:12px"><div class="line">This CRAC is one of <b>9 Red tags</b> holding Gate C. Clear its terminations and power-on, and it drops out of the cascade — but the gate only clears when <b>all 9</b> reach Yellow.</div></div>
+  </div>
+
+  <div class="sec">
+    <div class="sech">Owner</div>
+    <div class="owner-row">
+      <span class="av">DK</span>
+      <span><div class="nm">Declan Kearney</div><div class="ro">Site Manager · owner since 10 May</div></span>
+      <span class="co">Main Contractor</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sech">History · who · what · where · when · why · how</div>
+    <div class="hist">
+      <div class="he">
+        <div class="when">10 May 2026</div>
+        <div class="who">Declan Kearney — Red tag achieved</div>
+        <div class="what">CRAC physically installed, checklist approved. Asset ready to be worked on.</div>
+      </div>
+      <div class="he">
+        <div class="when">22 May 2026</div>
+        <div class="who">Commissioning Lead — chased MEP Sub</div>
+        <div class="what">Panel terminations not started. First chase for a date.</div>
+      </div>
+      <div class="he">
+        <div class="when">04 Jun 2026</div>
+        <div class="who">MEP Sub — replied</div>
+        <div class="what">"Crew moved to another hall, back next week." No movement since.</div>
+      </div>
+    </div>
+    <div class="six">
+      <div class="sx"><div class="q">Who</div><div class="a">MEP Sub owes terminations</div></div>
+      <div class="sx"><div class="q">What</div><div class="a">Panel terminations + power-on</div></div>
+      <div class="sx"><div class="q">Where</div><div class="a">Colo Hall 1, cooling</div></div>
+      <div class="sx"><div class="q">When</div><div class="a">40 days at Red</div></div>
+      <div class="sx"><div class="q">Why</div><div class="a">Crew diverted, not supply</div></div>
+      <div class="sx"><div class="q">How</div><div class="a">Chase MEP Sub for a date</div></div>
+    </div>
+  </div>
+</aside>
+
+<script>
+  function openD(){document.getElementById('scrim').classList.add('on');document.getElementById('drawer').classList.add('on');}
+  function closeD(){document.getElementById('scrim').classList.remove('on');document.getElementById('drawer').classList.remove('on');}
+  function setF(el){document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
+  function toggleDate(e){e.stopPropagation();document.getElementById('datepop').classList.toggle('on');}
+  function qk(el){document.querySelectorAll('.datepop .qk span').forEach(s=>s.style.background='#f0ebf7');el.style.background='var(--lilac)';}
+  document.addEventListener('click',()=>document.getElementById('datepop')&&document.getElementById('datepop').classList.remove('on'));
+</script>
+</body>
+</html>
