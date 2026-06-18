@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { Blocker, BlockerMap, BlockerStateName } from "../lib/blocker-state";
 import { daysInState } from "../lib/blocker-state";
 import { deriveOrgColour, getInitials, getLinkedBlockers } from "../utils";
@@ -47,6 +47,14 @@ const GBP = new Intl.NumberFormat("en-GB", {
   currency: "GBP",
   maximumFractionDigits: 0,
 });
+
+// Asset-level R→Y→G commissioning tag ladder (the team's native model).
+const TAG_PILL: Record<"red" | "yellow" | "green", string> = {
+  red: "bg-red-100 text-red-700",
+  yellow: "bg-yellow-100 text-yellow-800",
+  green: "bg-green-100 text-green-800",
+};
+type ChecklistItem = { label: string; status: string };
 
 const STAGE_BADGE: { match: (s: string) => boolean; classes: string }[] = [
   { match: (s) => s.includes("delivered") && s.includes("not installed"), classes: "bg-zinc-200 text-zinc-700" },
@@ -139,6 +147,26 @@ export default function AssetDetailPanel({
   xer,
 }: Props) {
   const [lightbox, setLightbox] = useState<FieldCapture | null>(null);
+
+  // Asset-level commissioning tag + next-tag checklist, fetched per org (RLS).
+  // Anon/untagged → tag stays null → the section is hidden (demo unaffected).
+  const [tag, setTag] = useState<"red" | "yellow" | "green" | null>(null);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const assetIdForTag = (asset?.asset_id ?? "").toString().trim();
+  useEffect(() => {
+    if (!assetIdForTag) { setTag(null); setChecklist([]); return; }
+    let live = true;
+    fetch(`/api/assets/tag?assetId=${encodeURIComponent(assetIdForTag)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!live) return;
+        setTag(j?.tag ?? null);
+        setChecklist(Array.isArray(j?.checklist) ? j.checklist : []);
+      })
+      .catch(() => { if (live) { setTag(null); setChecklist([]); } });
+    return () => { live = false; };
+  }, [assetIdForTag]);
+
   if (!asset) return null;
 
   const activityId = (asset.activity_id ?? "").toString().trim();
@@ -267,6 +295,59 @@ export default function AssetDetailPanel({
               </p>
             )}
           </section>
+
+          {/* Commissioning tag ladder (R→Y→G) + checklist for the next tag */}
+          {tag && (
+            <section>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-2">
+                Commissioning tag
+              </p>
+              <div className="flex items-center gap-1.5">
+                {(["red", "yellow", "green"] as const).map((t, i) => (
+                  <Fragment key={t}>
+                    {i > 0 && <span className="text-ink-mid" aria-hidden>→</span>}
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${TAG_PILL[t]} ${tag === t ? "" : "opacity-30"}`}
+                    >
+                      {t}
+                    </span>
+                  </Fragment>
+                ))}
+              </div>
+
+              {tag === "green" ? (
+                <p className="mt-3 text-sm text-green-800">Operational — fully commissioned.</p>
+              ) : (
+                <div className="mt-3">
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-mid">
+                    To reach {tag === "red" ? "Yellow" : "Green"}
+                  </p>
+                  {checklist.length === 0 ? (
+                    <p className="text-xs text-ink-mid">No checklist items recorded.</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {checklist.map((it, i) => {
+                        const done = it.status === "approved";
+                        return (
+                          <li key={i} className="flex items-center gap-2 text-sm">
+                            <span className={done ? "text-green-600" : "text-ink-mid"} aria-hidden>
+                              {done ? "✓" : "○"}
+                            </span>
+                            <span className={done ? "text-ink" : "text-ink-mid"}>{it.label}</span>
+                            <span
+                              className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${done ? "bg-green-100 text-green-800" : "bg-paper-warm text-ink-mid"}`}
+                            >
+                              {done ? "Approved" : "Outstanding"}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
 
           {/* P6 activity (only when an XER is loaded and this asset maps) */}
           {activity && (

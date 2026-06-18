@@ -2,6 +2,7 @@ import "server-only";
 import { randomBytes, createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { BASELINE_TASKS, COMPANIES } from "@/app/dashboard/lib/baseline-seed";
+import { generateAssets } from "@/app/dashboard/lib/demo-assets";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -173,14 +174,38 @@ const TRAIL: { dir: "outbound" | "inbound"; ago: number; subject: string; body: 
 export type SeedResult = {
   tasks: number; gates: number; milestones: number; blockers: number;
   signoffs: number; roster: number; assignments: number; emails: number;
+  assetTags: number;
 };
+
+// Asset R→Y→G tag derived from the register's existing stage, so the tag layer
+// agrees with the Stage column. Delivered = pre-tag (skip).
+function tagFromStage(stage: string): "red" | "yellow" | "green" | null {
+  if (stage === "On GT" || stage === "Off GT") return "green";
+  if (stage.includes("YT")) return "yellow";
+  if (stage === "RT") return "red";
+  return null;
+}
+const RYG_CHECKLISTS: Record<"red" | "yellow", string[]> = {
+  red: ["Equipment in place", "Documentation loaded for testing", "Cables installed", "Panel terminations complete", "Power-on test complete"],
+  yellow: ["Integrated systems test passed", "Witness sign-off complete", "Snag list closed", "Handover pack uploaded"],
+};
+// Checklist to reach the NEXT tag. Deterministic per-asset spread of approved vs
+// outstanding so the demo shows assets at different points (some ready to advance).
+function assetChecklist(tag: "red" | "yellow" | "green", assetId: string): { label: string; status: "approved" | "outstanding" }[] {
+  if (tag === "green") return [];
+  const labels = RYG_CHECKLISTS[tag];
+  let h = 0;
+  for (let i = 0; i < assetId.length; i++) h = (h * 31 + assetId.charCodeAt(i)) >>> 0;
+  const approved = 1 + (h % labels.length);
+  return labels.map((label, i) => ({ label, status: i < approved ? "approved" : "outstanding" }));
+}
 
 // Seed the calling org's DB with the full worked example. Idempotent: deletes
 // the seed's own rows for THIS org (by the fixed codes above) then re-inserts.
 // Every read/write is scoped to `orgId`.
 export async function seedSampleData(orgId: string): Promise<SeedResult> {
   const admin = createAdminClient();
-  const result: SeedResult = { tasks: 0, gates: 0, milestones: 0, blockers: 0, signoffs: 0, roster: 0, assignments: 0, emails: 0 };
+  const result: SeedResult = { tasks: 0, gates: 0, milestones: 0, blockers: 0, signoffs: 0, roster: 0, assignments: 0, emails: 0, assetTags: 0 };
 
   // --- project to hang everything off ---
   let { data: proj } = await admin.from("projects").select("id").eq("org_id", orgId).limit(1).maybeSingle<{ id: string }>();
@@ -198,6 +223,7 @@ export async function seedSampleData(orgId: string): Promise<SeedResult> {
   await del(admin, "task_notes", (q) => q.eq("org_id", orgId).in("task_code", [HERO, ...TRAIL_TASK_CODES]));
   await admin.from("gates").delete().eq("org_id", orgId).in("code", SEED_GATE_CODES);
   await del(admin, "roster", (q) => q.eq("org_id", orgId).like("email", "%.example"));
+  await del(admin, "asset_tags", (q) => q.eq("org_id", orgId));
 
   // --- tasks (upsert keeps ids stable for assignments) ---
   const taskRows = BASELINE_TASKS.map((t) => ({
@@ -330,6 +356,22 @@ export async function seedSampleData(orgId: string): Promise<SeedResult> {
       }
     }
   } catch { /* task_assignments not migrated */ }
+
+  // --- asset R/Y/G tags + next-tag checklists — the granular layer under gates.
+  //     Tag derived from each asset's stage so it agrees with the Stage column;
+  //     a believable spread of red/yellow/green for the drilldown demo. ---
+  try {
+    const rows = generateAssets()
+      .map((a) => {
+        const tag = tagFromStage(a.current_stage);
+        return tag ? { org_id: orgId, asset_id: a.asset_id, tag, next_checklist: assetChecklist(tag, a.asset_id) } : null;
+      })
+      .filter(Boolean) as { org_id: string; asset_id: string; tag: string; next_checklist: unknown }[];
+    if (rows.length) {
+      await admin.from("asset_tags").upsert(rows, { onConflict: "org_id,asset_id" });
+      result.assetTags = rows.length;
+    }
+  } catch { /* asset_tags not migrated yet */ }
 
   return result;
 }
