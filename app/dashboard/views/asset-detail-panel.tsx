@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import type { Blocker, BlockerMap, BlockerStateName } from "../lib/blocker-state";
 import { daysInState } from "../lib/blocker-state";
 import { deriveOrgColour, getInitials, getLinkedBlockers } from "../utils";
@@ -59,6 +59,7 @@ type TagStatus = "achieved" | "in_progress" | "late" | "blocked";
 type HistoryEntry = { seq: number; eventType: string; actorName: string | null; actorOrg: string | null; ts: string; payload: Record<string, unknown> };
 type TagData = {
   tag: "red" | "yellow" | "green";
+  canWrite: boolean;
   status: TagStatus;
   owner: { name: string; org: string } | null;
   achievedDate: string | null;
@@ -181,16 +182,33 @@ export default function AssetDetailPanel({
   // Asset-level commissioning tag + drawer data, fetched per org (RLS).
   // Anon/untagged → tagData stays null → the section is hidden (demo unaffected).
   const [tagData, setTagData] = useState<TagData | null>(null);
+  const [acting, setActing] = useState(false);
+  const [actErr, setActErr] = useState<string | null>(null);
   const assetIdForTag = (asset?.asset_id ?? "").toString().trim();
-  useEffect(() => {
+  const loadTag = useCallback(async () => {
     if (!assetIdForTag) { setTagData(null); return; }
-    let live = true;
-    fetch(`/api/assets/tag?assetId=${encodeURIComponent(assetIdForTag)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { if (live) setTagData(j?.tag ? (j as TagData) : null); })
-      .catch(() => { if (live) setTagData(null); });
-    return () => { live = false; };
+    try {
+      const r = await fetch(`/api/assets/tag?assetId=${encodeURIComponent(assetIdForTag)}`);
+      const j = r.ok ? await r.json() : null;
+      setTagData(j?.tag ? (j as TagData) : null);
+    } catch { setTagData(null); }
   }, [assetIdForTag]);
+  useEffect(() => { void loadTag(); }, [loadTag]);
+
+  // Strict-ladder action: approve/unapprove an item or advance the tag. The
+  // server enforces the dependency rule; we refetch + surface any rejection.
+  const act = useCallback(async (action: "approve" | "unapprove" | "advance", itemLabel?: string) => {
+    setActing(true); setActErr(null);
+    try {
+      const res = await fetch("/api/assets/tag", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetId: assetIdForTag, action, itemLabel }),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setActErr(j.error ?? `Failed (${res.status}).`); }
+      else await loadTag();
+    } catch (e) { setActErr((e as Error).message); }
+    finally { setActing(false); }
+  }, [assetIdForTag, loadTag]);
 
   if (!asset) return null;
 
@@ -351,28 +369,50 @@ export default function AssetDetailPanel({
                   </div>
                 </div>
 
-                {next && (
-                  <div className="mt-4">
-                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-mid">To reach {next}</p>
-                    {tagData.checklist.length === 0 ? (
-                      <p className="text-xs text-ink-mid">No checklist items recorded.</p>
-                    ) : (
-                      <ul className="space-y-1.5">
-                        {tagData.checklist.map((it, i) => {
-                          const done = it.status === "approved";
-                          return (
-                            <li key={i} className="flex items-center gap-2 text-sm">
-                              <span className={done ? "text-green-600" : "text-ink-mid"} aria-hidden>{done ? "✓" : "○"}</span>
-                              <span className={done ? "text-ink" : "text-ink-mid"}>{it.label}</span>
-                              {it.owner && <span className="text-[11px] text-ink-mid">· {it.owner}</span>}
-                              <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${done ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>{done ? "Approved" : "Outstanding"}</span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                )}
+                {next && (() => {
+                  const outstanding = tagData.checklist.filter((it) => it.status !== "approved").length;
+                  return (
+                    <div className="mt-4">
+                      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-mid">To reach {next}</p>
+                      {tagData.checklist.length === 0 ? (
+                        <p className="text-xs text-ink-mid">No checklist items recorded.</p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {tagData.checklist.map((it, i) => {
+                            const done = it.status === "approved";
+                            return (
+                              <li key={i} className="flex items-center gap-2 text-sm">
+                                {tagData.canWrite ? (
+                                  <button type="button" disabled={acting} onClick={() => act(done ? "unapprove" : "approve", it.label)} className={done ? "text-green-600" : "text-ink-mid hover:text-accent"} title={done ? "Un-approve" : "Approve"} aria-label={done ? "Un-approve" : "Approve"}>{done ? "✓" : "○"}</button>
+                                ) : (
+                                  <span className={done ? "text-green-600" : "text-ink-mid"} aria-hidden>{done ? "✓" : "○"}</span>
+                                )}
+                                <span className={done ? "text-ink" : "text-ink-mid"}>{it.label}</span>
+                                {it.owner && <span className="text-[11px] text-ink-mid">· {it.owner}</span>}
+                                <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${done ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>{done ? "Approved" : "Outstanding"}</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      {tagData.canWrite && (
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            disabled={acting || outstanding > 0}
+                            onClick={() => act("advance")}
+                            className="rounded-xl bg-ink px-3.5 py-2 text-xs font-medium text-paper transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                            title={outstanding > 0 ? `${outstanding} item(s) outstanding — complete them first` : `Advance to ${next}`}
+                          >
+                            Advance to {next}
+                          </button>
+                          {outstanding > 0 && <span className="ml-2 text-[11px] text-ink-mid">{outstanding} outstanding — locked until complete</span>}
+                          {actErr && <p className="mt-2 text-xs text-red-700">{actErr}</p>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 {tag === "green" && <p className="mt-3 text-sm text-green-800">Operational — fully commissioned.</p>}
 
                 {/* named owner */}

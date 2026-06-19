@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "crypto";
 import { hashBlockerEvent, normalizeTs } from "@/lib/blockers/event-hash";
+import { RYG_TEMPLATE } from "@/lib/assets/checklist";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { BASELINE_TASKS, COMPANIES } from "@/app/dashboard/lib/baseline-seed";
 import { generateAssets } from "@/app/dashboard/lib/demo-assets";
@@ -183,29 +184,14 @@ function tagFromStage(stage: string): "red" | "yellow" | "green" | null {
   if (stage === "RT") return "red";
   return null;
 }
-const RYG_CHECKLISTS: Record<"red" | "yellow", { label: string; owner: string }[]> = {
-  red: [
-    { label: "Equipment in place", owner: "J. Brennan" },
-    { label: "Documentation loaded for testing", owner: "M. Walsh" },
-    { label: "Cables installed", owner: "MEP Sub" },
-    { label: "Panel terminations complete", owner: "MEP Sub" },
-    { label: "Power-on test booked", owner: "Cx Engineer" },
-  ],
-  yellow: [
-    { label: "Integrated systems test passed", owner: "Cx Sub" },
-    { label: "Witness sign-off complete", owner: "Commissioning Lead" },
-    { label: "Snag list closed", owner: "Main Contractor" },
-    { label: "Handover pack uploaded", owner: "Document Control" },
-  ],
-};
 type ChecklistItem = { label: string; status: "approved" | "outstanding"; owner: string };
 function hashStr(s: string): number { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
 
-// Checklist to reach the NEXT tag, each item with its owner. Deterministic
-// approved/outstanding spread so assets sit at different points.
+// Checklist to reach the NEXT tag, from the shared template (single source of
+// truth with the dependency engine). Deterministic approved/outstanding spread.
 function assetChecklist(tag: "red" | "yellow" | "green", assetId: string): ChecklistItem[] {
   if (tag === "green") return [];
-  const items = RYG_CHECKLISTS[tag];
+  const items = RYG_TEMPLATE[tag];
   const approved = 1 + (hashStr(assetId) % items.length);
   return items.map((it, i) => ({ label: it.label, owner: it.owner, status: i < approved ? "approved" : "outstanding" }));
 }

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { authedActor } from "@/lib/auth/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { canWrite } from "@/lib/auth/profile";
+import { advanceAssetTag, setChecklistItem } from "@/lib/assets/tag-engine";
 
 const DAY = 86_400_000;
 
@@ -42,6 +44,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     tag: data.tag,
+    canWrite: canWrite(actor.role),
     status: data.status ?? "in_progress",
     owner: data.owner_name ? { name: data.owner_name, org: data.owner_org ?? "" } : null,
     achievedDate: data.achieved_date,
@@ -60,4 +63,36 @@ export async function GET(request: NextRequest) {
       };
     }),
   });
+}
+
+// POST → drive the strict ladder: approve/unapprove a checklist item, or advance
+// the tag (RED→YELLOW→GREEN, each gated on the previous + a complete checklist).
+// Identity/org from the verified session; writes via the service-role engine.
+export async function POST(request: NextRequest) {
+  const actor = await authedActor(request);
+  if (!actor) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  if (!canWrite(actor.role)) return NextResponse.json({ error: "Your role can't change asset tags." }, { status: 403 });
+
+  let body: Record<string, unknown>;
+  try { body = (await request.json()) as Record<string, unknown>; }
+  catch { return NextResponse.json({ error: "Bad payload." }, { status: 400 }); }
+
+  const assetId = String(body.assetId ?? "").trim();
+  const action = String(body.action ?? "");
+  if (!assetId) return NextResponse.json({ error: "Missing assetId." }, { status: 400 });
+
+  const admin = createAdminClient();
+  let result;
+  if (action === "advance") {
+    result = await advanceAssetTag(admin, { orgId: actor.orgId, assetId, actorName: actor.fullName, actorOrg: actor.orgName });
+  } else if (action === "approve" || action === "unapprove") {
+    const label = String(body.itemLabel ?? "").trim();
+    if (!label) return NextResponse.json({ error: "Missing itemLabel." }, { status: 400 });
+    result = await setChecklistItem(admin, { orgId: actor.orgId, assetId, label, approved: action === "approve" });
+  } else {
+    return NextResponse.json({ error: "Unknown action." }, { status: 400 });
+  }
+
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+  return NextResponse.json({ ok: true });
 }
