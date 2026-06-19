@@ -275,9 +275,17 @@ export default function AssetDetailPanel({
   const stageLower = stage.toLowerCase();
   const isStorageStalled = stageLower.includes("delivered") && stageLower.includes("not installed");
   const daysInStage = daysSinceStageDate(asset);
-  const linked = getLinkedBlockers(asset, blockerMap).filter(
-    (b) => b.state !== "closed",
-  );
+  // Blockers holding this asset: any directly linked (by linked_assets), PLUS
+  // the open blockers on this asset's gate (gate-level linkage — assets and
+  // blockers don't share IDs, so the gate is the honest join). Deduped by id.
+  const assetGate = gateForSystem((asset.system ?? "").toString());
+  const directLinked = getLinkedBlockers(asset, blockerMap).filter((b) => b.state !== "closed");
+  const gateLinked = assetGate && blockerMap
+    ? Object.values(blockerMap).filter((b) => b.state !== "closed" && b.gate === assetGate)
+    : [];
+  const linkedById = new Map<string, (typeof directLinked)[number]>();
+  for (const b of [...directLinked, ...gateLinked]) linkedById.set(b.id, b);
+  const linked = Array.from(linkedById.values());
   const chain = locationChain(asset);
 
   return (
@@ -573,11 +581,25 @@ export default function AssetDetailPanel({
             )}
           </section>
 
-          {/* Linked blockers */}
+          {/* What's blocking it — directly linked + this asset's gate blockers */}
           <section>
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-2">
-              Active blockers ({linked.length})
-            </p>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid">
+                What&apos;s blocking it ({linked.length})
+              </p>
+              {linked.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { onClose(); onOpenBlocker(linked[0].id); }}
+                  className="rounded-lg bg-ink px-2.5 py-1 text-[11px] font-medium text-paper transition-colors hover:bg-accent"
+                >
+                  Chase the holder →
+                </button>
+              )}
+            </div>
+            {assetGate && (
+              <p className="mb-2 text-[11px] text-ink-mid">Open blockers on this asset&apos;s gate (Gate {assetGate}) — click any to open its trail &amp; chase.</p>
+            )}
             {linked.length === 0 ? (
               <div className="flex items-center gap-2 rounded-2xl border border-green-200 bg-green-50/60 px-3 py-2.5 text-sm text-green-800">
                 <span className="text-green-600" aria-hidden>✓</span>
