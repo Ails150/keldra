@@ -1,23 +1,29 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { BlockerMap } from "../lib/blocker-state";
-import { STAGE_META, normalizeStage } from "../lib/cx-stages";
 import { useDemo } from "../demo-store";
-import { assetStats } from "../lib/demo-assets";
 import AssetDetailPanel from "./asset-detail-panel";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const SEVERITY: Record<string, number> = { RT: 6, "On YT": 5, "Off YT": 4, Delivered: 3, "Off GT": 2, "On GT": 1 };
+// Tag overlay (from /api/assets/tags), merged onto the register by asset_id.
+type TagRow = {
+  asset_id: string;
+  tag: "red" | "yellow" | "green";
+  status: "achieved" | "in_progress" | "late" | "blocked";
+  achievedDate: string | null;
+  daysAtTag: number | null;
+  done: number;
+  total: number;
+};
+const TAG_RANK: Record<string, number> = { red: 3, yellow: 2, green: 1 };
+const TAG_CLS: Record<string, string> = { red: "bg-red-100 text-red-700", yellow: "bg-yellow-100 text-yellow-800", green: "bg-green-100 text-green-800" };
+const STATUS_CLS: Record<string, string> = { achieved: "bg-green-100 text-green-800", in_progress: "bg-indigo-100 text-indigo-800", late: "bg-amber-100 text-amber-800", blocked: "bg-red-100 text-red-700" };
+const STATUS_LABEL: Record<string, string> = { achieved: "Achieved", in_progress: "In progress", late: "Late", blocked: "Blocked" };
 
-function shortDate(iso: string): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
-}
+type TagFilter = "all" | "red" | "yellow" | "delayed";
 
 export default function AssetsView({
   project,
@@ -34,32 +40,85 @@ export default function AssetsView({
   blockerMap: BlockerMap | null;
   onOpenBlocker: (id: string) => void;
 }) {
-  const { assets: liveAssets, burnPerDay, openBlockers } = useDemo();
+  const { assets: liveAssets, openBlockers } = useDemo();
   const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
-  const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [tagsById, setTagsById] = useState<Record<string, TagRow>>({});
+  const [tagFilter, setTagFilter] = useState<TagFilter>("all");
+  const [dateOpen, setDateOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
-  const highlightSet =
-    highlightIds && highlightIds.length > 0 ? new Set(highlightIds.map((s) => s.trim())) : null;
+  // Tag overlay for the whole list, org-scoped (anon → 401 → no overlay).
+  useEffect(() => {
+    let live = true;
+    fetch("/api/assets/tags")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!live || !j?.tags) return;
+        const m: Record<string, TagRow> = {};
+        for (const t of j.tags as TagRow[]) m[t.asset_id] = t;
+        setTagsById(m);
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
 
-  const stats = useMemo(() => assetStats(liveAssets), [liveAssets]);
-  // £/day is owned by the live blocker set — one source of truth across surfaces.
+  const highlightSet = highlightIds && highlightIds.length > 0 ? new Set(highlightIds.map((s) => s.trim())) : null;
   const burnByAsset = useMemo(() => {
     const m: Record<string, number> = {};
     for (const b of openBlockers) m[b.asset_id] = (m[b.asset_id] ?? 0) + b.burn_per_day;
     return m;
   }, [openBlockers]);
 
+  const tagged = Object.keys(tagsById).length > 0;
+
   const rows = useMemo(() => {
     let list = liveAssets.slice();
     if (highlightSet) list = list.filter((a) => highlightSet.has((a.asset_id ?? "").trim()));
-    if (stageFilter === "RT") list = list.filter((a) => a.current_stage === "RT");
-    else if (stageFilter === "YT") list = list.filter((a) => (a.current_stage ?? "").includes("YT"));
-    else if (stageFilter === "GT") list = list.filter((a) => (a.current_stage ?? "").includes("GT"));
+    if (tagFilter !== "all") {
+      list = list.filter((a) => {
+        const t = tagsById[a.asset_id];
+        if (!t) return false;
+        if (tagFilter === "red") return t.tag === "red";
+        if (tagFilter === "yellow") return t.tag === "yellow";
+        return t.status === "late" || t.status === "blocked"; // delayed
+      });
+    }
+    if (dateFrom || dateTo) {
+      list = list.filter((a) => {
+        const d = tagsById[a.asset_id]?.achievedDate;
+        if (!d) return false;
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo && d > dateTo) return false;
+        return true;
+      });
+    }
     const q = query.trim().toLowerCase();
-    if (q) list = list.filter((a) => [a.asset_id, a.asset_type, a.system, a.location, a.owner_name].some((f) => (f ?? "").toString().toLowerCase().includes(q)));
-    return list.sort((a, b) => (SEVERITY[b.current_stage] ?? 0) - (SEVERITY[a.current_stage] ?? 0));
-  }, [liveAssets, highlightSet, stageFilter, query]);
+    if (q) list = list.filter((a) => [a.asset_id, a.asset_type, a.system, a.location].some((f) => (f ?? "").toString().toLowerCase().includes(q)));
+    const rank = (a: any) => { const t = tagsById[a.asset_id]; return t ? TAG_RANK[t.tag] : -1; };
+    return list.sort((a, b) => rank(b) - rank(a));
+  }, [liveAssets, highlightSet, tagFilter, dateFrom, dateTo, query, tagsById]);
+
+  const clearDate = () => { setDateFrom(""); setDateTo(""); };
+  const quick = (kind: "week" | "month" | "overdue") => {
+    if (kind === "overdue") { setTagFilter("delayed"); clearDate(); }
+    else {
+      setTagFilter("all");
+      const now = new Date();
+      const from = new Date(now.getTime() - (kind === "week" ? 7 : 30) * 86_400_000);
+      setDateFrom(from.toISOString().slice(0, 10));
+      setDateTo(now.toISOString().slice(0, 10));
+    }
+    setDateOpen(false);
+  };
+
+  const CHIPS: { id: TagFilter; label: string }[] = [
+    { id: "all", label: "All" },
+    { id: "red", label: "🔴 Red → progressing to Yellow" },
+    { id: "yellow", label: "🟡 Yellow → progressing to Green" },
+    { id: "delayed", label: "⏱ Delayed vs programme" },
+  ];
 
   return (
     <section className="mx-auto max-w-6xl px-8">
@@ -68,16 +127,51 @@ export default function AssetsView({
           Assets
         </h1>
         <p className="mt-1.5 font-[family-name:var(--font-fraunces)] italic text-ink-mid" style={{ fontSize: 16 }}>
-          {stats.total} assets across the MER commissioning register.
+          {liveAssets.length} assets across the MER commissioning register · tags are the spine, gates roll up from them.
         </p>
       </header>
 
-      {/* Summary stats */}
-      <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <SummaryStat label="Commissioned" value={stats.commissioned} tone="good" onClick={() => setStageFilter(stageFilter === "GT" ? null : "GT")} active={stageFilter === "GT"} />
-        <SummaryStat label="At risk · yellow" value={stats.atRisk} tone="warn" onClick={() => setStageFilter(stageFilter === "YT" ? null : "YT")} active={stageFilter === "YT"} />
-        <SummaryStat label="Red-tagged" value={stats.redTagged} tone="danger" onClick={() => setStageFilter(stageFilter === "RT" ? null : "RT")} active={stageFilter === "RT"} />
-        <SummaryStat label="Live exposure" value={`£${Math.round(burnPerDay / 1000)}k/day`} tone="danger" />
+      {/* Tag filters + date popover */}
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-ink-mid">Filter</span>
+        {CHIPS.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => { setTagFilter(c.id); if (c.id !== "all") clearDate(); }}
+            className={`rounded-full border px-3.5 py-1.5 text-xs transition-colors ${tagFilter === c.id && !(dateFrom || dateTo) ? "border-accent bg-accent text-paper font-semibold" : "border-paper-line bg-paper-card text-ink-mid hover:border-accent"}`}
+          >
+            {c.label}
+          </button>
+        ))}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setDateOpen((o) => !o)}
+            className={`rounded-full border px-3.5 py-1.5 text-xs transition-colors ${dateFrom || dateTo ? "border-accent bg-accent text-paper font-semibold" : "border-paper-line bg-paper-card text-ink-mid hover:border-accent"}`}
+          >
+            By date ▾
+          </button>
+          {dateOpen && (
+            <div className="absolute left-0 top-10 z-30 w-64 rounded-xl border border-paper-line bg-paper-card p-3.5 shadow-lg">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-mid">Tag reached between</p>
+              <div className="flex gap-2">
+                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full rounded-lg border border-paper-line bg-paper-card px-2 py-1.5 text-xs text-ink outline-none focus:border-accent" />
+                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full rounded-lg border border-paper-line bg-paper-card px-2 py-1.5 text-xs text-ink outline-none focus:border-accent" />
+              </div>
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                <button type="button" onClick={() => quick("week")} className="rounded-full bg-paper-warm px-2.5 py-1 text-[11px] text-accent-deep hover:bg-accent/10">This week</button>
+                <button type="button" onClick={() => quick("month")} className="rounded-full bg-paper-warm px-2.5 py-1 text-[11px] text-accent-deep hover:bg-accent/10">Last 30 days</button>
+                <button type="button" onClick={() => quick("overdue")} className="rounded-full bg-paper-warm px-2.5 py-1 text-[11px] text-accent-deep hover:bg-accent/10">Overdue only</button>
+              </div>
+            </div>
+          )}
+        </div>
+        {(tagFilter !== "all" || dateFrom || dateTo) && (
+          <button type="button" onClick={() => { setTagFilter("all"); clearDate(); }} className="text-xs font-medium text-accent hover:text-accent-deep">
+            Clear
+          </button>
+        )}
       </div>
 
       {highlightSet && (
@@ -86,29 +180,19 @@ export default function AssetsView({
           <button type="button" onClick={onClearHighlight} className="text-xs font-medium text-accent hover:text-accent-deep">Clear filter</button>
         </div>
       )}
-      {stageFilter && !highlightSet && (
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-paper-line bg-paper-warm/50 px-4 py-2 text-sm">
-          <p className="text-ink-mid">Filtered to {stageFilter === "RT" ? "red-tagged" : stageFilter === "YT" ? "yellow-tag" : "commissioned"} assets · {rows.length}</p>
-          <button type="button" onClick={() => setStageFilter(null)} className="text-xs font-medium text-accent hover:text-accent-deep">Show all</button>
-        </div>
-      )}
 
-      {/* Live search — client-side, works alongside the status tiles */}
-      <div className="mt-5 flex items-center gap-3">
+      {/* Live search */}
+      <div className="mt-4 flex items-center gap-3">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search asset ID, type, system, zone or owner…"
+          placeholder="Search asset ID, type, system or zone…"
           className="flex-1 rounded-xl border border-paper-line bg-paper-card px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent"
         />
         {query && (
-          <button type="button" onClick={() => setQuery("")} className="text-xs font-medium text-accent hover:text-accent-deep">
-            Clear
-          </button>
+          <button type="button" onClick={() => setQuery("")} className="text-xs font-medium text-accent hover:text-accent-deep">Clear</button>
         )}
-        <span className="whitespace-nowrap text-xs text-ink-mid">
-          showing {rows.length} of {liveAssets.length}
-        </span>
+        <span className="whitespace-nowrap text-xs text-ink-mid">showing {rows.length} of {liveAssets.length}</span>
       </div>
 
       {/* Table */}
@@ -117,33 +201,37 @@ export default function AssetsView({
           <table className="w-full border-collapse text-left">
             <thead className="sticky top-0 z-10 bg-paper-warm">
               <tr className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">
-                <Th>Asset ID</Th><Th>Type</Th><Th>Zone</Th><Th>System</Th><Th>Stage</Th><Th>Owner</Th>
-                <Th center>Red</Th><Th center>Yellow</Th><Th center>Green</Th><Th right>£/day</Th>
+                <Th>Asset</Th><Th>System</Th><Th>Tag</Th><Th>Status</Th><Th>Progressing to</Th><Th>Days at tag</Th><Th right>£/day</Th>
               </tr>
             </thead>
             <tbody>
               {rows.map((a, i) => {
-                const meta = STAGE_META[normalizeStage(a.current_stage)];
+                const t = tagsById[a.asset_id];
                 const hot = highlightSet?.has((a.asset_id ?? "").trim());
+                const burn = burnByAsset[a.asset_id] ?? 0;
                 return (
                   <tr
                     key={a.asset_id ?? i}
                     onClick={() => setSelectedAsset(a)}
                     className={`cursor-pointer border-t border-paper-line transition-colors hover:bg-paper-warm/60 ${hot ? "bg-accent/5" : ""}`}
                   >
-                    <Td mono>{a.asset_id}</Td>
-                    <Td>{a.asset_type}</Td>
-                    <Td muted>{a.location}</Td>
+                    <td className="px-3 py-2">
+                      <span className="font-mono text-[11px] text-purple-900">{a.asset_id}</span>
+                      <span className="block text-[11px] text-ink-mid">{a.asset_type} · {a.location}</span>
+                    </td>
                     <Td muted>{a.system}</Td>
                     <td className="px-3 py-2">
-                      <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.bg} ${meta.border} ${meta.text} border`}>{a.current_stage}</span>
+                      {t ? <span className={`inline-block rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide ${TAG_CLS[t.tag]}`}>{t.tag}</span> : <span className="text-ink-mid">—</span>}
                     </td>
-                    <Td muted>{a.owner_name || <span className="text-red-600">Unclear</span>}</Td>
-                    <Td center muted>{shortDate(a.red_tag_date)}</Td>
-                    <Td center muted>{shortDate(a.yellow_tag_date)}</Td>
-                    <Td center muted>{shortDate(a.green_date)}</Td>
-                    <td className="px-3 py-2 text-right font-medium" style={{ color: (burnByAsset[a.asset_id] ?? 0) ? "#b91c1c" : "#9ca3af" }}>
-                      {(burnByAsset[a.asset_id] ?? 0) ? `£${Math.round((burnByAsset[a.asset_id] ?? 0) / 1000)}k` : "—"}
+                    <td className="px-3 py-2">
+                      {t ? <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_CLS[t.status]}`}>{STATUS_LABEL[t.status] ?? t.status}</span> : <span className="text-ink-mid">—</span>}
+                    </td>
+                    <td className="px-3 py-2 text-[12px] text-ink-mid">
+                      {t ? (t.tag === "green" ? "operational" : <>→ <b className="text-purple-900">{t.tag === "red" ? "Yellow" : "Green"}</b> · {t.done} of {t.total} done</>) : "—"}
+                    </td>
+                    <Td muted>{t?.daysAtTag == null ? "—" : `${t.daysAtTag}d`}</Td>
+                    <td className="px-3 py-2 text-right font-medium" style={{ color: burn ? "#b91c1c" : "#9ca3af" }}>
+                      {burn ? `£${Math.round(burn / 1000)}k` : "—"}
                     </td>
                   </tr>
                 );
@@ -152,6 +240,9 @@ export default function AssetsView({
           </table>
         </div>
       </div>
+      {!tagged && (
+        <p className="mt-2 text-[11px] italic text-ink-mid">Tag overlay loads for signed-in orgs — the public demo shows the register only.</p>
+      )}
 
       <AssetDetailPanel
         asset={selectedAsset}
@@ -164,28 +255,9 @@ export default function AssetsView({
   );
 }
 
-function SummaryStat({ label, value, tone, onClick, active }: { label: string; value: string | number; tone: "good" | "warn" | "danger"; onClick?: () => void; active?: boolean }) {
-  const colour = tone === "good" ? "#15803d" : tone === "warn" ? "#b45309" : "#b91c1c";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!onClick}
-      className={`rounded-2xl border bg-paper-card p-4 text-left transition-colors ${active ? "border-ink" : "border-paper-line"} ${onClick ? "hover:border-accent cursor-pointer" : "cursor-default"}`}
-    >
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">{label}</p>
-      <p className="mt-1 font-[family-name:var(--font-fraunces)] font-semibold" style={{ fontSize: 26, lineHeight: 1, color: colour }}>{value}</p>
-    </button>
-  );
+function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
+  return <th className={`px-3 py-2.5 ${right ? "text-right" : "text-left"}`}>{children}</th>;
 }
-
-function Th({ children, center, right }: { children: React.ReactNode; center?: boolean; right?: boolean }) {
-  return <th className={`px-3 py-2.5 ${center ? "text-center" : right ? "text-right" : "text-left"}`}>{children}</th>;
-}
-function Td({ children, mono, muted, center }: { children: React.ReactNode; mono?: boolean; muted?: boolean; center?: boolean }) {
-  return (
-    <td className={`px-3 py-2 text-[12.5px] ${mono ? "font-mono text-[11px] text-purple-900" : muted ? "text-ink-mid" : "text-ink"} ${center ? "text-center" : ""}`}>
-      {children}
-    </td>
-  );
+function Td({ children, muted }: { children: React.ReactNode; muted?: boolean }) {
+  return <td className={`px-3 py-2 text-[12.5px] ${muted ? "text-ink-mid" : "text-ink"}`}>{children}</td>;
 }
