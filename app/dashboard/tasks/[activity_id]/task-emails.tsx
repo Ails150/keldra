@@ -150,15 +150,17 @@ export function useTaskEmails(taskCode: string) {
 export function EmailUpdateModal({
   taskCode,
   evidence = [],
+  defaultTo = "",
   onClose,
   onSent,
 }: {
   taskCode: string;
   evidence?: EvidenceItem[];
+  defaultTo?: string;
   onClose: () => void;
   onSent: () => void;
 }) {
-  const [to, setTo] = useState("");
+  const [to, setTo] = useState(defaultTo);
   const [subject, setSubject] = useState("Status update requested");
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);

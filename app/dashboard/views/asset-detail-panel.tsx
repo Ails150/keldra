@@ -15,6 +15,9 @@ import {
 } from "@/lib/supabase/mer-field";
 import { forecastAsset, gateForSystem } from "@/lib/assets/gate-map";
 import type { DbGate } from "@/lib/org/dashboard-data";
+import { useTaskEmails, EmailUpdateModal } from "../tasks/[activity_id]/task-emails";
+
+const DEMO_CHASE_RECIPIENT = process.env.NEXT_PUBLIC_DEMO_CHASE_RECIPIENT ?? "";
 
 type FieldCapture = {
   kind: "photo" | "voice";
@@ -214,6 +217,11 @@ export default function AssetDetailPanel({
     finally { setActing(false); }
   }, [assetIdForTag, loadTag]);
 
+  // Chase-owner email thread for this asset (reuses the task-email machinery
+  // with taskCode = asset_id, so a reply threads back onto the asset).
+  const [chaseOpen, setChaseOpen] = useState(false);
+  const { activities: chaseThread, canEmail, reload: reloadChase } = useTaskEmails(assetIdForTag);
+
   if (!asset) return null;
 
   const activityId = (asset.activity_id ?? "").toString().trim();
@@ -268,8 +276,10 @@ export default function AssetDetailPanel({
         ? "bg-amber-500"
         : "bg-red-500";
 
-  const ownerName = (asset.owner_name ?? "").toString().trim();
-  const ownerOrg = (asset.owner_org ?? "").toString().trim();
+  // SINGLE owner source: the tag's named owner (asset_tags.owner_name) when the
+  // asset is tagged, else the register's owner. Prevents the two-owner mismatch.
+  const ownerName = (tagData?.owner?.name ?? asset.owner_name ?? "").toString().trim();
+  const ownerOrg = (tagData?.owner?.org ?? asset.owner_org ?? "").toString().trim();
   const ownerBlank = ownerName === "";
   const stage = (asset.current_stage ?? "").toString().trim();
   const stageLower = stage.toLowerCase();
@@ -453,17 +463,7 @@ export default function AssetDetailPanel({
                   </div>
                 )}
 
-                {/* named owner */}
-                {tagData.owner && (
-                  <div className="mt-4 flex items-center gap-3 rounded-xl border border-paper-line bg-paper-card p-3">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold text-paper" style={{ backgroundColor: deriveOrgColour(tagData.owner.org) }}>{getInitials(tagData.owner.name)}</span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-ink">{tagData.owner.name}</p>
-                      <p className="text-[11px] text-ink-mid">Owner{tagData.achievedDate ? ` · since ${fmtDay(tagData.achievedDate)}` : ""}</p>
-                    </div>
-                    {tagData.owner.org && <span className="ml-auto rounded-full bg-paper-warm px-2.5 py-1 text-[10px] font-semibold text-ink">{tagData.owner.org}</span>}
-                  </div>
-                )}
+                {/* (single owner source — rendered once in the Owner section below) */}
 
                 {/* history — who / what / where / when / why / how */}
                 {tagData.history.length > 0 && (
@@ -561,7 +561,7 @@ export default function AssetDetailPanel({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-ink">{ownerName}</p>
                   <p className="text-xs text-ink-mid">
-                    {(asset.owner_role ?? "Owner").toString()}
+                    {tagData?.owner ? "Owner" : (asset.owner_role ?? "Owner").toString()}
                   </p>
                 </div>
                 {ownerOrg && (
@@ -578,6 +578,32 @@ export default function AssetDetailPanel({
                   asset.installed_date ?? asset.delivered_date ?? asset.red_tag_date,
                 )}
               </p>
+            )}
+
+            {/* Chase owner — real email via the existing thread machinery; the
+                reply threads back onto this asset (taskCode = asset_id). */}
+            {canEmail && (
+              <button
+                type="button"
+                onClick={() => setChaseOpen(true)}
+                className="mt-3 rounded-xl bg-ink px-3.5 py-2 text-xs font-medium text-paper transition-colors hover:bg-accent"
+              >
+                ✉ Chase owner
+              </button>
+            )}
+
+            {chaseThread.length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {chaseThread.map((e) => (
+                  <li key={e.id} className={`rounded-xl border p-3 ${e.direction === "inbound" ? "border-accent/40 bg-accent/5" : "border-paper-line bg-paper-card"}`}>
+                    <p className="text-[11px] text-ink-mid">
+                      {e.direction === "inbound" ? "● reply in" : "chase out"} · {new Date(e.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                    <p className="mt-0.5 text-xs font-medium text-ink">{e.subject}</p>
+                    {e.body && <p className="mt-0.5 text-xs text-ink-mid line-clamp-3">{e.body}</p>}
+                  </li>
+                ))}
+              </ul>
             )}
           </section>
 
@@ -851,6 +877,15 @@ export default function AssetDetailPanel({
           </button>
         </footer>
       </aside>
+
+      {chaseOpen && (
+        <EmailUpdateModal
+          taskCode={assetIdForTag}
+          defaultTo={DEMO_CHASE_RECIPIENT}
+          onClose={() => setChaseOpen(false)}
+          onSent={() => { setChaseOpen(false); void reloadChase(); }}
+        />
+      )}
 
       {lightbox && (
         <div
