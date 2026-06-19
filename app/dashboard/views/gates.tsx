@@ -367,6 +367,13 @@ function DbGatesView({
                 {p.label}
                 {sum && sum.total > 0 ? ` · ${sum.signed}/${sum.total} signed` : g.openBlockers > 0 ? ` · ${g.openBlockers} open` : ""}
               </p>
+              {g.tagCounts.total > 0 && (
+                <p className="font-mono" style={{ fontSize: 10.5, marginTop: 6, display: "flex", gap: 8 }}>
+                  <span style={{ color: BRAND.dangerInk }}>🔴 {g.tagCounts.red}</span>
+                  <span style={{ color: BRAND.warningInk }}>🟡 {g.tagCounts.yellow}</span>
+                  <span style={{ color: BRAND.successInk }}>🟢 {g.tagCounts.green}</span>
+                </p>
+              )}
             </button>
           );
         })}
@@ -392,6 +399,15 @@ function DbGatesView({
           <h2 className="font-[family-name:var(--font-fraunces)]" style={{ fontSize: 20, lineHeight: 1.35, color: BRAND.successInk, marginTop: 8 }}>
             Cleared{selSum && selSum.total > 0 ? ` · all ${selSum.total} items signed off` : ""}
           </h2>
+        )}
+
+        {sel.tagCounts.total > 0 && (
+          <p style={{ fontSize: 12.5, color: BRAND.inkMuted, marginTop: 8, lineHeight: 1.5 }}>
+            Rolls up from <b style={{ color: BRAND.ink }}>{sel.tagCounts.total}</b> tagged assets ·{" "}
+            <span style={{ color: BRAND.dangerInk }}>{sel.tagCounts.red} red</span>,{" "}
+            <span style={{ color: BRAND.warningInk }}>{sel.tagCounts.yellow} yellow</span>,{" "}
+            <span style={{ color: BRAND.successInk }}>{sel.tagCounts.green} green</span> — clears when all reach green.
+          </p>
         )}
 
         {sel.impactNarrative && (

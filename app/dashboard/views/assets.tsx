@@ -40,7 +40,7 @@ export default function AssetsView({
   blockerMap: BlockerMap | null;
   onOpenBlocker: (id: string) => void;
 }) {
-  const { assets: liveAssets, openBlockers } = useDemo();
+  const { assets: liveAssets, openBlockers, burnPerDay } = useDemo();
   const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
   const [query, setQuery] = useState("");
   const [tagsById, setTagsById] = useState<Record<string, TagRow>>({});
@@ -72,6 +72,11 @@ export default function AssetsView({
   }, [openBlockers]);
 
   const tagged = Object.keys(tagsById).length > 0;
+  const counts = useMemo(() => {
+    let red = 0, yellow = 0, green = 0;
+    for (const t of Object.values(tagsById)) { if (t.tag === "red") red++; else if (t.tag === "yellow") yellow++; else if (t.tag === "green") green++; }
+    return { red, yellow, green };
+  }, [tagsById]);
 
   const rows = useMemo(() => {
     let list = liveAssets.slice();
@@ -131,8 +136,18 @@ export default function AssetsView({
         </p>
       </header>
 
+      {/* Rollup cards — tags are the spine; gates roll up from these */}
+      {tagged && (
+        <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <RollupCard label="Green · operational" value={counts.green} tone="#2f7d3a" />
+          <RollupCard label="Yellow · at risk" value={counts.yellow} tone="#9a6b00" />
+          <RollupCard label="Red · in place" value={counts.red} tone="#b3274d" />
+          <RollupCard label="Live exposure" value={`£${Math.round(burnPerDay / 1000)}k/day`} tone="#b3274d" />
+        </div>
+      )}
+
       {/* Tag filters + date popover */}
-      <div className="mt-6 flex flex-wrap items-center gap-2">
+      <div className={`${tagged ? "mt-5" : "mt-6"} flex flex-wrap items-center gap-2`}>
         <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-ink-mid">Filter</span>
         {CHIPS.map((c) => (
           <button
@@ -252,6 +267,15 @@ export default function AssetsView({
         onOpenBlocker={(id) => { setSelectedAsset(null); onOpenBlocker(id); }}
       />
     </section>
+  );
+}
+
+function RollupCard({ label, value, tone }: { label: string; value: string | number; tone: string }) {
+  return (
+    <div className="rounded-2xl border border-paper-line bg-paper-card p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">{label}</p>
+      <p className="mt-1 font-[family-name:var(--font-fraunces)] font-semibold" style={{ fontSize: 28, lineHeight: 1, color: tone }}>{value}</p>
+    </div>
   );
 }
 

@@ -11,6 +11,7 @@ import {
 } from "@/app/dashboard/lib/baseline-seed";
 import { computeGateImpacts, impactBadge, impactNarrative, type Milestone } from "@/lib/gates/impact";
 import { verifyBlockerChain } from "@/lib/blockers/event-hash";
+import { generateAssets } from "@/app/dashboard/lib/demo-assets";
 
 export type DbGate = {
   code: string;
@@ -29,7 +30,22 @@ export type DbGate = {
   milestoneSlipDays: number;
   impactBadge: string;
   impactNarrative: string | null;
+  // Tags roll up FROM assets: count of this gate's assets at each tag. An ADDED
+  // signal beside the sign-off/blocker status — does not change `status`.
+  tagCounts: { red: number; yellow: number; green: number; total: number };
 };
+
+// Provisional asset→gate heuristic (by system). Flagged as an open question in
+// keldra-tag-model-plan.md; a single derivation point to revise once confirmed.
+export function gateForSystem(system: string): string | null {
+  switch ((system || "").toLowerCase()) {
+    case "power": return "B";
+    case "cooling": return "C";
+    case "controls": return "D";
+    case "fire": return "E";
+    default: return null;
+  }
+}
 
 export type LoadedDashboard = {
   project: WizardData;
@@ -272,6 +288,26 @@ export async function loadOrgDashboard(
     now,
   );
 
+  // Tags roll up FROM assets: count each gate's assets per tag. Asset tags live
+  // in the DB keyed by asset_id; the system (→ gate) comes from the register.
+  const tagByGate = new Map<string, { red: number; yellow: number; green: number; total: number }>();
+  try {
+    const { data: at } = await supabase.from("asset_tags").select("asset_id, tag").eq("org_id", orgId);
+    if (at && at.length) {
+      const systemById = new Map<string, string>();
+      for (const a of generateAssets()) systemById.set(a.asset_id, a.system);
+      for (const row of at as { asset_id: string; tag: string }[]) {
+        const gate = gateForSystem(systemById.get(row.asset_id) ?? "");
+        if (!gate) continue;
+        const c = tagByGate.get(gate) ?? { red: 0, yellow: 0, green: 0, total: 0 };
+        if (row.tag === "red" || row.tag === "yellow" || row.tag === "green") { c[row.tag] += 1; c.total += 1; }
+        tagByGate.set(gate, c);
+      }
+    }
+  } catch {
+    /* asset_tags not migrated yet → no tag rollup */
+  }
+
   let priorBlocked = false;
   const gates: DbGate[] = ordered.map((g) => {
     const st = gateStats.get(g.code) ?? { open: 0, burn: 0, oldest: now };
@@ -279,6 +315,7 @@ export async function loadOrgDashboard(
     if (st.open > 0) priorBlocked = true;
     const imp = impacts.get(g.code);
     return {
+      tagCounts: tagByGate.get(g.code) ?? { red: 0, yellow: 0, green: 0, total: 0 },
       code: g.code,
       name: g.name,
       target_date: g.target_date,
