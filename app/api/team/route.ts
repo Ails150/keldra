@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
       // Evidence product: revoke access (permanent ban) + drop the profile, but
       // KEEP auth.users so all history stays attributed. Never hard-delete.
       await admin.auth.admin.updateUserById(userId, { ban_duration: BAN_FOREVER });
-      const { error } = await admin.from("users").delete().eq("id", userId);
+      const { error } = await admin.from("users").delete().eq("id", userId).eq("org_id", orgId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({
         ok: true,
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
       if (!ROLES.includes(body.role ?? "")) {
         return NextResponse.json({ error: "Unknown role." }, { status: 400 });
       }
-      const { error } = await admin.from("users").update({ role: body.role }).eq("id", userId);
+      const { error } = await admin.from("users").update({ role: body.role }).eq("id", userId).eq("org_id", orgId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ ok: true, message: `Role changed to ${body.role}.` });
     }
