@@ -13,6 +13,8 @@ import {
   subscribeFieldEvents,
   type MerFieldEvent,
 } from "@/lib/supabase/mer-field";
+import { forecastAsset, gateForSystem } from "@/lib/assets/gate-map";
+import type { DbGate } from "@/lib/org/dashboard-data";
 
 type FieldCapture = {
   kind: "photo" | "voice";
@@ -168,6 +170,7 @@ type Props = {
   onClose: () => void;
   onOpenBlocker: (id: string) => void;
   xer?: ParsedXer | null;
+  dbGates?: DbGate[];
 };
 
 export default function AssetDetailPanel({
@@ -176,6 +179,7 @@ export default function AssetDetailPanel({
   onClose,
   onOpenBlocker,
   xer,
+  dbGates,
 }: Props) {
   const [lightbox, setLightbox] = useState<FieldCapture | null>(null);
 
@@ -344,6 +348,10 @@ export default function AssetDetailPanel({
             const tag = tagData.tag;
             const next = tag === "red" ? "Yellow" : tag === "yellow" ? "Green" : null;
             const st = STATUS_PILL[tagData.status] ?? STATUS_PILL.in_progress;
+            const outstandingCount = tagData.checklist.filter((it) => it.status !== "approved").length;
+            const fc = forecastAsset(tag, outstandingCount, tagData.targetDate);
+            const gateCode = gateForSystem((asset.system ?? "").toString());
+            const g = (dbGates ?? []).find((x) => x.code === gateCode) ?? null;
             return (
               <section>
                 <p className="text-xs font-semibold uppercase tracking-wide text-ink-mid mb-2">Commissioning tag</p>
@@ -357,8 +365,8 @@ export default function AssetDetailPanel({
                   <span className={`ml-auto rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${st.classes}`}>{st.label}</span>
                 </div>
 
-                {/* dates / days-at-tag strip */}
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                {/* dates / days-at-tag / forecast strip */}
+                <div className="mt-3 grid grid-cols-3 gap-2">
                   <div className="rounded-xl border border-paper-line bg-paper-card p-3">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">{tag} delivered</p>
                     <p className="mt-1 text-sm font-medium text-ink">{fmtDay(tagData.achievedDate)}</p>
@@ -366,6 +374,10 @@ export default function AssetDetailPanel({
                   <div className="rounded-xl border border-paper-line bg-paper-card p-3">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">Days at {tag}</p>
                     <p className="mt-1 text-sm font-medium text-ink">{tagData.daysAtTag == null ? "—" : `${tagData.daysAtTag}d`}</p>
+                  </div>
+                  <div className="rounded-xl border border-paper-line bg-paper-card p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">{next ?? "Next"} forecast</p>
+                    <p className="mt-1 text-sm font-medium" style={{ color: fc.onTrack ? "#2f7d3a" : "#b3274d" }}>{next ? (fc.onTrack ? "on track" : `+${fc.lateDays}d late`) : "—"}</p>
                   </div>
                 </div>
 
@@ -414,6 +426,24 @@ export default function AssetDetailPanel({
                   );
                 })()}
                 {tag === "green" && <p className="mt-3 text-sm text-green-800">Operational — fully commissioned.</p>}
+
+                {/* Follow-on impact — what this one tag holds up (tag → gate → milestone) */}
+                {g && (next || !fc.onTrack) && (
+                  <div className="mt-4">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-mid">Follow-on impact · what this tag holds up</p>
+                    <div className="flex flex-wrap items-stretch gap-1.5 text-[11px]">
+                      <CascadeNode title="This tag" body={next ? `${tag} → ${next}` : tag} detail={fc.onTrack ? "on track" : `+${fc.lateDays}d late`} hot={!fc.onTrack} />
+                      <span className="flex items-center text-red-500">→</span>
+                      <CascadeNode title="Rolls into" body={`Gate ${g.code} · ${g.name ?? ""}`} detail={g.status === "blocked" ? `blocked${g.tagCounts.red ? ` · ${g.tagCounts.red} red` : ""}` : g.status} hot={g.status === "blocked"} />
+                      {g.milestoneName && (
+                        <>
+                          <span className="flex items-center text-red-500">→</span>
+                          <CascadeNode title="Which delays" body={g.milestoneName} detail={g.milestoneSlipDays > 0 ? `${g.milestoneSlipDays}d late` : "on target"} hot={g.milestoneSlipDays > 0} />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* named owner */}
                 {tagData.owner && (
@@ -1015,6 +1045,16 @@ function HistoryFromCsv({ asset }: { asset: any }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+function CascadeNode({ title, body, detail, hot }: { title: string; body: string; detail: string; hot?: boolean }) {
+  return (
+    <div className="rounded-xl border p-2.5" style={{ minWidth: 96, flex: "1 1 0", borderColor: hot ? "#eccdd8" : "#e6ddf3", background: hot ? "linear-gradient(160deg,#fdeef2,#fff)" : "#fff" }}>
+      <p className="text-[9px] font-semibold uppercase tracking-wide text-ink-mid">{title}</p>
+      <p className="mt-0.5 text-[12px] font-medium leading-tight text-ink">{body}</p>
+      <p className="mt-1 text-[11px] font-semibold" style={{ color: hot ? "#b3274d" : "#6b5d85" }}>{detail}</p>
+    </div>
   );
 }
 

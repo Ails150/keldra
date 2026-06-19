@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { WizardData, ViewingAs } from "../../onboarding/types";
 import type { BlockerMap } from "../lib/blocker-state";
+import type { DbGate } from "@/lib/org/dashboard-data";
+import { forecastAsset, gateForSystem } from "@/lib/assets/gate-map";
 import { useDemo } from "../demo-store";
 import AssetDetailPanel from "./asset-detail-panel";
 
@@ -14,6 +16,7 @@ type TagRow = {
   tag: "red" | "yellow" | "green";
   status: "achieved" | "in_progress" | "late" | "blocked";
   achievedDate: string | null;
+  targetDate: string | null;
   daysAtTag: number | null;
   done: number;
   total: number;
@@ -32,6 +35,7 @@ export default function AssetsView({
   onClearHighlight,
   blockerMap,
   onOpenBlocker,
+  dbGates,
 }: {
   project: WizardData;
   viewingAs: ViewingAs;
@@ -39,6 +43,7 @@ export default function AssetsView({
   onClearHighlight?: () => void;
   blockerMap: BlockerMap | null;
   onOpenBlocker: (id: string) => void;
+  dbGates?: DbGate[];
 }) {
   const { assets: liveAssets, openBlockers, burnPerDay } = useDemo();
   const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
@@ -72,6 +77,18 @@ export default function AssetsView({
   }, [openBlockers]);
 
   const tagged = Object.keys(tagsById).length > 0;
+
+  // Register-level follow-on impact: tags → blocked gates → worst milestone slip.
+  const impact = useMemo(() => {
+    const gates = dbGates ?? [];
+    if (!gates.length) return null;
+    const blocked = gates.filter((g) => g.status === "blocked");
+    const redBelow = gates.reduce((s, g) => s + g.tagCounts.red, 0);
+    const worst = gates.filter((g) => g.milestoneName && g.milestoneSlipDays > 0).sort((a, b) => b.milestoneSlipDays - a.milestoneSlipDays)[0];
+    if (!blocked.length && !worst) return null;
+    return { blockedCount: blocked.length, redBelow, milestone: worst?.milestoneName ?? null, slip: worst?.milestoneSlipDays ?? 0, gateCode: worst?.code ?? blocked[0]?.code ?? null };
+  }, [dbGates]);
+
   const counts = useMemo(() => {
     let red = 0, yellow = 0, green = 0;
     for (const t of Object.values(tagsById)) { if (t.tag === "red") red++; else if (t.tag === "yellow") yellow++; else if (t.tag === "green") green++; }
@@ -135,6 +152,17 @@ export default function AssetsView({
           {liveAssets.length} assets across the MER commissioning register · tags are the spine, gates roll up from them.
         </p>
       </header>
+
+      {/* Follow-on impact cascade — tags → gates → milestone */}
+      {impact && (impact.slip > 0 || impact.redBelow > 0) && (
+        <div className="mt-5 rounded-2xl border p-4" style={{ borderColor: "#eccdd8", background: "linear-gradient(120deg,#fdeef2,#fff)" }}>
+          <p className="text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: "#b3274d" }}>Follow-on impact · tags → gates → milestone</p>
+          <p className="mt-1.5 font-[family-name:var(--font-fraunces)]" style={{ fontSize: 18, color: "#1c1230", lineHeight: 1.35 }}>
+            <b>{impact.redBelow}</b> assets below Green are holding <b>{impact.blockedCount} gate{impact.blockedCount === 1 ? "" : "s"}</b>
+            {impact.milestone && impact.slip > 0 ? <> — pushing <b style={{ color: "#b3274d" }}>{impact.milestone} {impact.slip} days late</b>.</> : "."}
+          </p>
+        </div>
+      )}
 
       {/* Rollup cards — tags are the spine; gates roll up from these */}
       {tagged && (
@@ -216,7 +244,7 @@ export default function AssetsView({
           <table className="w-full border-collapse text-left">
             <thead className="sticky top-0 z-10 bg-paper-warm">
               <tr className="text-[10px] font-semibold uppercase tracking-wide text-ink-mid">
-                <Th>Asset</Th><Th>System</Th><Th>Tag</Th><Th>Status</Th><Th>Progressing to</Th><Th>Days at tag</Th><Th right>£/day</Th>
+                <Th>Asset</Th><Th>System</Th><Th>Tag</Th><Th>Status</Th><Th>Progressing to</Th><Th>Days at tag</Th><Th>Delay</Th><Th right>£/day</Th>
               </tr>
             </thead>
             <tbody>
@@ -245,6 +273,13 @@ export default function AssetsView({
                       {t ? (t.tag === "green" ? "operational" : <>→ <b className="text-purple-900">{t.tag === "red" ? "Yellow" : "Green"}</b> · {t.done} of {t.total} done</>) : "—"}
                     </td>
                     <Td muted>{t?.daysAtTag == null ? "—" : `${t.daysAtTag}d`}</Td>
+                    <td className="px-3 py-2 text-[12px] font-medium">
+                      {(() => {
+                        if (!t) return <span className="text-ink-mid">—</span>;
+                        const f = forecastAsset(t.tag, t.total - t.done, t.targetDate);
+                        return f.onTrack ? <span style={{ color: "#2f7d3a" }}>{t.tag === "green" ? "done" : "on track"}</span> : <span style={{ color: "#b3274d" }}>+{f.lateDays}d late</span>;
+                      })()}
+                    </td>
                     <td className="px-3 py-2 text-right font-medium" style={{ color: burn ? "#b91c1c" : "#9ca3af" }}>
                       {burn ? `£${Math.round(burn / 1000)}k` : "—"}
                     </td>
@@ -263,6 +298,7 @@ export default function AssetsView({
         asset={selectedAsset}
         blockerMap={blockerMap}
         xer={project.uploads.xer}
+        dbGates={dbGates}
         onClose={() => setSelectedAsset(null)}
         onOpenBlocker={(id) => { setSelectedAsset(null); onOpenBlocker(id); }}
       />

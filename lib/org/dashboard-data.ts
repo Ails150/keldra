@@ -12,6 +12,7 @@ import {
 import { computeGateImpacts, impactBadge, impactNarrative, type Milestone } from "@/lib/gates/impact";
 import { verifyBlockerChain } from "@/lib/blockers/event-hash";
 import { generateAssets } from "@/app/dashboard/lib/demo-assets";
+import { gateForSystem } from "@/lib/assets/gate-map";
 
 export type DbGate = {
   code: string;
@@ -34,18 +35,6 @@ export type DbGate = {
   // signal beside the sign-off/blocker status — does not change `status`.
   tagCounts: { red: number; yellow: number; green: number; total: number };
 };
-
-// Provisional asset→gate heuristic (by system). Flagged as an open question in
-// keldra-tag-model-plan.md; a single derivation point to revise once confirmed.
-export function gateForSystem(system: string): string | null {
-  switch ((system || "").toLowerCase()) {
-    case "power": return "B";
-    case "cooling": return "C";
-    case "controls": return "D";
-    case "fire": return "E";
-    default: return null;
-  }
-}
 
 export type LoadedDashboard = {
   project: WizardData;

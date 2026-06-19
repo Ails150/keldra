@@ -614,6 +614,7 @@ export default function DashboardShell({
             onClearHighlight={() => setAssetFilter(null)}
             blockerMap={blockerMap}
             onOpenBlocker={openBlocker}
+            dbGates={dbDashboard?.gates}
           />
         )}
         {tab === "constraints" && (
