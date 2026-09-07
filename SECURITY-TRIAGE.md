@@ -1,5 +1,14 @@
 # Keldra Security Triage
 
+> **Superseded — every item below (C1, C2, H2, M1, M2, M3, L1, L2) is applied.**
+> M3 was folded into `supabase-harden-identity.sql` alongside C1.
+> See `docs/audit/REPORT.md` (7 Sep 2026) for the state of each item, the six new
+> findings raised since, and `scripts/audit/` for the re-runnable proof (122
+> probes, 0 failures). Confirmed live: an authenticated session gets 403 on
+> `PATCH /users`, `POST /organisations` and `POST /org_invite_links`
+> (`docs/audit/evidence/isolation.txt`, group 4). Kept for the original evidence
+> and reasoning.
+
 Status: **proposed fixes — nothing applied yet.** Derived from the read-only audit
 (API routes, RLS, secrets, audit-trail/injection). Each item has evidence, a
 concrete fix, effort, the risk if deferred, and how to verify. Apply in the

@@ -5,7 +5,7 @@
 **Method:** the phase structure used for Quottrr's `docs/audit` — inventory, exposure, auth, input, secrets, logging, GDPR — with tenant isolation proven by executable probes rather than by reading code.
 **Commercial context:** the first paying user is a single commissioning consultant with his own workspace, holding data he controls. The three questions that mattered most were therefore: *nothing leaks between workspaces*, *keys and tokens at rest*, *auth on every function*.
 
-**Result:** 122 probes run, 0 failures. Three open triage items (M2, L1, L2) closed and proven. Six new findings raised, two of them fixed in this run. **No cross-tenant leak was found on any path tested.** The material residual risk is not in the application — it is that there is no dev project, no point-in-time recovery, and no data-protection apparatus at all.
+**Result:** 122 probes run, 0 failures. The three open triage items (M2, L1, L2) are closed and proven, which clears the whole of `SECURITY-TRIAGE.md` — C1, C2, H2, M1 and M3 were already applied, and group 4 of the isolation suite re-proves them. Six new findings raised, two of them fixed in this run. **No cross-tenant leak was found on any path tested.** The material residual risk is not in the application — it is that there is no dev project, no point-in-time recovery, and no data-protection apparatus at all.
 
 ---
 
