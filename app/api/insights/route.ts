@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { authedActor } from '@/lib/auth/api-auth';
+import { rateLimit } from '@/lib/security/rate-limit';
 
 // Note: `export const dynamic = 'force-dynamic'` was removed — it's no longer a
 // supported route-segment-config option in Next 16 (see route-segment-config
@@ -25,8 +27,56 @@ interface ProjectState {
   }>;
 }
 
+// Insights are refreshed on dashboard load, so the budget is per-minute rather
+// than per-hour, but still bounded to cap GEMINI_API_KEY spend.
+const LIMIT = 20;
+const WINDOW_MS = 60 * 1000; // per minute, per user
+
+// Security (L2). /dashboard is deliberately reachable logged-out (the public
+// synthetic demo), and the demo renders this panel — so a hard 401 would break
+// it. Instead the paid path is what's gated:
+//
+//   authenticated  -> Gemini, rate limited per user id
+//   anonymous      -> rule-based alerts only, never a Gemini call, rate limited
+//                     per IP so the rule engine can't be hammered either
+//
+// That closes the L2 hole (nobody can spend GEMINI_API_KEY without an account,
+// and no anonymous payload is forwarded to Google) with the demo left working.
+//
+// The route reads no database of its own — the caller POSTs its project state —
+// but for a signed-in user that payload carries real blocker text, asset ids and
+// named people, so the Gemini path is authenticated-only by design.
+function clientIp(req: NextRequest): string {
+  const fwd = req.headers.get('x-forwarded-for');
+  if (fwd) return fwd.split(',')[0].trim();
+  return req.headers.get('x-real-ip') ?? 'unknown';
+}
+
 export async function POST(req: NextRequest) {
-  const projectState: ProjectState = await req.json();
+  const actor = await authedActor(req);
+
+  const bucket = actor ? `insights:user:${actor.userId}` : `insights:anon:${clientIp(req)}`;
+  const limit = rateLimit(bucket, LIMIT, WINDOW_MS);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Try again shortly.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } },
+    );
+  }
+
+  let projectState: ProjectState;
+  try {
+    projectState = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  }
+
+  // Anonymous demo: deterministic rules only. No API key is ever spent, and the
+  // posted payload never leaves the server.
+  if (!actor) {
+    return NextResponse.json({ alerts: generateRuleBasedAlerts(projectState), source: 'rules' });
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {

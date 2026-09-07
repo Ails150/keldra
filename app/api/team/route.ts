@@ -55,6 +55,32 @@ export async function GET() {
   return NextResponse.json({ people });
 }
 
+// M2 defence-in-depth. The public.users writes below are org-scoped with
+// .eq("org_id", orgId), but the GoTrue admin calls (deleteUser / updateUserById)
+// address a bare auth user id — auth.users has no org_id, so there is no filter
+// to add. Without this, a refactor that dropped the single target-org check at
+// the top of POST would silently turn every one of them into a cross-org user
+// takeover. Re-assert membership immediately before each destructive auth call
+// so the guarantee doesn't rest on one distant guard.
+async function assertStillInOrg(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  orgId: string,
+): Promise<boolean> {
+  const { data } = await admin
+    .from("users")
+    .select("id")
+    .eq("id", userId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  return !!data;
+}
+
+// A function, not a shared constant: a NextResponse body is a single-use stream,
+// so one module-level instance would break on the second request that hit it.
+const crossOrg = () =>
+  NextResponse.json({ error: "Person not found in your org." }, { status: 404 });
+
 export async function POST(request: NextRequest) {
   const state = await getSessionState();
   if (state.status !== "ready" || !state.profile.org_id || !isAdminRole(state.profile.role)) {
@@ -127,16 +153,19 @@ export async function POST(request: NextRequest) {
     }
     case "cancel": {
       // Pending only — no history to preserve, so a hard delete is safe.
+      if (!(await assertStillInOrg(admin, userId, orgId))) return crossOrg();
       const { error } = await admin.auth.admin.deleteUser(userId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ ok: true, message: "Invite cancelled." });
     }
     case "suspend": {
+      if (!(await assertStillInOrg(admin, userId, orgId))) return crossOrg();
       const { error } = await admin.auth.admin.updateUserById(userId, { ban_duration: BAN_FOREVER });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ ok: true, message: "Access suspended — history kept." });
     }
     case "reactivate": {
+      if (!(await assertStillInOrg(admin, userId, orgId))) return crossOrg();
       const { error } = await admin.auth.admin.updateUserById(userId, { ban_duration: "none" });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ ok: true, message: "Access reactivated." });
@@ -144,6 +173,7 @@ export async function POST(request: NextRequest) {
     case "remove": {
       // Evidence product: revoke access (permanent ban) + drop the profile, but
       // KEEP auth.users so all history stays attributed. Never hard-delete.
+      if (!(await assertStillInOrg(admin, userId, orgId))) return crossOrg();
       await admin.auth.admin.updateUserById(userId, { ban_duration: BAN_FOREVER });
       const { error } = await admin.from("users").delete().eq("id", userId).eq("org_id", orgId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });

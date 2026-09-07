@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
     .from("org_invite_links")
     .update({ expires_at: new Date().toISOString() })
     .eq("id", body.id)
+    .eq("org_id", state.profile.org_id) // defence-in-depth: only revoke own-org invites
     .select("id")
     .maybeSingle();
 

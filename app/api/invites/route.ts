@@ -15,6 +15,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("org_invite_links")
     .select("id, token, role, expires_at, max_uses, use_count, created_at")
+    .eq("org_id", state.profile.org_id) // defence-in-depth: RLS also scopes this
     .order("created_at", { ascending: false });
 
   if (error) {

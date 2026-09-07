@@ -285,21 +285,21 @@ config screen). Default cadence: step 1 at +2 days, step 2 (CC escalation
 contact) at +4, step 3 (flag-to-report) at +7, from when the sequence starts.
 
 1. **Set `CRON_SECRET`** in `.env.local` AND Netlify (a long random string).
-2. **Wire the pg_cron tick** in Supabase SQL editor (needs `pg_cron` + `pg_net`,
-   both available on Supabase). Replace the secret with your `CRON_SECRET`:
-   ```sql
-   create extension if not exists pg_cron;
-   create extension if not exists pg_net;
-   select cron.schedule('keldra-sequence-tick', '*/15 * * * *', $$
-     select net.http_post(
-       url     := 'https://app.keldra.io/api/sequences/tick',
-       headers := jsonb_build_object('x-cron-secret', '<YOUR_CRON_SECRET>'),
-       body    := '{}'::jsonb
-     );
-   $$);
-   ```
-   (Every 15 min; the engine only sends within the org's working hours + daily
-   cap.)
+2. **Wire the pg_cron tick** by running `supabase-sequences-cron.sql` in the
+   Supabase SQL editor (needs `pg_cron` + `pg_net`, both available on Supabase).
+   Set the two literals at the top of its step-2 block first — that migration
+   puts the URL and the secret in **Vault** and has the cron command read them
+   back at run time. (Every 15 min; the engine only sends within the org's
+   working hours + daily cap.)
+
+   > **Do not paste the secret into `cron.schedule` directly.** Anything written
+   > into the schedule is stored in clear text in `cron.job.command`, which is
+   > readable by any role that can select from `cron.job` and shows up in query
+   > logs. Earlier versions of this runbook showed an inline
+   > `jsonb_build_object('x-cron-secret', '<YOUR_CRON_SECRET>')` snippet — if the
+   > live job was created that way, rotate `CRON_SECRET` and re-run
+   > `supabase-sequences-cron.sql`. `supabase-verify-cron-secret.sql` reports
+   > which of the two shapes is live.
 3. **Enable an org:** sign in as superadmin → `/dashboard/admin/config` → pick the
    org → tick **"Enable automatic sending for this org"** → Save. (Edit the step
    copy / working hours / daily cap in the `sequence` JSON on the same screen.)
@@ -320,7 +320,7 @@ contact) at +4, step 3 (flag-to-report) at +7, from when the sequence starts.
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → **Project Settings → API** → "Project API keys" → reveal **`service_role`** → copy | `.env.local` **and** Netlify |
 | `RESEND_API_KEY` | Resend → **API Keys** → **Create API Key** (Full access or Sending) → copy once | `.env.local` **and** Netlify |
 | `RESEND_WEBHOOK_SECRET` | Resend → **Webhooks** → open your inbound (`email.received`) endpoint → **Signing Secret** (`whsec_…`) → copy | `.env.local` **and** Netlify |
-| `CRON_SECRET` | Invent a long random string (e.g. `openssl rand -hex 32`) — the pg_cron tick sends it as `x-cron-secret` | `.env.local` **and** Netlify (+ paste into the pg_cron SQL) |
+| `CRON_SECRET` | Invent a long random string (e.g. `openssl rand -hex 32`) — the pg_cron tick sends it as `x-cron-secret` | `.env.local` **and** Netlify (+ store in Vault via `supabase-sequences-cron.sql` — never inline in `cron.schedule`) |
 | `NEXT_PUBLIC_SITE_URL` *(optional)* | Your production URL, `https://app.keldra.io` | `.env.local` **and** Netlify |
 | `NEXT_PUBLIC_SUPABASE_URL` *(exists)* | Supabase → Project Settings → API → Project URL | already set |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` *(exists)* | Supabase → Project Settings → API → `anon` `public` key | already set |

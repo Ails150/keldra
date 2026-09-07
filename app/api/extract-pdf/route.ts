@@ -1,13 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { authedActor } from "@/lib/auth/api-auth";
+import { rateLimit } from "@/lib/security/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+// A PDF extraction costs a multimodal Gemini call and up to 60s of compute, so
+// it is the most expensive thing an anonymous caller could loop. Tighter budget
+// than /insights.
+const LIMIT = 10;
+const WINDOW_MS = 60 * 60 * 1000; // per hour, per user
+
+// Cap the decoded PDF at ~15MB. Without this, one authenticated caller can post
+// an arbitrarily large base64 string and the JSON parse alone exhausts memory.
+const MAX_PDF_BYTES = 15 * 1024 * 1024;
+const MAX_B64_CHARS = Math.ceil(MAX_PDF_BYTES / 3) * 4;
+
 // Extracts programme activity rows from a PDF using Gemini (multimodal). Reuses
 // the existing GEMINI_API_KEY — no Anthropic key / new dependency required.
+//
+// Security (L2): authenticated + rate limited. The route holds no tenant data of
+// its own, but it spends GEMINI_API_KEY and forwards caller-supplied documents to
+// Google, so it must not be reachable anonymously.
 export async function POST(req: NextRequest) {
-  const { pdf_base64 } = await req.json();
+  const actor = await authedActor(req);
+  if (!actor) {
+    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
+  const limit = rateLimit(`extract-pdf:${actor.userId}`, LIMIT, WINDOW_MS);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded. Try again shortly." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
+
+  let pdf_base64: unknown;
+  try {
+    ({ pdf_base64 } = await req.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -17,6 +51,12 @@ export async function POST(req: NextRequest) {
   }
   if (!pdf_base64 || typeof pdf_base64 !== "string") {
     return NextResponse.json({ activities: [] }, { status: 200 });
+  }
+  if (pdf_base64.length > MAX_B64_CHARS) {
+    return NextResponse.json(
+      { activities: [], warning: "PDF too large (15MB limit)." },
+      { status: 413 },
+    );
   }
 
   try {

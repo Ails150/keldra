@@ -1,0 +1,86 @@
+Keldra exposure + auth sweep — fmeixgnxkcapxyhrjhvm (keldra-prod)
+Run: 2026-09-07T09:47:32.126Z
+App: http://localhost:3210
+
+1. Every app route, called with NO credentials
+-----------------------------------------------
+  ok    POST /api/admin/seed-sample -> 403
+  ok    POST /api/assets/tag -> 401
+  ok    GET /api/assets/tags -> 401
+  ok    POST /api/blockers/visibility -> 401
+  ok    POST /api/email/inbound -> 401 [PUBLIC BY DESIGN]
+        Resend webhook; gated by RESEND_WEBHOOK_SECRET signature
+  ok    POST /api/extract-pdf -> 401
+  ok    POST /api/field/capture -> 401
+  ok    GET /api/gates/export -> 401
+  ok    POST /api/gates/signoff -> 401
+  ok    GET /api/gates/signoff/history -> 401
+  ok    GET /api/health/setup -> 403
+  ok    POST /api/insights -> 200 [PUBLIC BY DESIGN]
+        public demo panel; anonymous callers get rule-based output only, never Gemini
+  ok    GET /api/invites -> 403
+  ok    POST /api/invites/direct -> 403
+  ok    POST /api/invites/direct/resend -> 403
+  ok    POST /api/invites/revoke -> 403
+  ok    POST /api/join -> 400 [PUBLIC BY DESIGN]
+        invite acceptance; gated by an unguessable invite token, not a session
+  ok    POST /api/onboarding/complete -> 403
+  ok    GET /api/org-commercials -> 403
+  ok    GET /api/org-config -> 403
+  ok    POST /api/sequences/control -> 403
+  ok    POST /api/sequences/start -> 403
+  ok    POST /api/sequences/tick -> 503 [PUBLIC BY DESIGN]
+        cron entry point; gated by the CRON_SECRET header
+  ok    POST /api/signup -> 400 [PUBLIC BY DESIGN]
+        public sign-up; creates a brand-new org, touches no existing tenant
+  ok    POST /api/tasks/assign -> 403
+  ok    GET /api/tasks/contacts -> 401
+  ok    POST /api/tasks/cost -> 403
+  ok    POST /api/tasks/email -> 401
+  ok    GET /api/tasks/export -> 401
+  ok    POST /api/tasks/notes -> 401
+  ok    GET /api/tasks/share -> 401
+  ok    GET /api/tasks/summary -> 401
+  ok    GET /api/team -> 403
+
+2. Anon PostgREST surface (no session, public anon key)
+--------------------------------------------------------
+  ok    anon GET /users -> 200, 0 row(s)
+  ok    anon GET /organisations -> 200, 0 row(s)
+  ok    anon GET /projects -> 200, 0 row(s)
+  ok    anon GET /tasks -> 200, 0 row(s)
+  ok    anon GET /gates -> 200, 0 row(s)
+  ok    anon GET /blockers -> 200, 0 row(s)
+  ok    anon GET /blocker_events -> 200, 0 row(s)
+  ok    anon GET /asset_tags -> 200, 0 row(s)
+  ok    anon GET /asset_tag_events -> 200, 0 row(s)
+  ok    anon GET /task_notes -> 200, 0 row(s)
+  ok    anon GET /task_emails -> 200, 0 row(s)
+  ok    anon GET /task_threads -> 200, 0 row(s)
+  ok    anon GET /task_email_attachments -> 200, 0 row(s)
+  ok    anon GET /gate_signoffs -> 200, 0 row(s)
+  ok    anon GET /org_invite_links -> 200, 0 row(s)
+  ok    anon GET /org_invites -> 200, 0 row(s)
+  ok    anon GET /org_config -> 200, 0 row(s)
+  ok    anon GET /roster -> 200, 0 row(s)
+  ok    anon GET /task_sequences -> 200, 0 row(s)
+  ok    anon GET /sequence_audit -> 200, 0 row(s)
+  ok    anon GET /milestones -> 200, 0 row(s)
+  ok    anon GET /task_contacts -> 404
+  ok    anon GET /task_assignments -> 200, 0 row(s)
+  ok    anon GET /task_summaries -> 200, 0 row(s)
+  ok    anon GET /inbound_unmatched -> 200, 0 row(s)
+  ok    anon GET /mer_field_events -> 200, 3 row(s), 0 org-owned
+        demo rows only, by design
+
+3. Storage buckets, unauthenticated
+------------------------------------
+  ok    anon list bucket gate-signatures -> 400
+        no objects listed
+  ok    anon list bucket task-email-attachments -> 400
+        no objects listed
+
+==============================================================================
+61 probes run | passed 61 | FAILED 0
+
+No unauthenticated route or table exposes tenant data.

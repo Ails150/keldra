@@ -1,0 +1,103 @@
+Keldra tenant-isolation suite — fmeixgnxkcapxyhrjhvm (keldra-prod)
+Run: 2026-09-07T09:47:25.982Z
+App-route probes: http://localhost:3210
+
+tenant A    : 236c9c3b-2633-4c7d-8f06-ed822ff853c2 (user d791cc4b-e13d-4761-ab33-322a67523b55)
+tenant B    : 683d7c67-1d4b-4e9c-aa8a-fb9f1dda1e27 (user 5575cfec-b4c5-41f5-a5be-8d48a11775ef)
+real tenant : 437ec2d5-0c94-4ba8-b8bb-328c3f780774 (Ardmac — read-only target, never written)
+
+1. PostgREST cross-tenant reads (tenant A session -> tenant B rows)
+-------------------------------------------------------------------
+  ok    GET /users?org_id=B -> 200 0 rows
+  ok    GET /projects?org_id=B -> 200 0 rows
+  ok    GET /tasks?org_id=B -> 200 0 rows
+  ok    GET /gates?org_id=B -> 200 0 rows
+  ok    GET /blockers?org_id=B -> 200 0 rows
+  ok    GET /blocker_events?org_id=B -> 200 0 rows
+  ok    GET /asset_tags?org_id=B -> 200 0 rows
+  ok    GET /asset_tag_events?org_id=B -> 200 0 rows
+  ok    GET /task_notes?org_id=B -> 200 0 rows
+  ok    GET /task_emails?org_id=B -> 200 0 rows
+  ok    GET /task_threads?org_id=B -> 200 0 rows
+  ok    GET /gate_signoffs?org_id=B -> 200 0 rows
+  ok    GET /org_invite_links?org_id=B -> 200 0 rows
+  ok    GET /org_config?org_id=B -> 200 0 rows
+  ok    GET /roster?org_id=B -> 200 0 rows
+  ok    GET /milestones?org_id=B -> 200 0 rows
+  ok    GET /task_assignments?org_id=B -> 200 0 rows
+  ok    GET /task_summaries?org_id=B -> 200 0 rows
+  ok    GET /mer_field_events?org_id=B -> 200 0 rows
+
+2. Same sweep against the real customer tenant (Ardmac)
+--------------------------------------------------------
+  ok    GET /users?org_id=Ardmac -> 200 0 rows
+  ok    GET /projects?org_id=Ardmac -> 200 0 rows
+  ok    GET /tasks?org_id=Ardmac -> 200 0 rows
+  ok    GET /gates?org_id=Ardmac -> 200 0 rows
+  ok    GET /blockers?org_id=Ardmac -> 200 0 rows
+  ok    GET /blocker_events?org_id=Ardmac -> 200 0 rows
+  ok    GET /asset_tags?org_id=Ardmac -> 200 0 rows
+  ok    GET /asset_tag_events?org_id=Ardmac -> 200 0 rows
+  ok    GET /task_notes?org_id=Ardmac -> 200 0 rows
+  ok    GET /task_emails?org_id=Ardmac -> 200 0 rows
+  ok    GET /task_threads?org_id=Ardmac -> 200 0 rows
+  ok    GET /gate_signoffs?org_id=Ardmac -> 200 0 rows
+  ok    GET /org_invite_links?org_id=Ardmac -> 200 0 rows
+  ok    GET /org_config?org_id=Ardmac -> 200 0 rows
+  ok    GET /roster?org_id=Ardmac -> 200 0 rows
+  ok    GET /milestones?org_id=Ardmac -> 200 0 rows
+  ok    GET /task_assignments?org_id=Ardmac -> 200 0 rows
+  ok    GET /task_summaries?org_id=Ardmac -> 200 0 rows
+  ok    GET /mer_field_events?org_id=Ardmac -> 200 0 rows
+
+3. Tampered tokens (claim injection on the token itself)
+--------------------------------------------------------
+  ok    GET /projects [edited sub -> tenant B user id] -> 401
+  ok    GET /projects [edited role claim -> service_role] -> 401
+  ok    GET /projects [injected app_metadata.org_id -> Ardmac] -> 401
+  ok    GET /projects [alg:none, sub = tenant B] -> 401
+  ok    GET /projects [alg:none, role = service_role] -> 401
+  ok    GET /projects [signature stripped] -> 401
+
+4. C1 regression — self-escalation via direct table writes
+----------------------------------------------------------
+  ok    PATCH /users [role -> superadmin] -> 403
+  ok    PATCH /users [own org_id -> Ardmac] -> 403
+  ok    POST /users [insert self into Ardmac] -> 403
+  ok    POST /organisations [create an organisation] -> 403
+  ok    POST /org_invite_links [mint an org invite for Ardmac] -> 403
+  ok    tenant A profile unchanged after escalation attempts (role=org_admin)
+
+5. C2 regression — anonymous access to mer_field_events
+--------------------------------------------------------
+  ok    anon GET /mer_field_events -> 200, 3 rows, 0 org-owned
+        only org-less demo rows visible
+  ok    anon DELETE (zero-match probe) -> 200
+        non-destructive by construction: filter matches no row
+  ok    anon DELETE where org_id=Ardmac -> 200, 0 rows deleted
+        policy scoped to org_id IS NULL — no org row reachable
+  ok    anon INSERT tagged org_id=Ardmac -> 401
+
+6. App routes — org_id / foreign ids injected into the request body
+-------------------------------------------------------------------
+  ok    CONTROL GET /api/invites as tenant A -> 200
+        session accepted; sees 0 own-org invite(s)
+  ok    POST /api/invites/revoke [tenant B invite id + injected org_id] -> 404
+        tenant B invite untouched (L1)
+  ok    POST /api/team [role change on tenant B user] -> 404
+        tenant B user role unchanged (M2)
+  ok    POST /api/team [suspend tenant B user — auth-plane write] -> 404
+        tenant B user not banned (M2 auth-plane guard)
+  ok    POST /api/team [remove tenant B user] -> 404
+        tenant B user still present
+  ok    POST /api/extract-pdf [no session] -> 401
+        L2: must be 401
+  ok    POST /api/insights [no session] -> 200 source=rules
+        L2: anonymous demo served by rules, no Gemini spend
+
+==============================================================================
+61 probes run, 0 skipped | passed 61 | FAILED 0
+
+All cross-tenant access paths denied.
+
+cleanup: removed 2 user(s) + 2 org(s); organisations now = 2, users now = 10

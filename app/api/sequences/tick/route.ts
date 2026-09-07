@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { advanceDueSequences, autoStartSilentSequences } from "@/lib/sequences/engine";
 
@@ -10,7 +11,11 @@ export async function POST(request: NextRequest) {
   if (!secret) {
     return NextResponse.json({ error: "CRON_SECRET not configured." }, { status: 503 });
   }
-  if (request.headers.get("x-cron-secret") !== secret) {
+  // Constant-time compare so the header can't be recovered a byte at a time.
+  // Same treatment the Resend webhook secret already gets in lib/email/svix.ts.
+  const presented = Buffer.from(request.headers.get("x-cron-secret") ?? "");
+  const expected = Buffer.from(secret);
+  if (presented.length !== expected.length || !timingSafeEqual(presented, expected)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 

@@ -1,0 +1,40 @@
+Keldra inventory — project fmeixgnxkcapxyhrjhvm (keldra-prod)
+Run: 2026-09-07T09:47:45.753Z
+
+setup_health(): all green
+  RLS enabled on 5/5 checked tables
+
+=== TENANTS (2) ===
+  437ec2d5-0c94-4ba8-b8bb-328c3f780774  Ardmac
+  4451b60f-e13a-4f88-8279-4904e79c38e8  Blake
+
+=== ROW COUNTS ===
+table                     total      Ardmac       Blake   org-less
+  users                      10           3           4          3
+  organisations               2   (no org_id column)
+  projects                    2           1           1          0
+  tasks                      92          46          46          0
+  gates                       9           4           5          0
+  blockers                    8           0           8          0
+  blocker_events             45           0          45          0
+  asset_tags                335           0         335          0
+  asset_tag_events          623           0         623          0
+  task_notes                 14           0          14          0
+  task_emails                66           6          60          0
+  task_threads               17           1          16          0
+  task_email_attachments      3           3           0          0
+  gate_signoffs              19           0          19          0
+  org_invite_links            1           1           0          0
+  org_invites                 2           2           0          0
+  org_config                  2           1           1          0
+  roster                     10           0          10          0
+  task_sequences              0           0           0          0
+  sequence_audit              0           0           0          0
+  milestones                  2           0           2          0
+  task_contacts            null        null        null          0
+  task_assignments            7           3           4          0
+  task_summaries              4           0           4          0
+  inbound_unmatched           0   (no org_id column)
+  mer_field_events            3           0           0          3
+
+Tables checked: 26

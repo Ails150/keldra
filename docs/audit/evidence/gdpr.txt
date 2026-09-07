@@ -1,0 +1,69 @@
+Keldra GDPR / personal-data map — fmeixgnxkcapxyhrjhvm (keldra-prod)
+Run: 2026-09-07T09:45:14.972Z
+Values are never printed — counts and distinct-cardinality only.
+
+1. Personal data held, by table
+--------------------------------
+  users                   10 row(s)   cols: full_name
+  roster                  10 row(s)   cols: name, email
+  task_contacts         null row(s)   cols: name, email
+  org_invites              2 row(s)   cols: email, full_name
+  task_emails             66 row(s)   cols: from_email, to_email, subject, body_text, body_html
+  task_threads            17 row(s)   cols: subject
+  task_notes              14 row(s)   cols: author_name, body
+  blocker_events          45 row(s)   cols: actor, payload
+  asset_tag_events       623 row(s)   cols: actor_name, payload
+  gate_signoffs           19 row(s)   cols: signed_by_name, signed_by_email
+  mer_field_events         3 row(s)   cols: actor_user_id
+  inbound_unmatched        0 row(s)   cols: from_email, subject
+
+2. Data-subject population (distinct addresses, values not shown)
+-----------------------------------------------------------------
+  roster.email                       10 value(s)
+  org_invites.email                   2 value(s)
+  task_emails.from_email             66 value(s)
+  task_emails.to_email               66 value(s)
+  inbound_unmatched.from_email        0 value(s)
+  auth.users (account holders)        11 value(s)
+
+  DISTINCT data subjects total        30
+    of which hold an account          11
+    NON-users (no account, no login)  19
+    -> non-users are third parties whose data arrived by inbound email or
+       was entered by a customer. They never see a notice or a consent step.
+
+3. Orphaned / retained identity rows
+-------------------------------------
+  public.users with org_id IS NULL              3
+  auth.users with NO public.users profile      1
+    (this is what /api/team 'remove' leaves behind by design, so the
+     audit trail stays attributable — it is retained personal data)
+  auth.users banned (access revoked, kept)     1
+
+4. Subject-rights paths present in code
+----------------------------------------
+  PRESENT  Right of access / portability (export)
+            /api/tasks/export + /api/gates/export — org-scoped CSV
+  MISSING  Right to erasure (delete a person's data)
+            no endpoint; /api/team 'remove' deliberately RETAINS auth.users + all authored rows
+  MISSING  Right to rectification (edit own profile)
+            no self-service profile edit; org_admin can change role only
+  MISSING  Consent record (who agreed, when, to what)
+            no consent table, no timestamped record anywhere in the schema
+  MISSING  Privacy notice shown to data subjects
+            no privacy policy page or copy in the app
+  MISSING  Retention policy / automatic deletion
+            nothing expires; no TTL, no scheduled purge
+  MISSING  Processor disclosure (Gemini, Resend, Supabase)
+            no DPA list or sub-processor page in the repo
+
+5. Personal data leaving the platform (processors)
+--------------------------------------------------
+  Google Gemini   <- /api/insights forwards blocker text, asset ids and PEOPLE'S
+                     NAMES; /api/tasks/summary + lib/ai/task-summary.ts forward
+                     email bodies. Both authenticated-only after this audit.
+  Resend          <- outbound chase email + inbound webhook (addresses, bodies)
+  Supabase        <- primary processor, eu-west-1
+
+Note: no automated check can establish lawful basis or a DPA. Items above are
+reported as present/missing in the CODE, not as legal conclusions.
