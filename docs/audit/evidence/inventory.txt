@@ -1,5 +1,5 @@
 Keldra inventory — project fmeixgnxkcapxyhrjhvm (keldra-prod)
-Run: 2026-09-07T10:56:48.140Z
+Run: 2026-09-07T11:10:46.097Z
 
 setup_health(): all green
   RLS enabled on 5/5 checked tables

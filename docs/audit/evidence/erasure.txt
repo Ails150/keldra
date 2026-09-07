@@ -1,8 +1,8 @@
 Keldra erasure suite — fmeixgnxkcapxyhrjhvm (keldra-prod)
-Run: 2026-09-07T10:57:05.759Z
+Run: 2026-09-07T11:10:40.575Z
 
-tenant A (attacker) : a77f761d-231f-4906-ad61-d02365e38bd3
-tenant B (holds the subject) : fad13d0f-609f-42eb-8c29-cab4ba7f6dbc
+tenant A (attacker) : ff6998c4-6c95-4648-a22d-e3497d312003
+tenant B (holds the subject) : 366aa597-d472-4b5a-9e39-a35e5a2f2388
 Ardmac 437ec2d5-0c94-4ba8-b8bb-328c3f780774 — never touched
 
 1. Cross-tenant: tenant A tries to erase tenant B's subject

@@ -1,6 +1,6 @@
 Keldra exposure + auth sweep — fmeixgnxkcapxyhrjhvm (keldra-prod)
-Run: 2026-09-07T10:56:55.426Z
-App: http://localhost:3210
+Run: 2026-09-07T11:10:29.042Z
+App: https://app.keldra.io
 
 1. Every app route, called with NO credentials
 -----------------------------------------------
@@ -26,6 +26,8 @@ App: http://localhost:3210
         invite acceptance; gated by an unguessable invite token, not a session
   ok    POST /api/onboarding/complete -> 403
   ok    GET /api/org-commercials -> 403
+  ok    GET /api/privacy/erase -> 403
+  ok    POST /api/privacy/erase -> 403
   ok    GET /api/org-config -> 403
   ok    POST /api/sequences/control -> 403
   ok    POST /api/sequences/start -> 403
@@ -81,6 +83,6 @@ App: http://localhost:3210
         no objects listed
 
 ==============================================================================
-61 probes run | passed 61 | FAILED 0
+63 probes run | passed 63 | FAILED 0
 
 No unauthenticated route or table exposes tenant data.

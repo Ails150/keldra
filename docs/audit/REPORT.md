@@ -412,3 +412,90 @@ which is why I have not guessed at the value.
 
 *The commits from this session are **not pushed**. Pushing would trigger a
 production deploy, which is yours to make.*
+
+---
+
+## 9. Third pass — actions taken on prod
+
+Same session, after the §8 decisions. Suites in §8 ran against a local dev
+server; **everything below re-ran against the live deployment at
+`https://app.keldra.io`** — 138 probes, 0 failures, and the database finished at
+exactly the pre-audit baseline (11 auth users, 10 profiles, 2 orgs).
+
+### 9.1 Done
+
+| Action | Result |
+|---|---|
+| Pre-migration snapshot | 1,287 rows, all 25 readable tables + `auth.users`, at `C:\keldra-backups\fmeixgnxkcapxyhrjhvm-2026-09-07T11-08-31-554Z` (outside the repo — personal data) |
+| Deployed the session's work | 5 commits pushed to `origin/main`; Vercel built and released |
+| Postgres network restriction | `dbAllowedCidrs: ["90.252.106.74/32"]`, `dbAllowedCidrsV6: []` — was `0.0.0.0/0` + `::/0` |
+| Re-ran all four suites against production | exposure 63/63, isolation 61/61, erasure 14/14, inventory + gdpr clean |
+
+### 9.2 Three findings closed by the deploy
+
+The deploy resolved 8.2, 8.3 and part of F2 in one go — verified on the live site:
+
+```
+X-Vercel-Id: lhr1::dub1::…                          (was lhr1::iad1 — US East)
+Content-Security-Policy: default-src 'self'; …      (was absent)
+X-Frame-Options: SAMEORIGIN                         (was absent)
+Referrer-Policy: strict-origin-when-cross-origin    (was absent)
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+                                                    (was Vercel's default 63072000)
+GET /privacy -> 200                                 (privacy notice now live)
+```
+
+So **8.3 was simply an undeployed commit** — the headers had been written and
+merged, and production had never been rebuilt since. And **8.2 is fixed and
+confirmed**: compute now runs in Dublin alongside the eu-west-1 database, which
+makes the EU-compute statement on `/privacy` true rather than aspirational.
+
+### 9.3 The network restriction, and what it does not do
+
+`dbAllowedCidrs` is now a single host. Worth being precise about what changed:
+this closes **direct Postgres and pooler access**, which only your own tooling
+uses. It does not touch the app, and I verified that after applying it —
+PostgREST (anon and service), GoTrue and `app.keldra.io` all still return 200.
+
+Note the CLI cleared the IPv6 list to `[]` as well, so the `::/0` hole went with
+it rather than being left behind.
+
+Two consequences to keep in mind:
+
+- **If your IP changes** (dynamic broadband, a different network, a VPN), direct
+  DB tooling stops working until you update it:
+  `supabase network-restrictions update --project-ref fmeixgnxkcapxyhrjhvm --db-allow-cidr <new>/32 --experimental`
+  To reopen entirely: same command with `0.0.0.0/0`.
+- **The Supabase SQL editor runs server-side** inside Supabase and is not
+  expected to be affected. If it is, the command above reverses this in seconds.
+
+### 9.4 Not done, and why
+
+**PITR is still off.** You asked for it enabled before the migration. It is a
+billable add-on and the CLI exposes only `backups list` and `backups restore` —
+there is no enable path from here. It needs Settings → Add-ons in the dashboard.
+The snapshot in 9.1 stands in for it, but only for data: no schema, roles,
+policies or storage objects. Recovery position is unchanged — daily physical
+backups, 8 retained.
+
+**`supabase-data-protection.sql` is not applied.** By your decision I prepared it
+for you to run rather than seeking a database credential. Instructions,
+expected output, and what to check are in
+`docs/audit/RUN-THESE-IN-SQL-EDITOR.md`, along with
+`supabase-verify-cron-secret.sql` — the plaintext-cron-secret question (F5) is
+still open until that read-only file is run.
+
+Until the migration lands: consent is not recorded at sign-up (the route logs the
+failure and continues), and the erasure endpoint correctly returns
+`500 / ok:false` because it cannot write `erasure_log`.
+
+**`keldra-dev` was not created.** Skipped by your decision. The dev-first rule in
+RUNBOOK.md §4 and the `KELDRA_ENV=dev` support in the harness are in place for
+whenever it exists.
+
+### 9.5 The one that still blocks the pilot
+
+Sign-up remains broken until SMTP is configured in Supabase Auth. The deployed
+fix means a failed sign-up now says so honestly and no longer strands an auth row
+that poisons the address on retry — but it does not create accounts. Nothing else
+in this report matters more: the first paying customer cannot get in.

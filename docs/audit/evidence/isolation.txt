@@ -1,9 +1,9 @@
 Keldra tenant-isolation suite — fmeixgnxkcapxyhrjhvm (keldra-prod)
-Run: 2026-09-07T10:57:00.519Z
-App-route probes: http://localhost:3210
+Run: 2026-09-07T11:10:35.074Z
+App-route probes: https://app.keldra.io
 
-tenant A    : 035f1491-87da-46d3-9a2a-23cb19573eaa (user f0cd86e3-44ab-4a6f-ac24-cf07abdcf477)
-tenant B    : 48459852-1d9c-4ada-88be-00e7111dbae0 (user 8bd46523-00af-4175-a045-d5485f657746)
+tenant A    : 6dac95ab-1b95-4a11-b3b1-56febda240a9 (user 62ed4f2d-27bc-4214-8e51-db2707995b8f)
+tenant B    : 49a93a8b-1951-4fa2-b2be-37d8b49ec059 (user 7d7bd7bd-8392-41df-96e1-d91103bc2b1b)
 real tenant : 437ec2d5-0c94-4ba8-b8bb-328c3f780774 (Ardmac — read-only target, never written)
 
 1. PostgREST cross-tenant reads (tenant A session -> tenant B rows)
