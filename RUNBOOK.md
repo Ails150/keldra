@@ -3,8 +3,8 @@
 Everything you need to take the new self-serve sign-up and per-task email
 threading live, in order. Follow top to bottom.
 
-> **Why local AND Netlify:** secrets in `.env.local` only affect your machine.
-> Production runs on Netlify, which reads **its own** env vars. If you set a
+> **Why local AND Vercel:** secrets in `.env.local` only affect your machine.
+> Production runs on Vercel, which reads **its own** env vars. If you set a
 > secret in one place and not the other, local works while production breaks
 > (or vice-versa). Always set each secret in **both**.
 
@@ -19,7 +19,7 @@ threading live, in order. Follow top to bottom.
      "Untracked files". (It won't, because it's ignored.)
 2. Never paste a real secret into any file that gets committed — not even a
    placeholder that looks real. Secrets go **only** into `.env.local` (local)
-   and the Netlify dashboard (production).
+   and the Vercel dashboard (production).
 
 ---
 
@@ -54,7 +54,7 @@ Save. Restart `npm run dev` so the new vars load.
 
 ---
 
-## 3. Put the SAME secrets in Netlify (production)
+## 3. Put the SAME secrets in Vercel (production)
 
 1. Go to **app.netlify.com** → your Keldra site.
 2. **Site configuration → Environment variables → Add a variable** (or
@@ -73,28 +73,41 @@ Save. Restart `npm run dev` so the new vars load.
 
 ## 4. Apply the database migrations (Supabase SQL editor)
 
-Supabase → your project (`fmeixgnxkcapxyhrjhvm`) → **SQL Editor → New query**.
-Paste and **Run** each file **in this exact order**. All are idempotent
-(safe to re-run).
+> ### Dev first. Always.
+>
+> **Every migration is applied to `keldra-dev` first, verified there, and only
+> then applied to `keldra-prod` (`fmeixgnxkcapxyhrjhvm`).** No exceptions, and
+> not "unless it's a small one" — the small ones are the ones that get pasted
+> straight into production.
+>
+> The order is: run it on dev → run `node scripts/audit/inventory.mjs` and the
+> isolation suite against dev → then run the identical file on prod → re-run the
+> health check. If a migration needs editing after it has touched dev, edit the
+> file and re-run it on dev; never hand-patch prod to match.
+>
+> This rule exists because it was learned the expensive way:
+> `supabase-contacts.sql` sat in the repo unapplied for nearly three months while
+> two code paths assumed the table existed. See `docs/MIGRATIONS.md` → "Known
+> drift".
 
-1. `supabase-org-model.sql` — *(already applied previously; re-run only if
-   unsure. It creates organisations/users and the Ardmac seed.)*
-2. **`supabase-signup.sql`** — token invites table `org_invite_links`,
-   `auth_role()` helper, `claim_org_invite()`, RLS.
-3. **`supabase-email.sql`** — `task_threads`, `task_emails`,
-   `task_email_attachments`, `inbound_unmatched`, the private storage bucket,
-   RLS, and `user_id_by_email()`.
-4. **`supabase-instances.sql`** — `projects`, `tasks`, `gates`, `blockers`,
-   `org_config`, the `task_threads.task_id` FK, the `hyperscaler-dc` template
-   and `init_org_from_template()`, plus the Ardmac org_config seed.
-5. **`supabase-sequences.sql`** — `task_sequences`, `sequence_audit`, and the
-   `sequence` block added to org_config (sending OFF by default).
-6. **`supabase-orgdata.sql`** — `roster`, `blocker_events`, `task_assignments`,
-   and the state-machine columns on `blockers` (backs the full new-org
-   experience: sample blockers/roster + task assignment + field filtering).
-7. **`supabase-health.sql`** — `setup_health()` for the health check below.
+**`docs/MIGRATIONS.md` is the canonical ordered list of all migrations** and
+records which are applied to prod. Keep it updated when you add one — a new
+`supabase-*.sql` file that is not in that table is invisible.
+
+Supabase → the target project → **SQL Editor → New query**. Paste and **Run**
+each file in the order given in `docs/MIGRATIONS.md`. All are idempotent, so
+re-running is safe.
 
 Each file ends with a sanity `SELECT` — check it returns without error.
+
+### After applying, on either project
+
+```bash
+node scripts/audit/inventory.mjs      # every table counted; an error = missing table
+```
+
+`GET /api/health/setup` (superadmin) gives green ticks, but it only covers 15
+tables — `inventory.mjs` covers all of them and is what catches drift.
 
 ---
 
@@ -284,7 +297,7 @@ until you enable an org. Steps live in `org_config.sequence` (editable in the
 config screen). Default cadence: step 1 at +2 days, step 2 (CC escalation
 contact) at +4, step 3 (flag-to-report) at +7, from when the sequence starts.
 
-1. **Set `CRON_SECRET`** in `.env.local` AND Netlify (a long random string).
+1. **Set `CRON_SECRET`** in `.env.local` AND Vercel (a long random string).
 2. **Wire the pg_cron tick** by running `supabase-sequences-cron.sql` in the
    Supabase SQL editor (needs `pg_cron` + `pg_net`, both available on Supabase).
    Set the two literals at the top of its step-2 block first — that migration
@@ -317,11 +330,11 @@ contact) at +4, step 3 (flag-to-report) at +7, from when the sequence starts.
 
 | Secret | Get it from (click-path) | Goes in |
 | --- | --- | --- |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → **Project Settings → API** → "Project API keys" → reveal **`service_role`** → copy | `.env.local` **and** Netlify |
-| `RESEND_API_KEY` | Resend → **API Keys** → **Create API Key** (Full access or Sending) → copy once | `.env.local` **and** Netlify |
-| `RESEND_WEBHOOK_SECRET` | Resend → **Webhooks** → open your inbound (`email.received`) endpoint → **Signing Secret** (`whsec_…`) → copy | `.env.local` **and** Netlify |
-| `CRON_SECRET` | Invent a long random string (e.g. `openssl rand -hex 32`) — the pg_cron tick sends it as `x-cron-secret` | `.env.local` **and** Netlify (+ store in Vault via `supabase-sequences-cron.sql` — never inline in `cron.schedule`) |
-| `NEXT_PUBLIC_SITE_URL` *(optional)* | Your production URL, `https://app.keldra.io` | `.env.local` **and** Netlify |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → **Project Settings → API** → "Project API keys" → reveal **`service_role`** → copy | `.env.local` **and** Vercel |
+| `RESEND_API_KEY` | Resend → **API Keys** → **Create API Key** (Full access or Sending) → copy once | `.env.local` **and** Vercel |
+| `RESEND_WEBHOOK_SECRET` | Resend → **Webhooks** → open your inbound (`email.received`) endpoint → **Signing Secret** (`whsec_…`) → copy | `.env.local` **and** Vercel |
+| `CRON_SECRET` | Invent a long random string (e.g. `openssl rand -hex 32`) — the pg_cron tick sends it as `x-cron-secret` | `.env.local` **and** Vercel (+ store in Vault via `supabase-sequences-cron.sql` — never inline in `cron.schedule`) |
+| `NEXT_PUBLIC_SITE_URL` *(optional)* | Your production URL, `https://app.keldra.io` | `.env.local` **and** Vercel |
 | `NEXT_PUBLIC_SUPABASE_URL` *(exists)* | Supabase → Project Settings → API → Project URL | already set |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` *(exists)* | Supabase → Project Settings → API → `anon` `public` key | already set |
 

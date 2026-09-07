@@ -1,5 +1,5 @@
 Keldra GDPR / personal-data map — fmeixgnxkcapxyhrjhvm (keldra-prod)
-Run: 2026-09-07T09:45:14.972Z
+Run: 2026-09-07T10:57:11.660Z
 Values are never printed — counts and distinct-cardinality only.
 
 1. Personal data held, by table
@@ -9,7 +9,6 @@ Values are never printed — counts and distinct-cardinality only.
   task_contacts         null row(s)   cols: name, email
   org_invites              2 row(s)   cols: email, full_name
   task_emails             66 row(s)   cols: from_email, to_email, subject, body_text, body_html
-  task_threads            17 row(s)   cols: subject
   task_notes              14 row(s)   cols: author_name, body
   blocker_events          45 row(s)   cols: actor, payload
   asset_tag_events       623 row(s)   cols: actor_name, payload
@@ -44,18 +43,20 @@ Values are never printed — counts and distinct-cardinality only.
 ----------------------------------------
   PRESENT  Right of access / portability (export)
             /api/tasks/export + /api/gates/export — org-scoped CSV
-  MISSING  Right to erasure (delete a person's data)
-            no endpoint; /api/team 'remove' deliberately RETAINS auth.users + all authored rows
+  PRESENT  Right to erasure (endpoint)
+            /api/privacy/erase — org-scoped, dry-run + confirm, logs what it retained
+  MISSING  Erasure audit log (erasure_log table)
+            MISSING — supabase-data-protection.sql not applied; erasures will report incomplete
   MISSING  Right to rectification (edit own profile)
-            no self-service profile edit; org_admin can change role only
-  MISSING  Consent record (who agreed, when, to what)
-            no consent table, no timestamped record anywhere in the schema
-  MISSING  Privacy notice shown to data subjects
-            no privacy policy page or copy in the app
-  MISSING  Retention policy / automatic deletion
-            nothing expires; no TTL, no scheduled purge
-  MISSING  Processor disclosure (Gemini, Resend, Supabase)
-            no DPA list or sub-processor page in the repo
+            still no self-service profile edit
+  MISSING  Consent record (consent_records table)
+            MISSING — supabase-data-protection.sql not applied; signup logs a consent failure
+  PRESENT  Privacy notice page
+            /privacy — public, includes sub-processors and retention
+  MISSING  Retention rule (12-month inbound email purge)
+            MISSING — supabase-data-protection.sql not applied
+  PRESENT  Processor disclosure (sub-processor list)
+            rendered on /privacy from lib/privacy/policy.ts
 
 5. Personal data leaving the platform (processors)
 --------------------------------------------------

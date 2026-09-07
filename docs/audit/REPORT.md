@@ -1,11 +1,11 @@
 # Keldra security audit — `fmeixgnxkcapxyhrjhvm` (keldra-prod)
 
-**Date:** 7 September 2026
+**Date:** 7 September 2026 (updated later the same day — see §8)
 **Scope:** `C:\keldra-web` at commit `d7bf521`, and the live Supabase project `fmeixgnxkcapxyhrjhvm` (`keldra-prod`, eu-west-1).
 **Method:** the phase structure used for Quottrr's `docs/audit` — inventory, exposure, auth, input, secrets, logging, GDPR — with tenant isolation proven by executable probes rather than by reading code.
 **Commercial context:** the first paying user is a single commissioning consultant with his own workspace, holding data he controls. The three questions that mattered most were therefore: *nothing leaks between workspaces*, *keys and tokens at rest*, *auth on every function*.
 
-**Result:** 122 probes run, 0 failures. The three open triage items (M2, L1, L2) are closed and proven, which clears the whole of `SECURITY-TRIAGE.md` — C1, C2, H2, M1 and M3 were already applied, and group 4 of the isolation suite re-proves them. Six new findings raised, two of them fixed in this run. **No cross-tenant leak was found on any path tested.** The material residual risk is not in the application — it is that there is no dev project, no point-in-time recovery, and no data-protection apparatus at all.
+**Result:** 138 probes run, 0 failures. The three open triage items (M2, L1, L2) are closed and proven, which clears the whole of `SECURITY-TRIAGE.md` — C1, C2, H2, M1 and M3 were already applied, and group 4 of the isolation suite re-proves them. Six new findings raised in the first pass, plus two production defects found in the second (§8) — sign-up is broken, and a migration was never applied. **No cross-tenant leak was found on any path tested.** The material residual risk is not tenant isolation: it is that there is still no dev project, no point-in-time recovery, and that the data-protection layer built in §8 is written but not yet applied to the database.
 
 ---
 
@@ -13,7 +13,7 @@
 
 | | |
 |---|---|
-| Cross-tenant leaks found | **0** across 61 isolation probes |
+| Cross-tenant leaks found | **0** across 61 isolation + 14 erasure probes |
 | Routes reachable without credentials | **0** of 28 that should refuse (5 are public by design, each documented) |
 | Live secrets in git history or the browser bundle | **0** |
 | SQL-injection / XSS surface | **none found** |
@@ -234,3 +234,181 @@ Re-run `inventory.mjs` afterwards and diff it against the committed baseline —
 ---
 
 *Fixes from this run are in commit `d7bf521`. Evidence: `docs/audit/evidence/{inventory,exposure,isolation,gdpr}.txt`. The two SQL files needing a human in the Supabase SQL editor are `supabase-verify-cron-secret.sql` (read-only check) and, only if it reports ROTATE, a re-run of `supabase-sequences-cron.sql`.*
+
+---
+
+## 8. Second pass — data-protection build and what it uncovered
+
+Added after the first report, in the same session. Three things were asked for: a
+dev project, prod network/cron hardening, and a minimum data-protection layer.
+The first is blocked, the second is partly blocked, the third is built — and
+building it surfaced two production defects the first pass had not reached.
+
+### 8.1 Two production defects found by testing the new code
+
+**D1 — Public sign-up is completely broken. (Critical — blocks the first customer)**
+
+Nobody can create an account. Probing `auth.signUp` directly:
+
+```
+signUp -> error: "Error sending confirmation email" | user: NULL
+```
+
+Supabase Auth has no working SMTP, so GoTrue writes the auth row, fails to send
+the confirmation, and returns no usable user. The route then read the empty
+`identities` array as "this email already exists" and returned:
+
+> That email is already registered. Try signing in, or use a different email.
+
+…to a customer whose address had never been seen before — while leaving the
+half-created auth row behind, so every retry hit the same message. That is the
+origin of the orphan rows reported in §4/F2: the `3 public.users with org_id IS
+NULL` and `1 auth.users with no profile` are the debris of failed sign-ups.
+
+Fixed in code: account existence is now checked explicitly via
+`user_id_by_email()` rather than inferred from `identities`; a mail failure rolls
+back the stranded auth row and returns a 502 saying what actually went wrong.
+Verified — retrying a previously failed address no longer reports "already
+registered".
+
+**The code fix does not make sign-up work.** It makes it fail honestly and
+recoverably. Sign-up stays broken until SMTP is configured in Supabase Auth
+(Authentication → Emails → SMTP). Resend is already a dependency and
+`RESEND_API_KEY` already exists, so it is the obvious provider. **Do this before
+the consultant is invited.**
+
+**D2 — `supabase-contacts.sql` was never applied to prod. (Medium)**
+
+`task_contacts` returns PostgREST `PGRST205` — the table does not exist, though
+the migration has been in the repo since 15 June. Consequences: `GET
+/api/tasks/contacts` cannot work, and the `task_contacts` upsert at
+`app/api/tasks/email/route.ts:115` fails silently.
+
+This is precisely what having no dev project costs (F1). It also went unnoticed
+because of a tooling flaw worth naming: **a Supabase `head`+`count` request
+returns `error: null, count: null` for a table that does not exist**, so it reads
+as an empty table. My own first-pass inventory printed `task_contacts null` and I
+took it for an empty table. `inventory.mjs` and `gdpr.mjs` now probe with a real
+row select first, print `MISSING`, and exit non-zero.
+
+### 8.2 Vercel compute runs in the US while the database is in Ireland
+
+Static assets return `x-vercel-id: lhr1::…` (edge only). API routes — where all
+personal data is handled — return `lhr1::iad1::…`. The second segment is the
+compute region: **iad1, US East**. Supabase is in eu-west-1.
+
+So every request carrying names, email bodies and blocker text crossed the
+Atlantic and back. Fixed in `vercel.json` with `"regions": ["dub1"]` (Dublin,
+co-located with Supabase). **This takes effect on next deploy and must be
+verified then** — the privacy notice now states EU compute, so it needs to be
+true before that page is live:
+
+```bash
+curl -sI https://app.keldra.io/api/health/setup | grep -i x-vercel-id   # expect lhr1::dub1::…
+```
+
+If the plan does not permit region selection, change the Vercel row in
+`lib/privacy/policy.ts` back to US-with-SCCs rather than leaving the notice wrong.
+
+### 8.3 The security headers are not live
+
+`vercel.json` sets CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
+and Permissions-Policy, and commit `689c6cf` is on `origin/main`. Production
+serves **none of them** — only Vercel's own default HSTS (`max-age=63072000`,
+which is not the value in `vercel.json`). Either the deployment predates that
+commit, or the Vercel project is not building from this repo/root. Worth ten
+minutes: it is a whole class of protection that everyone currently believes is on.
+
+### 8.4 The data-protection layer
+
+Built and tested against throwaway tenants. `scripts/audit/erasure.mjs`, 14
+probes, evidence in `evidence/erasure.txt`.
+
+| Asked for | Delivered |
+|---|---|
+| Privacy notice page | `/privacy` — public, versioned (`2026-09-07.1`) |
+| Sub-processor list with regions | on `/privacy`, from `lib/privacy/policy.ts` — Supabase eu-west-1, Vercel dub1, Resend US, Gemini US, each with a transfer basis |
+| Erasure endpoint across all tables | `POST /api/privacy/erase`, with `GET` dry run |
+| 12-month retention on inbound email | `purge_old_email_bodies()` + nightly pg_cron, in `supabase-data-protection.sql` |
+| Consent capture on signup | `consent_records`, written service-side with the policy version; sign-up refuses without it |
+
+**The erasure design decision, made deliberately.** `blocker_events` and
+`asset_tag_events` are append-only *and* hash-chained — `actor` / `actor_name`
+are inputs to the row hash — and `gate_signoffs` is immutable. Redacting a name
+in any of them breaks chain verification and destroys the evidence property
+Keldra is sold on; the guard triggers reject the write anyway. So erasure removes
+contact data, roster entries, invitations, email content, note authorship, the
+profile and the account, and **retains the accountability record** under UK/EU
+GDPR Art 17(3)(e). Every request records what it kept and why in `erasure_log`,
+so "what do you still hold about me?" has an exact answer rather than a vague one.
+
+Proven, not asserted:
+
+```
+ok  GET dry-run as tenant A -> 200, would erase 0 row(s)   (cannot see tenant B's subject)
+ok  POST erase with injected org_id=B -> erased 0; tenant B roster intact
+ok  POST without confirm:true -> 400
+ok  roster removed (1 -> 0), org_invites removed, task_emails content redacted
+ok  blocker_events unchanged — actor + hash identical
+ok  service-role UPDATE on blocker_events rejected by the guard trigger
+```
+
+Two bugs were caught by that suite and fixed before commit: the endpoint
+initially **reported redacting an email it had not redacted** (a failed write to a
+column that did not exist yet, with the error ignored), and it treated a
+not-yet-created table as a hard failure. It now counts only rows the database
+actually returned, separates "table absent on this project" from a real write
+error, and returns **500 with `ok:false`** if any part failed — a GDPR endpoint
+that overstates what it erased is worse than one that errors.
+
+It correctly returns 500 today, because `erasure_log` does not exist until the
+migration is applied.
+
+### 8.5 What is blocked, and on what
+
+**`keldra-dev` does not exist.** `PASTE_REF` came through as a literal
+placeholder, and `supabase projects list` shows no such project on the account —
+only `keldra-prod`, `vantro-dev`, `Quottrr`, `quottrr-dev` and `vantro-testing`.
+So it could not be linked, migrated or seeded, and the dev-first rule now written
+into RUNBOOK.md §4 has nowhere to point yet. The harness is ready for it:
+`KELDRA_ENV=dev` reads `.env.dev.local` and derives the project ref from the URL,
+so no code changes when the project appears.
+
+**No SQL execution path from here.** Every migration is applied by hand in the SQL
+editor; the anon and service-role keys cannot run DDL, and the CLI needs a
+database password to connect. So `supabase-data-protection.sql` is written and
+reviewed but **not applied**, and `supabase-verify-cron-secret.sql` could not be
+run — the plaintext-cron-secret question in F5 is still open.
+
+**Network restrictions not changed, deliberately.** The instruction was to
+restrict Postgres to "Vercel and Supabase only". Worth flagging before doing it:
+**nothing in Keldra connects to Postgres directly.** There is no `pg` client, no
+`DATABASE_URL`, no pooler string — the app speaks to Supabase entirely over HTTPS
+(PostgREST / GoTrue / Storage), which network restrictions do not govern. So
+Vercel needs no allowance at all, and Vercel publishes no stable egress CIDRs to
+grant one with. The only thing `dbAllowedCidrs` controls is direct psql/pooler
+access — that is, **your own** migration and dump tooling. Setting it wrong locks
+you out of your own database rather than locking an attacker out of the app,
+which is why I have not guessed at the value.
+
+### 8.6 Revised order
+
+**Before the consultant is invited — sign-up must work**
+
+1. **Configure SMTP in Supabase Auth** (D1). Nothing else matters if nobody can
+   create an account.
+2. Apply `supabase-data-protection.sql` (dev first, once dev exists) — until
+   then consent is not recorded and erasure reports incomplete.
+3. Apply `supabase-contacts.sql` (D2).
+4. Run `supabase-verify-cron-secret.sql`; rotate if it reports plaintext (F5).
+5. Enable PITR (F3).
+
+**Before the pilot is called live**
+
+6. Create `keldra-dev` (F1) and replay migrations per `docs/MIGRATIONS.md`.
+7. Deploy, then verify `x-vercel-id` shows `dub1` (8.2) and that the security
+   headers are actually served (8.3).
+8. Decide the `dbAllowedCidrs` policy (8.5) and re-add the `/dashboard` redirect.
+
+*The commits from this session are **not pushed**. Pushing would trigger a
+production deploy, which is yours to make.*

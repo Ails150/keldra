@@ -31,7 +31,17 @@ console.log(`\n=== ROW COUNTS ===`);
 const header = "table".padEnd(24) + "total".padStart(7) + (orgs??[]).map(o=>o.name.padStart(12)).join("") + "   org-less".padStart(11);
 console.log(header);
 const counts = {};
+let missing = 0;
 for (const t of TABLES) {
+  // A head+count request returns error:null / count:null for a table that does
+  // not exist, so it silently reads as an empty table. Probe with a real row
+  // select first — this is what makes unapplied migrations visible.
+  const { error: probeErr } = await admin.from(t).select("*").limit(1);
+  if (probeErr) {
+    console.log(`  ${t.padEnd(22)}   MISSING — ${probeErr.message.slice(0, 60)}`);
+    missing++;
+    continue;
+  }
   const { count, error } = await admin.from(t).select("*", { count: "exact", head: true });
   if (error) { console.log(`  ${t.padEnd(22)} ERR ${error.message.slice(0,50)}`); continue; }
   let line = "  " + t.padEnd(22) + String(count).padStart(7);
@@ -47,4 +57,9 @@ for (const t of TABLES) {
   else line += String((count ?? 0) - scoped).padStart(11);
   console.log(line);
 }
-console.log(`\nTables checked: ${TABLES.length}`);
+console.log(`\nTables checked: ${TABLES.length}, missing: ${missing}`);
+if (missing) {
+  console.log("A MISSING table means a migration in the repo was never applied to this");
+  console.log("project. See docs/MIGRATIONS.md for the canonical order and known drift.");
+  process.exitCode = 1;
+}

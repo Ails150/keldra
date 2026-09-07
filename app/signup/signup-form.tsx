@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { PRIVACY_POLICY_VERSION } from "@/lib/privacy/policy";
 
 const INPUT =
   "w-full rounded-[12px] border border-[#dbcce8] bg-white px-4 text-ink placeholder:text-ink-mid/60 outline-none focus:border-accent transition-colors";
@@ -11,6 +12,7 @@ export default function SignupForm() {
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -23,7 +25,16 @@ export default function SignupForm() {
     const res = await fetch("/api/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fullName, companyName, email, password }),
+      body: JSON.stringify({
+        fullName,
+        companyName,
+        email,
+        password,
+        acceptPrivacy,
+        // Send the version actually rendered on this page, so the stored consent
+        // names the notice the person saw rather than whatever is current later.
+        policyVersion: PRIVACY_POLICY_VERSION,
+      }),
     });
     const data = (await res.json().catch(() => ({}))) as {
       error?: string;
@@ -109,9 +120,29 @@ export default function SignupForm() {
           className={INPUT}
           style={{ height: 52, fontSize: 15 }}
         />
+        <label className="flex items-start gap-2.5 text-sm text-ink-mid" style={{ lineHeight: 1.5 }}>
+          <input
+            type="checkbox"
+            checked={acceptPrivacy}
+            onChange={(e) => setAcceptPrivacy(e.target.checked)}
+            disabled={loading}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
+          />
+          <span>
+            I&rsquo;ve read the{" "}
+            <Link
+              href="/privacy"
+              target="_blank"
+              className="font-medium text-accent hover:text-accent-deep underline"
+            >
+              privacy notice
+            </Link>{" "}
+            and I understand Keldra will hold data about the people on my projects.
+          </span>
+        </label>
         <button
           type="submit"
-          disabled={loading || !fullName || !companyName || !email || !password}
+          disabled={loading || !fullName || !companyName || !email || !password || !acceptPrivacy}
           className="w-full rounded-[12px] bg-ink text-paper font-medium transition-colors hover:bg-accent disabled:opacity-60 disabled:cursor-not-allowed"
           style={{ height: 52, fontSize: 15 }}
         >

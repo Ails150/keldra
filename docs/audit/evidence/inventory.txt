@@ -1,5 +1,5 @@
 Keldra inventory — project fmeixgnxkcapxyhrjhvm (keldra-prod)
-Run: 2026-09-07T09:47:45.753Z
+Run: 2026-09-07T10:56:48.140Z
 
 setup_health(): all green
   RLS enabled on 5/5 checked tables
@@ -31,10 +31,12 @@ table                     total      Ardmac       Blake   org-less
   task_sequences              0           0           0          0
   sequence_audit              0           0           0          0
   milestones                  2           0           2          0
-  task_contacts            null        null        null          0
+  task_contacts            MISSING — Could not find the table 'public.task_contacts' in the schem
   task_assignments            7           3           4          0
   task_summaries              4           0           4          0
   inbound_unmatched           0   (no org_id column)
   mer_field_events            3           0           0          3
 
-Tables checked: 26
+Tables checked: 26, missing: 1
+A MISSING table means a migration in the repo was never applied to this
+project. See docs/MIGRATIONS.md for the canonical order and known drift.

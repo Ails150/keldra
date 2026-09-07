@@ -5,8 +5,17 @@ import { dirname, resolve } from "node:path";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+// Which project the suite runs against.
+//   KELDRA_ENV=dev   -> .env.dev.local   (keldra-dev)
+//   default          -> .env.local       (keldra-prod)
+// Everything else in the harness is project-agnostic, so the same probes prove
+// the same properties on either. Per RUNBOOK.md §4 migrations are verified on
+// dev before prod, which means running these suites against dev first.
+const TARGET = (process.env.KELDRA_ENV || "prod").toLowerCase();
+const ENV_FILE = TARGET === "dev" ? ".env.dev.local" : ".env.local";
+
 export const env = Object.fromEntries(
-  readFileSync(resolve(ROOT, ".env.local"), "utf8")
+  readFileSync(resolve(ROOT, ENV_FILE), "utf8")
     .split(/\r?\n/)
     .filter((l) => l && !l.startsWith("#"))
     .map((l) => { const i = l.indexOf("="); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }),
@@ -16,9 +25,13 @@ export const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
 export const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
 
-// The one live project. There is NO keldra-dev — see docs/audit/REPORT.md.
-export const PROJECT_REF = "fmeixgnxkcapxyhrjhvm";
-// Real customer org — read-only in every probe, never a write target.
+// Derived from the URL rather than hardcoded, so targeting dev needs no edit.
+export const PROJECT_REF = (SUPABASE_URL || "").replace(/^https?:\/\//, "").split(".")[0];
+export const TARGET_ENV = TARGET;
+
+// Real customer org on PROD — read-only in every probe, never a write target.
+// On dev no such org exists, so probes against it return nothing, which is the
+// correct result there too.
 export const ARDMAC = "437ec2d5-0c94-4ba8-b8bb-328c3f780774";
 
 export function rest(path, { key = ANON, token, method = "GET", body, prefer } = {}) {

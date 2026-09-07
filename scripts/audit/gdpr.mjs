@@ -20,7 +20,7 @@ const PD = {
   task_contacts: ["name", "email"],
   org_invites: ["email", "full_name"],
   task_emails: ["from_email", "to_email", "subject", "body_text", "body_html"],
-  task_threads: ["subject"],
+  // task_threads holds no personal data: org_id, task_code, email_token only.
   task_notes: ["author_name", "body"],
   blocker_events: ["actor", "payload"],
   asset_tag_events: ["actor_name", "payload"],
@@ -93,17 +93,58 @@ console.log(`  auth.users banned (access revoked, kept)  ${String(banned).padSta
 console.log("");
 console.log("4. Subject-rights paths present in code");
 console.log("----------------------------------------");
+// Detected, not asserted: check the database and the app rather than trusting a
+// hardcoded list that goes stale the moment something is built.
+// NB: a head+count request does NOT surface a missing-table error through
+// supabase-js — it comes back with error null and count null, which reads as
+// "present". A real row select does surface PGRST205. Do not "simplify" this.
+const exists = async (table) => {
+  const { error } = await admin.from(table).select("*").limit(1);
+  return !error;
+};
+const routeExists = async (path) => {
+  const app = process.env.APP_ORIGIN;
+  if (!app) return null;
+  try {
+    const r = await fetch(`${app}${path}`, { method: "GET" });
+    return r.status !== 404;
+  } catch { return null; }
+};
+
+const hasConsent = await exists("consent_records");
+const hasErasureLog = await exists("erasure_log");
+const hasPurgeCol = await (async () => {
+  const { error } = await admin.from("task_emails").select("purged_at").limit(1);
+  return !error;
+})();
+const hasErasureRoute = await routeExists("/api/privacy/erase");
+const hasPrivacyPage = await routeExists("/privacy");
+const tri = (v) => (v === null ? "UNKNOWN " : v ? "PRESENT " : "MISSING ");
+
 const rights = [
   ["Right of access / portability (export)", true, "/api/tasks/export + /api/gates/export — org-scoped CSV"],
-  ["Right to erasure (delete a person's data)", false, "no endpoint; /api/team 'remove' deliberately RETAINS auth.users + all authored rows"],
-  ["Right to rectification (edit own profile)", false, "no self-service profile edit; org_admin can change role only"],
-  ["Consent record (who agreed, when, to what)", false, "no consent table, no timestamped record anywhere in the schema"],
-  ["Privacy notice shown to data subjects", false, "no privacy policy page or copy in the app"],
-  ["Retention policy / automatic deletion", false, "nothing expires; no TTL, no scheduled purge"],
-  ["Processor disclosure (Gemini, Resend, Supabase)", false, "no DPA list or sub-processor page in the repo"],
+  ["Right to erasure (endpoint)", hasErasureRoute,
+    hasErasureRoute === null ? "set APP_ORIGIN to check" :
+    hasErasureRoute ? "/api/privacy/erase — org-scoped, dry-run + confirm, logs what it retained"
+                    : "no erasure endpoint"],
+  ["Erasure audit log (erasure_log table)", hasErasureLog,
+    hasErasureLog ? "present" : "MISSING — supabase-data-protection.sql not applied; erasures will report incomplete"],
+  ["Right to rectification (edit own profile)", false, "still no self-service profile edit"],
+  ["Consent record (consent_records table)", hasConsent,
+    hasConsent ? "present — written by the signup route with the policy version"
+               : "MISSING — supabase-data-protection.sql not applied; signup logs a consent failure"],
+  ["Privacy notice page", hasPrivacyPage,
+    hasPrivacyPage === null ? "set APP_ORIGIN to check" :
+    hasPrivacyPage ? "/privacy — public, includes sub-processors and retention" : "no privacy page"],
+  ["Retention rule (12-month inbound email purge)", hasPurgeCol,
+    hasPurgeCol ? "task_emails.purged_at present; nightly cron purges inbound bodies at 12 months"
+                : "MISSING — supabase-data-protection.sql not applied"],
+  ["Processor disclosure (sub-processor list)", hasPrivacyPage,
+    hasPrivacyPage ? "rendered on /privacy from lib/privacy/policy.ts" : "no sub-processor list"],
 ];
+
 for (const [name, present, detail] of rights) {
-  console.log(`  ${present ? "PRESENT " : "MISSING "} ${name}`);
+  console.log(`  ${tri(present)} ${name}`);
   console.log(`            ${detail}`);
 }
 

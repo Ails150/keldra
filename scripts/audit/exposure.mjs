@@ -41,6 +41,8 @@ const ROUTES = [
   ["/api/join", "POST", { token: "definitely-not-a-real-invite-token" }],
   ["/api/onboarding/complete", "POST", { org_name: "x" }],
   ["/api/org-commercials", "GET", null],
+  ["/api/privacy/erase", "GET", null],
+  ["/api/privacy/erase", "POST", { email: "nobody@example.invalid", confirm: true }],
   ["/api/org-config", "GET", null],
   ["/api/sequences/control", "POST", { action: "pause" }],
   ["/api/sequences/start", "POST", { task_id: "00000000-0000-0000-0000-000000000000" }],

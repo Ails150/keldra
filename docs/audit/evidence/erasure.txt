@@ -1,0 +1,52 @@
+Keldra erasure suite — fmeixgnxkcapxyhrjhvm (keldra-prod)
+Run: 2026-09-07T10:57:05.759Z
+
+tenant A (attacker) : a77f761d-231f-4906-ad61-d02365e38bd3
+tenant B (holds the subject) : fad13d0f-609f-42eb-8c29-cab4ba7f6dbc
+Ardmac 437ec2d5-0c94-4ba8-b8bb-328c3f780774 — never touched
+
+1. Cross-tenant: tenant A tries to erase tenant B's subject
+-----------------------------------------------------------
+  ok    GET dry-run as tenant A -> 200, would erase 0 row(s)
+        sees nothing — scoped to its own org
+  ok    POST erase with injected org_id=B -> 500, erased 0; tenant B roster row still present: true
+        injected org_id ignored — session org wins
+
+2. Refuses to act without explicit confirmation
+------------------------------------------------
+  ok    POST without confirm:true -> 400
+        must refuse
+
+3. Tenant B erases its own subject
+-----------------------------------
+  ok    GET dry-run as tenant B -> 200
+        would erase: {"roster":1,"task_contacts":0,"org_invites":1,"inbound_unmatched":0,"task_emails_redacted":1,"task_notes_authorship":0,"users_profile":0,"auth_account":0}
+  ok    dry run states what it would RETAIN and the lawful basis
+        UK/EU GDPR Art 17(3)(e) — append-only, hash-chained commissi…
+        [counts before erase] roster=1, blocker_events=1
+  ok    POST erase -> 500 ok=false
+        correctly reports INCOMPLETE: erasure_log table not yet created
+  ok    no per-table write problems
+        all writes succeeded
+  ok    tables skipped as absent on this project
+        {"task_contacts":"table not present on this project"}
+  ok    roster row removed (1 -> 0)
+  ok    org_invites row removed (-> 0)
+  ok    task_emails content redacted (from_email="[erased]", body_text=null)
+        row kept so the trail still shows an email happened
+  ok    erasure_log: log_written=false
+        NOT logged — Could not find the table 'public.erasure_log' in the schema cache
+
+4. The accountability record survived, and is still DB-protected
+----------------------------------------------------------------
+  ok    blocker_events unchanged by the erasure (1 row(s), actor + hash identical)
+        retained under Art 17(3)(e), chain inputs untouched
+  ok    service-role UPDATE on blocker_events rejected by guard trigger
+        blocker_events is append-only — events cannot be modified
+
+==============================================================================
+14 probes run | passed 14 | FAILED 0
+
+Erasure is org-scoped, effective, and leaves the trail intact.
+
+cleanup: organisations now = 2, users now = 10
